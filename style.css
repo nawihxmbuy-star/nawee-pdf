@@ -1,0 +1,246 @@
+:root {
+    --bg-color: #0f172a;       
+    --toolbar-bg: #1e293b;     
+    --accent-color: #22d3ee;   
+    --text-color: #f8fafc;     
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body { 
+    background: var(--bg-color); 
+    height: 100vh; 
+    overflow: hidden; 
+    font-family: 'Sarabun', sans-serif; 
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* --- ระบบเปิด-ปิดส่วนควบคุม UI ตามสถานะโหมดการทำงาน --- */
+body.mode-pdf .word-formatting-bar { display: none; }
+body.mode-pdf .toolbar { display: flex; }
+
+body.mode-word .word-formatting-bar { display: flex; }
+body.mode-word .toolbar { display: flex; }
+
+/* แถบเมนูด้านบน */
+.top-bar {
+    position: fixed; top: 0; left: 0; width: 100%; height: 65px;
+    background: var(--toolbar-bg); border-bottom: 2px solid var(--accent-color);
+    display: flex; justify-content: space-between; align-items: center; padding: 0 20px; z-index: 1000;
+}
+.brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: bold; font-size: 18px; }
+.text-glow { color: var(--accent-color); text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+.badge { font-size: 10px; background: #ff0055; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
+body.mode-word .badge { background: #2b579a; }
+
+.action-group { display: flex; gap: 10px; align-items: center; }
+.action-group button {
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+}
+.btn-premium { background: linear-gradient(135deg, #0077ff, var(--accent-color)) !important; border: none !important; }
+.btn-line { background: #06C755 !important; border: none !important; color: #fff !important; }
+
+/* เมนูแปลงไฟล์ Dropdown */
+.dropdown-wrapper { position: relative; display: inline-block; }
+.dropdown-popup {
+    display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+    background: #1e293b; border: 1px solid var(--accent-color); border-radius: 10px;
+    padding: 6px; min-width: 250px; z-index: 1010; box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+}
+.dropdown-popup.show { display: block; }
+.dropdown-popup button {
+    width: 100%; background: transparent !important; border: none !important;
+    padding: 12px 14px !important; text-align: left; color: #fff; border-radius: 6px !important;
+}
+.dropdown-popup button:hover { background: rgba(255,255,255,0.08) !important; }
+
+/* แถบฟอร์แมตฟอนต์ Word */
+.word-formatting-bar {
+    position: fixed; top: 65px; left: 0; width: 100%; height: 45px;
+    background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);
+    z-index: 998; display: none; align-items: center; padding: 0 20px; gap: 12px;
+}
+.format-group { display: flex; gap: 4px; align-items: center; }
+.format-group button {
+    background: transparent; border: none; color: #94a3b8; width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+}
+.format-group button:hover { color: #fff; background: rgba(255,255,255,0.1); }
+.text-size-selector { color: #94a3b8; font-size: 13px; display: flex; align-items: center; gap: 6px;}
+.text-size-selector select { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 4px; outline: none;}
+
+/* พื้นที่สเตจทำงาน */
+.workspace {
+    height: 100vh; width: 100vw; overflow: auto;
+    padding: 85px 20px 180px 20px; 
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+body.mode-word .workspace { padding-top: 130px; }
+
+.initial-notice { background: #1e293b; border: 1px dashed rgba(255,255,255,0.1); padding: 50px; max-width: 500px; margin: 50px auto; border-radius: 12px; text-align: center; color: #94a3b8; }
+
+/* โครงสร้างเพจแบบรวมศูนย์คู่ขนาน */
+#pdf-container { margin: 0 auto; width: fit-content; transform-origin: top left; transition: transform 0.1s ease-out; }
+.page-wrapper { position: relative; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); background: #ffffff; }
+.pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: block; }
+.drawing-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+
+/* เลเยอร์ครอบกล่องอักษรสัมบูรณ์ */
+.text-overlay-layer { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; 
+    overflow: hidden; pointer-events: none; 
+}
+body.mode-pdf .drawing-page-canvas { pointer-events: auto; }
+body.mode-word .drawing-page-canvas { pointer-events: none; }
+
+/* เพิ่มความคมชัดสูงสุดให้กับเนื้อความอักษรต้นฉบับภาษาไทย */
+.word-text-node {
+    position: absolute;
+    background: transparent;
+    color: #000000;
+    border: 1px solid transparent;
+    outline: none;
+    white-space: nowrap;
+    overflow: visible;
+    padding: 0;
+    margin: 0;
+    transform-origin: left top;
+    user-select: text;
+    -webkit-user-select: text;
+    font-family: 'Sarabun', sans-serif;
+    line-height: 1.0;
+    text-rendering: optimizeLegibility !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+}
+
+body.mode-pdf .word-text-node { display: none; }
+body.mode-pdf .word-text-node.is-edited { 
+    display: block; 
+    background: #ffffff; 
+    color: #000000;
+    pointer-events: none; 
+}
+
+body.mode-word .word-text-node { 
+    display: block;
+    background: rgba(255, 255, 255, 0.85); 
+    color: #000000;
+    border: 1px dashed rgba(34, 211, 238, 0.3);
+    cursor: text; 
+    pointer-events: auto;
+}
+body.mode-word .word-text-node:hover { border: 1px dashed var(--accent-color); background: #f0fdfa; }
+body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); background: #ffffff !important; color: #000000 !important; z-index: 999; }
+
+.word-text-node.is-edited {
+    background: #ffffff !important; 
+    color: #000000 !important;
+}
+
+/* สไตล์พิเศษสำหรับบล็อกข้อความลอยอิสระ (Draggable) */
+.custom-draggable-text-node {
+    position: absolute;
+    white-space: pre-wrap; 
+    cursor: move; 
+    user-select: none; 
+    touch-action: none;
+    padding: 6px 10px; 
+    border-radius: 6px;
+    display: inline-block; 
+    transform: translate(-50%, -50%); 
+    background: transparent !important;
+    z-index: 5000;
+    pointer-events: auto !important; 
+    text-rendering: optimizeLegibility !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* แถบเครื่องมือควบคุมด้านล่าง */
+.toolbar {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 70px;
+    display: flex; justify-content: center; gap: 15px; align-items: center;
+    background: var(--toolbar-bg); border-top: 2px solid var(--accent-color); z-index: 9999;
+    padding: 0 15px;
+}
+.toolbar button { color: var(--accent-color); font-size: 24px; cursor: pointer; background: none; border: none; width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center;}
+.toolbar button.active { background: var(--accent-color); color: #0f172a; }
+.toolbar button.nav-btn { color: #f8fafc; font-size: 28px; }
+.toolbar button.nav-btn:hover { color: var(--accent-color); }
+.toolbar button.nav-btn-action { color: #94a3b8; font-size: 22px; }
+.toolbar button.nav-btn-action:hover { color: #fff; }
+.divider { width: 1px; height: 24px; background: rgba(255,255,255,0.15); }
+
+/* กล่องตั้งค่าแผงควบคุมย่อยลอยเหนือทูลบาร์ */
+.pen-sub-panel {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; border: 2px solid var(--accent-color); border-radius: 12px;
+    padding: 10px 20px; display: none; gap: 20px; align-items: center; z-index: 9998;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.panel-item { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 14px; }
+.panel-item input[type="color"] { border: none; background: transparent; width: 32px; height: 32px; cursor: pointer; }
+.panel-item input[type="range"] { accent-color: var(--accent-color); cursor: pointer; width: 120px; }
+
+/* กล่องพรีวิวพิกเซลปลายพู่กันวาดเขียน */
+.brush-preview-box {
+    width: 36px; height: 36px; background: rgba(0,0,0,0.3); 
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(255,255,255,0.1); margin-left: 4px;
+}
+#brush-preview {
+    border-radius: 50%; background: var(--accent-color);
+    width: 6px; height: 6px; transition: width 0.1s, height 0.1s, background-color 0.1s;
+}
+
+@media (max-width: 650px) {
+    .top-bar { padding: 0 8px; height: 60px; }
+    .brand span { font-size: 13px; }
+    .brand small { display: none; }
+    .action-group { gap: 4px; }
+    .action-group button { padding: 6px 8px; font-size: 13px; gap: 4px; }
+    .action-group button .lbl { display: none; }
+    body.mode-word .workspace { padding-top: 115px; }
+    .toolbar { gap: 4px; }
+    .toolbar button { width: 34px; height: 34px; font-size: 16px; }
+    .toolbar button.nav-btn { font-size: 18px; }
+    .toolbar button.nav-btn-action { font-size: 16px; }
+    .pen-sub-panel { flex-direction: column; gap: 10px; width: 90%; bottom: 75px; }
+}
+
+@media print {
+    @page { margin: 0; size: auto; }
+    
+    body, html { 
+        height: auto !important; 
+        overflow: visible !important; 
+        background: white !important; 
+    }
+    
+    .top-bar, .toolbar, .nav-btn, .action-group, 
+    .pen-sub-panel, .text-settings-panel, .brand, .word-formatting-bar { 
+        display: none !important; 
+    }
+
+    #pdf-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        background: white !important;
+        transform: none !important;
+    }
+
+    .page-wrapper {
+        box-shadow: none !important;
+        margin: 0 !important;
+        page-break-after: always !important;
+        break-after: page !important;
+    }
+}

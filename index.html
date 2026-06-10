@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nawee PDF & Word Pro Studio</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="mode-pdf"> 
+    <header class="top-bar">
+        <div class="brand">
+            <i class="fa-solid fa-file-invoice text-glow"></i>
+            <span id="app-title">PDF Pro <small class="badge">PDF MODE</small></span>
+        </div>
+        <div class="action-group">
+            <button onclick="document.getElementById('upload').click()" title="เปิดไฟล์ PDF"><i class="fa-solid fa-folder-open"></i> <span class="lbl">เปิดไฟล์</span></button>
+            <button onclick="saveToDatabase()" title="บันทึกลงฐานข้อมูลตรงๆ ไม่ดาวน์โหลด"><i class="fa-solid fa-floppy-disk"></i> <span class="lbl">เซฟไฟล์</span></button>
+            <button onclick="shareToLine()" title="แชร์ผ่าน LINE" class="btn-line"><i class="fa-brands fa-line"></i> <span class="lbl">แชร์ LINE</span></button>
+            
+            <div class="dropdown-wrapper">
+                <button onclick="toggleDropdown('convert-menu')" class="btn-premium" title="เมนูแปลงไฟล์"><i class="fa-solid fa-arrows-rotate"></i> <span class="lbl">แปลงไฟล์</span></button>
+                <div id="convert-menu" class="dropdown-popup">
+                    <button onclick="triggerPdfToWord()"><i class="fa-solid fa-file-word" style="color: #2b579a;"></i> แปลงไฟล์ PDF เป็น Word</button>
+                    <button onclick="triggerWordToPdf()"><i class="fa-solid fa-file-pdf" style="color: #e44d26;"></i> แปลงไฟล์ Word เป็น PDF</button>
+                    <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 4px 0;">
+                    <button onclick="exportToPDFFile()"><i class="fa-solid fa-download"></i> ดาวน์โหลดไฟล์ PDF </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="word-formatting-bar">
+        <div class="format-group">
+            <button onclick="formatWord('bold')" title="ตัวหนา"><i class="fa-solid fa-bold"></i></button>
+            <button onclick="formatWord('italic')" title="ตัวเอียง"><i class="fa-solid fa-italic"></i></button>
+            <button onclick="formatWord('underline')" title="ขีดเส้นใต้"><i class="fa-solid fa-underline"></i></button>
+        </div>
+        <div class="divider"></div>
+        <div class="format-group">
+            <button onclick="openCenterTextInput()" title="แทรกข้อความลอยอิสระ" style="color: #f59e0b; background: rgba(245, 158, 11, 0.1); width: auto; padding: 0 12px; gap: 6px; display: flex; align-items: center; border-radius: 6px;">
+                <i class="fa-solid fa-font"></i>
+                <span style="font-size: 13px; font-weight: bold;">แทรกข้อความลอย</span>
+            </button>
+        </div>
+        <div class="divider"></div>
+        <div class="format-group text-size-selector">
+            <label>ขนาดฟอนต์แก้ไขหลัก:</label>
+            <select onchange="formatWord('fontSize', this.value)">
+                <option value="3">ปกติ</option>
+                <option value="1">เล็กสุด</option>
+                <option value="2">เล็ก</option>
+                <option value="4">กลาง</option>
+                <option value="5">ใหญ่</option>
+                <option value="6">ใหญ่พิเศษ</option>
+            </select>
+        </div>
+    </div>
+
+    <input type="file" id="upload" accept="application/pdf" style="display:none;">
+
+    <main class="workspace">
+        <div id="pdf-container">
+            <div class="initial-notice">
+                <p><i class="fa-solid fa-cloud-arrow-up" style="font-size: 48px; color: var(--accent-color); margin-bottom: 15px;"></i></p>
+                <p>ยินดีต้อนรับสู่ระบบกรุณากดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มต้นทำงานค่ะ</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="pen-settings-panel" class="pen-sub-panel">
+        <div class="panel-item">
+            <label><i class="fa-solid fa-palette"></i> สีปากกา:</label>
+            <input type="color" id="color-picker" value="#22d3ee">
+        </div>
+        <div class="panel-item">
+            <label><i class="fa-solid fa-paint-brush"></i> ขนาดปลาย: <span id="brush-size-val">6px</span></label>
+            <input type="range" id="brush-size-slider" min="2" max="30" value="6">
+            <div class="brush-preview-box">
+                <div id="brush-preview"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="text-settings-panel" class="pen-sub-panel">
+        <div class="panel-item">
+            <label><i class="fa-solid fa-palette"></i> สีข้อความ:</label>
+            <input type="color" id="text-color-picker" value="#f59e0b">
+        </div>
+        <div class="panel-item">
+            <label><i class="fa-solid fa-text-height"></i> ขนาดฟอนต์: <span id="text-size-val">24px</span></label>
+            <input type="range" id="text-size-slider" min="12" max="72" value="24">
+        </div>
+    </div>
+
+    <nav class="toolbar">
+        <button onclick="navigatePage('prev')" id="tool-prev" class="nav-btn" title="ย้อนกลับไปหน้าก่อนหน้า"><i class="fa-solid fa-circle-chevron-left"></i></button>
+        <div class="divider"></div>
+        
+        <button onclick="undoAction()" id="tool-undo" class="nav-btn-action" title="ย้อนกลับการวาดเขียน (Undo)"><i class="fa-solid fa-rotate-left"></i></button>
+        <button onclick="redoAction()" id="tool-redo" class="nav-btn-action" title="ทำซ้ำการวาดเขียน (Redo)"><i class="fa-solid fa-rotate-right"></i></button>
+        <div class="divider"></div>
+        
+        <button onclick="setTool('pan')" id="tool-pan" class="tool-btn active" title="โหมดเลื่อนดูงาน"><i class="fa-solid fa-hand"></i></button>
+        <button onclick="setTool('pen')" id="tool-pen" class="tool-btn" title="ปากกาวาดเขียน"><i class="fa-solid fa-pen-fancy"></i></button>
+        <button onclick="setTool('text')" id="tool-text" class="tool-btn" title="พิมพ์ข้อความลอย"><i class="fa-solid fa-font"></i></button>
+        <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn" title="ยางลบเจาะรู"><i class="fa-solid fa-eraser"></i></button>
+        <div class="divider"></div>
+        <button onclick="zoom('in')" title="ขยาย"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+        <button onclick="zoom('out')" title="ย่อ"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+        <div class="divider"></div>
+        <button onclick="navigatePage('next')" id="tool-next" class="nav-btn" title="ถัดไปข้างหน้า"><i class="fa-solid fa-circle-chevron-right"></i></button>
+    </nav>
+
+    <script src="script.js"></script>
+</body>
+</html>
