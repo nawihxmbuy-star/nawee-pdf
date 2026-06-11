@@ -224,7 +224,7 @@ function getPDFOptions() {
             format: 'a4', 
             orientation: 'portrait' 
         },
-        pagebreak: { mode: ['css', 'legacy'], before: '.page-wrapper' }
+        pagebreak: { mode: 'avoid-all' }
     };
 }
 
@@ -279,12 +279,17 @@ async function shareToLine() {
 
     try {
     const originalStyle = element.style.cssText;
-        element.style.width = '794px';  
-       element.style.height = '1123px';
-       element.style.maxWidth = '100%';
-       element.style.overflow = 'hidden';
-        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
-        element.style.cssText = originalStyle;
+    element.style.width = '800px'; 
+    element.style.height = 'auto'; 
+    element.style.maxWidth = '100%';
+    element.style.minHeight = '0';
+    element.style.margin = '0px';
+    element.style.padding = '0px';
+    element.style.overflow = 'hidden';
+    
+       const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+       element.style.cssText = originalStyle;
+
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
