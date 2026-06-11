@@ -238,63 +238,117 @@ function getPDFOptions() {
 async function exportToPDFFile() {
     closeAllPopups();
     if (!pdfDoc) {
-        alert("ไม่พบข้อมูลเอกสารค่ะ");
+        alert("ไม่พบข้อมูลเอกสารเพื่อส่งออกค่ะ!");
         return;
     }
     
-    // ตั้งค่าตัวแปรเริ่มต้น
+    const originalScale = currentScale;
+    currentScale = 1.0; 
+    applyZoom();
+
+    // สร้าง Tag พิเศษชั่วคราวเพื่อทำลาย Margin และซ่อน UI ควบคุม ป้องกันหน้ากระดาษงอกเพิ่ม
+    const styleTag = document.createElement('style');
+    styleTag.innerHTML = `
+        /* 🛠️ ปรับตัวแม่: ล้างช่องว่างและ Gap ของ Flexbox ทั้งหมดให้ต่อสนิทกัน */
+        #pdf-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            gap: 0 !important; 
+            display: block !important; 
+        }
+        
+        /* 🛠️ ปรับหน้าย่อย: ล้างขอบเงาและบังคับไม่ให้เนื้อหาฉีกขาดกลางคัน */
+        .page-wrapper { 
+            margin: 0 !important; 
+            padding: 0 !important;
+            border: none !important; 
+            box-shadow: none !important; 
+            display: block !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        
+        .custom-draggable-text-node { border: none !important; background: transparent !important; }
+        .text-node-controls { display: none !important; }
+    `;
+    document.head.appendChild(styleTag);
+
     const element = document.getElementById('pdf-container');
-    const filename = `${originalFileName || 'Document'}_Output.pdf`;
-
-    // แจ้งเตือนผู้ใช้งานว่าระบบกำลังทำงาน
-    const loadingNotice = document.createElement('div');
-    loadingNotice.style.cssText = "position:fixed; top:20px; right:20px; background:#22d3ee; color:#0f172a; padding:15px 25px; border-radius:8px; z-index:99999; font-weight:bold; box-shadow:0 4px 15px rgba(0,0,0,0.3); font-family:sans-serif;";
-    loadingNotice.innerText = "⏳ กำลังสร้าง PDF ด้วยระบบประมวลผลด่วน... กรุณารอสักครู่";
-    document.body.appendChild(loadingNotice);
-
-    // ตั้งค่า html2pdf.js (ตัวนี้เบาและเสถียรกว่าการวนลูปทีละหน้า)
-    const opt = {
-        margin: 0,
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.8 },
-        html2canvas: { scale: 1.2, useCORS: true, logging: false },
-        jsPDF: { unit: 'px', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: 'css' }
-    };
+    const opt = getPDFOptions();
 
     try {
         await html2pdf().set(opt).from(element).save();
-        loadingNotice.innerText = "✅ ดาวน์โหลดเรียบร้อยแล้วค่ะ!";
-        setTimeout(() => loadingNotice.remove(), 2000);
-    } catch (err) {
-        alert("ระบบทำงานไม่ได้ เนื่องจากข้อมูลมีขนาดใหญ่เกินไป ลองลดจำนวนหน้าหรือปิดแอปอื่นที่กินแรมค่ะ");
-        loadingNotice.remove();
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาดในการดาวน์โหลด PDF:", error);
+        alert("เกิดข้อผิดพลาดในระบบส่งออกดาวน์โหลดไฟล์ค่ะ");
+    } finally {
+        styleTag.remove();
+        currentScale = originalScale;
+        applyZoom();
     }
 }
 
-// ฟังก์ชันสำหรับแชร์เข้า Line
 async function shareToLine() {
     closeAllPopups();
+    if (!pdfDoc) {
+        alert("ไม่พบข้อมูลเอกสารเพื่อส่งออกแชร์ค่ะ!");
+        return;
+    }
+
+    const originalScale = currentScale;
+    currentScale = 1.0; 
+    applyZoom();
+
+    const styleTag = document.createElement('style');
+    styleTag.innerHTML = `
+        /* 🛠️ ปรับตัวแม่: ล้างช่องว่างและ Gap ของ Flexbox ทั้งหมดให้ต่อสนิทกัน */
+        #pdf-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            gap: 0 !important; 
+            display: block !important; 
+        }
+        
+        /* 🛠️ ปรับหน้าย่อย: ล้างขอบเงาและบังคับไม่ให้เนื้อหาฉีกขาดกลางคัน */
+        .page-wrapper { 
+            margin: 0 !important; 
+            padding: 0 !important;
+            border: none !important; 
+            box-shadow: none !important; 
+            display: block !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        
+        .custom-draggable-text-node { border: none !important; background: transparent !important; }
+        .text-node-controls { display: none !important; }
+    `;
+    document.head.appendChild(styleTag);
+
     const element = document.getElementById('pdf-container');
-    const opt = {
-        margin: 0,
-        filename: `${originalFileName || 'Document'}.pdf`,
-        image: { type: 'jpeg', quality: 0.8 },
-        html2canvas: { scale: 1.2, useCORS: true, logging: false },
-        jsPDF: { unit: 'px', format: 'a4', orientation: 'portrait' }
-    };
+    const opt = getPDFOptions();
 
     try {
-        const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
-        
+
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file] });
+            await navigator.share({
+                files: [file],
+                title: 'Nawee Document',
+                text: 'ไฟล์ PDF จากแอปพลิเคชันของคุณนาวีค่ะ'
+            });
         } else {
-            alert("อุปกรณ์นี้ไม่รองรับการแชร์โดยตรง");
+            alert("เบราว์เซอร์นี้ไม่รองรับการแชร์ไฟล์โดยตรง ระบบกำลังดาวน์โหลดไฟล์ให้แทนนะคะ");
+            await html2pdf().set(opt).from(element).save();
         }
-    } catch (err) {
-        alert("เกิดข้อผิดพลาดในการแชร์ค่ะ");
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาดในการแชร์:", error);
+        await html2pdf().set(opt).from(element).save();
+    } finally {
+        styleTag.remove();
+        currentScale = originalScale;
+        applyZoom();
     }
 }
 
