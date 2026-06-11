@@ -282,8 +282,9 @@ async function exportToPDFFile() {
         for (let i = 0; i < wrappers.length; i++) {
             loadingNotice.innerText = `⏳ กำลังแปลงหน้าเอกสารที่ ${i + 1}/${wrappers.length} เครื่องกำลังทำงาน...`;
             
+            // 🌟 ใช้ scale: 1.0 เพื่อเซฟแรมของแท็บเล็ตไม่ให้ระเบิด
             const canvas = await html2canvas(wrappers[i], {
-                scale: 1.5, 
+                scale: 1.0, 
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
@@ -291,7 +292,8 @@ async function exportToPDFFile() {
                 height: pdfHeight
             });
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.9);
+            // บีบอัดเป็นภาพ JPEG ที่ความละเอียด 0.85 ช่วยประหยัดพื้นที่หน่วยความจำขณะประมวลผล
+            const imgData = canvas.toDataURL('image/jpeg', 0.85);
             
             if (i > 0) {
                 pdf.addPage([pdfWidth, pdfHeight], orientation);
@@ -299,10 +301,12 @@ async function exportToPDFFile() {
             
             pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
             
+            // ล้างเคลียร์หน่วยความจำ canvas หน้านี้ทิ้งทันที
             canvas.width = 0;
             canvas.height = 0;
 
-            await new Promise(resolve => setTimeout(resolve, 60));
+            // หน่วงเวลาเพิ่มเป็น 300 มิลลิวินาที ให้ CPU แท็บเล็ตมีเวลาเคลียร์ RAM คืนระบบ
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
         pdf.save(`${originalFileName || 'Document'}_Output.pdf`);
@@ -368,7 +372,7 @@ async function shareToLine() {
             loadingNotice.innerText = `⏳ กำลังประมวลผลแชร์หน้าเอกสารที่ ${i + 1}/${wrappers.length}...`;
             
             const canvas = await html2canvas(wrappers[i], {
-                scale: 1.5, 
+                scale: 1.0, 
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
@@ -376,7 +380,7 @@ async function shareToLine() {
                 height: pdfHeight
             });
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.9);
+            const imgData = canvas.toDataURL('image/jpeg', 0.85);
             
             if (i > 0) {
                 pdf.addPage([pdfWidth, pdfHeight], orientation);
@@ -387,7 +391,7 @@ async function shareToLine() {
             canvas.width = 0;
             canvas.height = 0;
 
-            await new Promise(resolve => setTimeout(resolve, 60));
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
         const pdfBlob = pdf.output('blob');
