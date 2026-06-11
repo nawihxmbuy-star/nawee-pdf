@@ -278,7 +278,13 @@ async function shareToLine() {
     const opt = getPDFOptions();
 
     try {
+    const originalStyle = element.style.cssText;
+        element.style.width = '794px';  
+       element.style.height = '1123px';
+       element.style.maxWidth = '100%';
+       element.style.overflow = 'hidden';
         const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+        element.style.cssText = originalStyle;
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
