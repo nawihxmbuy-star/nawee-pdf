@@ -230,7 +230,8 @@ function getPDFOptions() {
             format: [pdfWidth, pdfHeight], 
             orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait'
         },
-        pagebreak: { mode: ['css', 'legacy'], before: '.page-wrapper + .page-wrapper' }
+        // 🛠️ อัปเดต: เปลี่ยนมาใช้โหมด 'slice' เพื่อล็อกตัดแบ่งหน้าตามพิกเซลความสูงจริง ป้องกันเนื้อหาเลื่อนหลุดตำแหน่ง
+        pagebreak: { mode: 'slice' }
     };
 }
 
@@ -248,7 +249,25 @@ async function exportToPDFFile() {
     // สร้าง Tag พิเศษชั่วคราวเพื่อทำลาย Margin และซ่อน UI ควบคุม ป้องกันหน้ากระดาษงอกเพิ่ม
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        .page-wrapper { margin-bottom: 0 !important; box-shadow: none !important; border: none !important; }
+        /* 🛠️ ปรับตัวแม่: ล้างช่องว่างและ Gap ของ Flexbox ทั้งหมดให้ต่อสนิทกัน */
+        #pdf-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            gap: 0 !important; 
+            display: block !important; 
+        }
+        
+        /* 🛠️ ปรับหน้าย่อย: ล้างขอบเงาและบังคับไม่ให้เนื้อหาฉีกขาดกลางคัน */
+        .page-wrapper { 
+            margin: 0 !important; 
+            padding: 0 !important;
+            border: none !important; 
+            box-shadow: none !important; 
+            display: block !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls { display: none !important; }
     `;
@@ -282,7 +301,25 @@ async function shareToLine() {
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        .page-wrapper { margin-bottom: 0 !important; box-shadow: none !important; border: none !important; }
+        /* 🛠️ ปรับตัวแม่: ล้างช่องว่างและ Gap ของ Flexbox ทั้งหมดให้ต่อสนิทกัน */
+        #pdf-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            gap: 0 !important; 
+            display: block !important; 
+        }
+        
+        /* 🛠️ ปรับหน้าย่อย: ล้างขอบเงาและบังคับไม่ให้เนื้อหาฉีกขาดกลางคัน */
+        .page-wrapper { 
+            margin: 0 !important; 
+            padding: 0 !important;
+            border: none !important; 
+            box-shadow: none !important; 
+            display: block !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls { display: none !important; }
     `;
@@ -478,7 +515,7 @@ function bindDrawingEngine(canvas) {
         lastY = coords.y;
     }
 
-    const stopAction = () => {
+const stopAction = () => {
         if (isDrawing) {
             isDrawing = false;
             const currentState = canvas.toDataURL();
