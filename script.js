@@ -230,7 +230,7 @@ function getPDFOptions() {
             format: [pdfWidth, pdfHeight], 
             orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait'
         },
-        pagebreak: { mode: ['css', 'legacy'], before: '.page-wrapper' }
+        pagebreak: { mode: ['css', 'legacy'], before: '.page-wrapper + .page-wrapper' }
     };
 }
 
