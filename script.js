@@ -854,3 +854,154 @@ function applyZoom() {
         container.style.transform = `scale(${currentScale})`;
     }
 }
+
+// ==========================================================================
+//  AI ASSISTANT ENGINE (GEMINI API INTEGRATION) FOR NAWEE STUDIO
+// ==========================================================================
+
+// คอยดึงคีย์เดิมที่คุณนาวีเคยเซฟไว้ในเครื่องมาโชว์ตอนเปิดหน้าจอใหม่
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const savedKey = localStorage.getItem('nawee_gemini_api_key');
+        const keyInput = document.getElementById('ai-api-key');
+        if (savedKey && keyInput) {
+            keyInput.value = savedKey;
+        }
+    }, 500);
+});
+
+// ฟังก์ชันเปิด-ปิดแถบเมนู AI ด้านข้าง
+function toggleSidebar() {
+    const sidebar = document.getElementById('ai-sidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('open');
+    }
+}
+
+// ฟังก์ชันตรวจจับแกะตัวหนังสือและข้อความตารางจากหน้าจอที่คุณนาวีกำลังส่องอยู่ ณ ปัจจุบัน
+function getActivePageText() {
+    const activePage = getActivePageWrapper();
+    if (!activePage) return "";
+    
+    // ดึงตัวหนังสือภาษาไทยทั้งหมดที่มีการแกะเลเยอร์ไว้ในหน้านั้นๆ
+    const textNodes = activePage.querySelectorAll('.word-text-node');
+    let textArray = [];
+    textNodes.forEach(node => {
+        if (node.innerText && node.innerText.trim() !== "") {
+            textArray.push(node.innerText.trim());
+        }
+    });
+    return textArray.join(" ");
+}
+
+// แกนหลักในการยิงคำสั่งข้ามเน็ตไปหาเซิร์ฟเวอร์สมองกล Google Gemini 2.5 Flash แบบฟรี
+async function callGeminiAPI(promptText) {
+    const apiKeyInput = document.getElementById('ai-api-key');
+    const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+    
+    if (!apiKey) {
+        alert("คุณนาวียังไม่ได้ใส่ Gemini API Key เลยค่ะ! สามารถไปกดรับคีย์ฟรีใช้งานได้ที่ Google AI Studio นะคะ");
+        return null;
+    }
+
+    // เซฟเก็บลงเครื่องไว้เลยกันลืมและไม่ต้องคอยพิมพ์ใหม่
+    localStorage.setItem('nawee_gemini_api_key', apiKey);
+
+    // ยิงไปที่โมเดล Gemini 2.5 Flash ตัวล่าสุดที่ประมวลผลเร็วและใช้สิทธิ์พัฒนาฟรีได้
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: promptText }] }]
+            })
+        });
+        
+        const data = await response.json();
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+            return data.candidates[0].content.parts[0].text;
+        } else {
+            console.error("Gemini Error Payload:", data);
+            return "❌ เกิดข้อผิดพลาดจากเซิร์ฟเวอร์ AI กรุณาตรวจสอบความถูกต้องของ API Key อีกครั้งนะคะ";
+        }
+    } catch (error) {
+        console.error("API Call Connection Failed:", error);
+        return "❌ เชื่อมต่อสัญญานไปหา AI ล้มเหลวค่ะ กรุณาเช็กเครือข่ายอินเทอร์เน็ตหรือตรวจสอบสถานะเซิร์ฟเวอร์นะคะ";
+    }
+}
+
+// คำสั่งด่วน: จัดการสรุปเนื้อหาตาราง/รายงานประจำหน้ากระดาษ
+async function askAiToSummary() {
+    const pageText = getActivePageText();
+    if (!pageText || pageText.trim() === "") {
+        alert("หน้าเอกสารปัจจุบันไม่มีข้อมูลตัวอักษรเลยค่ะ! (ไฟล์อาจจะเป็นรูปภาพล้วน หรือคุณนาวียังไม่ได้เปิดเปิดไฟล์เข้ามาค่ะ)");
+        return;
+    }
+    
+    appendAiMessage("system", "🔄 ระบบกำลังวิเคราะห์และสรุปสาระสำคัญให้คุณนาวีสักครู่นะคะ...");
+    
+    const prompt = `คุณคือผู้ช่วยอัจฉริยะในแอป Nawee PDF & Word Pro Studio หน้าที่ของคุณคืออ่านตารางและข้อมูลดิบต่อไปนี้ แล้วสรุปใจความสำคัญเป็นภาษาไทยอย่างชัดเจน เป็นระเบียบ แยกเป็นข้อๆ ให้อ่านง่ายทันที:\n\n${pageText}`;
+    
+    const result = await callGeminiAPI(prompt);
+    if (result) {
+        appendAiMessage("ai", result);
+    }
+}
+
+// คำสั่งแชท: พิมพ์คุยตอบโต้แบบพ่วงเนื้อหาไฟล์ในหน้ากระดาษเข้าไปเป็นบริบทเบื้องหลังด้วย
+async function sendAiChatMessage() {
+    const input = document.getElementById('ai-chat-input');
+    if (!input || !input.value.trim()) return;
+    
+    const userText = input.value.trim();
+    appendAiMessage("user", userText);
+    input.value = ''; // เคลียร์ช่องพิมพ์
+
+    const pageText = getActivePageText();
+    let finalPrompt = "";
+    
+    // ถ้าในหน้านั้นมีข้อความ ให้พ่วงข้อความนั้นเป็นสมองดิบให้ AI อ่านก่อนตอบทุกครั้ง
+    if (pageText && pageText.trim() !== "") {
+        finalPrompt = `ข้อมูลเนื้อหาจากหน้าเอกสารของคุณนาวีในปัจจุบัน:\n"""\n${pageText}\n"""\n\nคำสั่ง/คำถามจากคุณนาวี: ${userText}\n\n(จงใช้ข้อมูลในเอกสารข้างต้นในการตอบคำถามอย่างถูกต้อง หากไม่มีคำตอบในตัวเล่มให้ใช้ฐานความรู้ทั่วไปตอบเสริมได้อย่างเป็นมิตรและเป็นมืออาชีพ สรุปเป็นภาษาไทยอย่างกระชับ)`;
+    } else {
+        finalPrompt = userText;
+    }
+
+    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
+    
+    const result = await callGeminiAPI(finalPrompt);
+    if (result) {
+        appendAiMessage("ai", result);
+    }
+}
+
+// ฟังก์ชันสำหรับต่อกล่องแชทพ่นกล่องข้อความลงบน UI หน้าจอ
+function appendAiMessage(sender, text) {
+    const chatBox = document.getElementById('ai-chat-box');
+    if (!chatBox) return;
+    
+    // ลบข้อความจำพวก "กำลังประมวลผล..." ชั่วคราวออกไปก่อน เพื่อให้แชทสะอาด
+    if (sender === 'system' && (text.includes("กำลังวิเคราะห์") || text.includes("กำลังคิดคำตอบ"))) {
+        const tempMsg = document.createElement('div');
+        tempMsg.className = 'ai-message system-msg temp-status';
+        tempMsg.innerText = text;
+        chatBox.appendChild(tempMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return;
+    }
+    
+    const tempStatus = chatBox.querySelector('.temp-status');
+    if (tempStatus) tempStatus.remove();
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `ai-message ${sender}-msg`;
+    
+    // ตกแต่งฟอร์แมตตัวหนังสือเบื้องต้น แปลงเครื่องหมาย ** เป็นตัวหนาแท็ก <b> เพื่อความสวยงามในการแสดงผล
+    let formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    msgDiv.innerHTML = formattedText;
+    
+    chatBox.appendChild(msgDiv);
+    chatBox.scrollTop = chatBox.scrollHeight; // ออโต้สกรอลล์ลงล่างสุดตามข้อความใหม่
+}
