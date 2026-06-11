@@ -220,9 +220,9 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
         background: white !important; 
     }
     
-    .top-bar, .toolbar, .nav-btn, .action-group, 
-    .pen-sub-panel, .text-settings-panel, .brand, .word-formatting-bar { 
-        display: none !important; 
+    .top-bar, .toolbar, .nav-btn, .action-group, \
+    .pen-sub-panel, .text-settings-panel, .brand, .word-formatting-bar { \
+        display: none !important; \
     }
 
     #pdf-container {

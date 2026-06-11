@@ -110,15 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-function updateBrushPreview() {
-    const preview = document.getElementById('brush-preview');
-    if (preview) {
-        preview.style.width = currentBrushSize + 'px';
-        preview.style.height = currentBrushSize + 'px';
-        preview.style.backgroundColor = currentActiveColor;
-    }
-}
-
 const DB_NAME = "NaweeStudio_Database_V2";
 const STORE_NAME = "DocumentStore";
 
@@ -208,23 +199,38 @@ function triggerWordToPdf() {
     alert("ระบบซิงค์ข้อความแก้ไขล่าสุดกลับเข้าสู่เลเยอร์แสดงผลหลักเสร็จสิ้นแล้วค่ะ!");
 }
 
+// 🌟 ฟังก์ชันระดับ AI Smart-Fit: คำนวณสัดส่วนกระดาษตามไฟล์จริงโดยอัตโนมัติ 1:1
 function getPDFOptions() {
+    const element = document.getElementById('pdf-container');
+    const firstPage = element ? element.querySelector('.page-wrapper') : null;
+    
+    // ตั้งค่าเริ่มต้นมาตรฐาน A4 (ถ้ายังไม่ได้โหลดไฟล์)
+    let pdfWidth = 794;
+    let pdfHeight = 1123;
+    
+    // ตรวจสอบขนาดจริงของหน้ากระดาษที่เปิดอยู่ เพื่อขยายขอบเขต PDF ให้พอดีขอบขวา
+    if (firstPage) {
+        pdfWidth = parseFloat(firstPage.style.width) || firstPage.offsetWidth || 794;
+        pdfHeight = parseFloat(firstPage.style.height) || firstPage.offsetHeight || 1123;
+    }
+    
     return {
         margin: 0,
         filename: `${originalFileName || 'Document'}_Output.pdf`,
         image: { type: 'jpeg', quality: 1 },
         html2canvas: {
-            scale: 2,
+            scale: 2, 
             useCORS: true,
             logging: false,
-            backgroundColor: '#ffffff'
+            backgroundColor: '#ffffff',
+            windowWidth: pdfWidth 
         },
         jsPDF: {
             unit: 'px',
-            format: [794, 1123], 
-            orientation: 'portrait'
+            format: [pdfWidth, pdfHeight], 
+            orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait'
         },
-        pagebreak: { mode: 'css', inside: 'avoid' }
+        pagebreak: { mode: ['css', 'legacy'], before: '.page-wrapper' }
     };
 }
 
@@ -239,8 +245,10 @@ async function exportToPDFFile() {
     currentScale = 1.0; 
     applyZoom();
 
+    // สร้าง Tag พิเศษชั่วคราวเพื่อทำลาย Margin และซ่อน UI ควบคุม ป้องกันหน้ากระดาษงอกเพิ่ม
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
+        .page-wrapper { margin-bottom: 0 !important; box-shadow: none !important; border: none !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls { display: none !important; }
     `;
@@ -249,11 +257,16 @@ async function exportToPDFFile() {
     const element = document.getElementById('pdf-container');
     const opt = getPDFOptions();
 
-    html2pdf().set(opt).from(element).save().then(() => {
+    try {
+        await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาดในการดาวน์โหลด PDF:", error);
+        alert("เกิดข้อผิดพลาดในระบบส่งออกดาวน์โหลดไฟล์ค่ะ");
+    } finally {
         styleTag.remove();
         currentScale = originalScale;
         applyZoom();
-    });
+    }
 }
 
 async function shareToLine() {
@@ -269,6 +282,7 @@ async function shareToLine() {
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
+        .page-wrapper { margin-bottom: 0 !important; box-shadow: none !important; border: none !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls { display: none !important; }
     `;
@@ -278,29 +292,7 @@ async function shareToLine() {
     const opt = getPDFOptions();
 
     try {
-    const originalStyle = element.style.cssText;
-
-    element.style.width = 'auto';
-    element.style.height = 'auto';
-    element.style.margin = '0px';
-    element.style.padding = '0px';
-
-    const contentWidth = element.scrollWidth || element.offsetWidth;
-    const targetWidth = 794; 
-
-    if (contentWidth > targetWidth) {
-        const scaleRatio = targetWidth / contentWidth;
-        element.style.width = `${contentWidth}px`; 
-        element.style.transform = `scale(${scaleRatio})`;
-        element.style.transformOrigin = 'top left'; 
-    } else {
-        element.style.width = `${targetWidth}px`; 
-    }
-
-    const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
-
-    element.style.cssText = originalStyle;
-
+        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -311,11 +303,11 @@ async function shareToLine() {
             });
         } else {
             alert("เบราว์เซอร์นี้ไม่รองรับการแชร์ไฟล์โดยตรง ระบบกำลังดาวน์โหลดไฟล์ให้แทนนะคะ");
-            html2pdf().set(opt).from(element).save();
+            await html2pdf().set(opt).from(element).save();
         }
     } catch (error) {
         console.error("เกิดข้อผิดพลาดในการแชร์:", error);
-        html2pdf().set(opt).from(element).save();
+        await html2pdf().set(opt).from(element).save();
     } finally {
         styleTag.remove();
         currentScale = originalScale;
@@ -497,7 +489,7 @@ function bindDrawingEngine(canvas) {
         }
     };
     
-        canvas.addEventListener('mousedown', startAction);
+    canvas.addEventListener('mousedown', startAction);
     canvas.addEventListener('mousemove', moveAction);
     canvas.addEventListener('mouseup', stopAction);
     canvas.addEventListener('mouseleave', stopAction);
