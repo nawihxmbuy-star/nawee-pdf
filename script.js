@@ -210,21 +210,21 @@ function triggerWordToPdf() {
 
 function getPDFOptions() {
     return {
-        margin: [0, 0, 0, 0],
-        filename: `${originalFileName || 'Nawee_Document'}_Studio_Output.pdf`,
+        margin: 0,
+        filename: `${originalFileName || 'Document'}_Output.pdf`,
         image: { type: 'jpeg', quality: 1 },
-        html2canvas: { 
-            scale: 2, 
+        html2canvas: {
+            scale: 2,
             useCORS: true,
             logging: false,
             backgroundColor: '#ffffff'
         },
-        jsPDF: { 
-            unit: 'mm', 
-            format: 'a4', 
-            orientation: 'portrait' 
+        jsPDF: {
+            unit: 'px',
+            format: [794, 1123], 
+            orientation: 'portrait'
         },
-        pagebreak: { mode: 'avoid-all' }
+        pagebreak: { mode: 'css', inside: 'avoid' }
     };
 }
 
@@ -279,17 +279,27 @@ async function shareToLine() {
 
     try {
     const originalStyle = element.style.cssText;
-    element.style.width = '850px';  
-    element.style.height = '1130px';  
-    element.style.maxWidth = '100%';
-    element.style.maxHeight = '100%';
-    element.style.overflow = 'hidden';
+
+    element.style.width = 'auto';
+    element.style.height = 'auto';
     element.style.margin = '0px';
     element.style.padding = '0px';
-    element.style.boxSizing = 'border-box';
-    
-       const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
-       element.style.cssText = originalStyle;
+
+    const contentWidth = element.scrollWidth || element.offsetWidth;
+    const targetWidth = 794; 
+
+    if (contentWidth > targetWidth) {
+        const scaleRatio = targetWidth / contentWidth;
+        element.style.width = `${contentWidth}px`; 
+        element.style.transform = `scale(${scaleRatio})`;
+        element.style.transformOrigin = 'top left'; 
+    } else {
+        element.style.width = `${targetWidth}px`; 
+    }
+
+    const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+
+    element.style.cssText = originalStyle;
 
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
 
