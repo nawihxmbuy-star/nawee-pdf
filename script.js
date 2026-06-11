@@ -238,184 +238,63 @@ function getPDFOptions() {
 async function exportToPDFFile() {
     closeAllPopups();
     if (!pdfDoc) {
-        alert("ไม่พบข้อมูลเอกสารสำหรับการดาวน์โหลดไฟล์ค่ะ!");
+        alert("ไม่พบข้อมูลเอกสารค่ะ");
         return;
     }
     
-    const originalScale = currentScale;
-    currentScale = 1.0; 
-    applyZoom();
+    // ตั้งค่าตัวแปรเริ่มต้น
+    const element = document.getElementById('pdf-container');
+    const filename = `${originalFileName || 'Document'}_Output.pdf`;
 
-    const styleTag = document.createElement('style');
-    styleTag.innerHTML = `
-        .custom-draggable-text-node { border: none !important; background: transparent !important; }
-        .text-node-controls { display: none !important; }
-    `;
-    document.head.appendChild(styleTag);
-
+    // แจ้งเตือนผู้ใช้งานว่าระบบกำลังทำงาน
     const loadingNotice = document.createElement('div');
     loadingNotice.style.cssText = "position:fixed; top:20px; right:20px; background:#22d3ee; color:#0f172a; padding:15px 25px; border-radius:8px; z-index:99999; font-weight:bold; box-shadow:0 4px 15px rgba(0,0,0,0.3); font-family:sans-serif;";
-    loadingNotice.innerText = "⏳ กำลังจัดคิวประมวลผลเอกสารทีละหน้าเพื่อประหยัดแรม...";
+    loadingNotice.innerText = "⏳ กำลังสร้าง PDF ด้วยระบบประมวลผลด่วน... กรุณารอสักครู่";
     document.body.appendChild(loadingNotice);
 
+    // ตั้งค่า html2pdf.js (ตัวนี้เบาและเสถียรกว่าการวนลูปทีละหน้า)
+    const opt = {
+        margin: 0,
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.8 },
+        html2canvas: { scale: 1.2, useCORS: true, logging: false },
+        jsPDF: { unit: 'px', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: 'css' }
+    };
+
     try {
-        const wrappers = document.querySelectorAll('.page-wrapper');
-        if (wrappers.length === 0) return;
-
-        const firstPage = wrappers[0];
-        const pdfWidth = parseFloat(firstPage.style.width) || firstPage.offsetWidth || 794;
-        const pdfHeight = parseFloat(firstPage.style.height) || firstPage.offsetHeight || 1123;
-        const orientation = pdfWidth > pdfHeight ? 'landscape' : 'portrait';
-
-        const JsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-        if (!JsPDFClass) {
-            alert("ไม่พบไลบรารีพิมพ์เอกสาร jsPDF ในระบบค่ะ!");
-            return;
-        }
-        
-        const pdf = new JsPDFClass({
-            orientation: orientation,
-            unit: 'px',
-            format: [pdfWidth, pdfHeight]
-        });
-
-        for (let i = 0; i < wrappers.length; i++) {
-            loadingNotice.innerText = `⏳ กำลังแปลงหน้าเอกสารที่ ${i + 1}/${wrappers.length} เครื่องกำลังทำงาน...`;
-            
-            // 🌟 ใช้ scale: 1.0 เพื่อเซฟแรมของแท็บเล็ตไม่ให้ระเบิด
-            const canvas = await html2canvas(wrappers[i], {
-                scale: 1.0, 
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                width: pdfWidth,
-                height: pdfHeight
-            });
-
-            // บีบอัดเป็นภาพ JPEG ที่ความละเอียด 0.85 ช่วยประหยัดพื้นที่หน่วยความจำขณะประมวลผล
-            const imgData = canvas.toDataURL('image/jpeg', 0.85);
-            
-            if (i > 0) {
-                pdf.addPage([pdfWidth, pdfHeight], orientation);
-            }
-            
-            pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-            
-            // ล้างเคลียร์หน่วยความจำ canvas หน้านี้ทิ้งทันที
-            canvas.width = 0;
-            canvas.height = 0;
-
-            // หน่วงเวลาเพิ่มเป็น 300 มิลลิวินาที ให้ CPU แท็บเล็ตมีเวลาเคลียร์ RAM คืนระบบ
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
-
-        pdf.save(`${originalFileName || 'Document'}_Output.pdf`);
-        loadingNotice.innerText = "✅ บันทึกและดาวน์โหลดไฟล์ PDF เรียบร้อยแล้วค่ะ!";
+        await html2pdf().set(opt).from(element).save();
+        loadingNotice.innerText = "✅ ดาวน์โหลดเรียบร้อยแล้วค่ะ!";
         setTimeout(() => loadingNotice.remove(), 2000);
-
-    } catch (error) {
-        console.error("Error during PDF generation queue:", error);
-        alert("เกิดข้อผิดพลาดในระบบส่งออกดาวน์โหลดไฟล์ค่ะ (หน่วยความจำแรมของเครื่องไม่พอ)");
+    } catch (err) {
+        alert("ระบบทำงานไม่ได้ เนื่องจากข้อมูลมีขนาดใหญ่เกินไป ลองลดจำนวนหน้าหรือปิดแอปอื่นที่กินแรมค่ะ");
         loadingNotice.remove();
-    } finally {
-        styleTag.remove();
-        currentScale = originalScale;
-        applyZoom();
     }
 }
 
+// ฟังก์ชันสำหรับแชร์เข้า Line
 async function shareToLine() {
     closeAllPopups();
-    if (!pdfDoc) {
-        alert("ไม่พบข้อมูลเอกสารสำหรับการแชร์ไฟล์ค่ะ!");
-        return;
-    }
-
-    const originalScale = currentScale;
-    currentScale = 1.0; 
-    applyZoom();
-
-    const styleTag = document.createElement('style');
-    styleTag.innerHTML = `
-        .custom-draggable-text-node { border: none !important; background: transparent !important; }
-        .text-node-controls { display: none !important; }
-    `;
-    document.head.appendChild(styleTag);
-
-    const loadingNotice = document.createElement('div');
-    loadingNotice.style.cssText = "position:fixed; top:20px; right:20px; background:#f59e0b; color:#0f172a; padding:15px 25px; border-radius:8px; z-index:99999; font-weight:bold; box-shadow:0 4px 15px rgba(0,0,0,0.3); font-family:sans-serif;";
-    loadingNotice.innerText = "⏳ กำลังเตรียมไฟล์ระบบแชร์ทีละหน้าเพื่อประหยัดแรม...";
-    document.body.appendChild(loadingNotice);
+    const element = document.getElementById('pdf-container');
+    const opt = {
+        margin: 0,
+        filename: `${originalFileName || 'Document'}.pdf`,
+        image: { type: 'jpeg', quality: 0.8 },
+        html2canvas: { scale: 1.2, useCORS: true, logging: false },
+        jsPDF: { unit: 'px', format: 'a4', orientation: 'portrait' }
+    };
 
     try {
-        const wrappers = document.querySelectorAll('.page-wrapper');
-        if (wrappers.length === 0) return;
-
-        const firstPage = wrappers[0];
-        const pdfWidth = parseFloat(firstPage.style.width) || firstPage.offsetWidth || 794;
-        const pdfHeight = parseFloat(firstPage.style.height) || firstPage.offsetHeight || 1123;
-        const orientation = pdfWidth > pdfHeight ? 'landscape' : 'portrait';
-
-        const JsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-        if (!JsPDFClass) {
-            alert("ไม่พบไลบรารีพิมพ์เอกสาร jsPDF ในระบบค่ะ!");
-            return;
-        }
-        
-        const pdf = new JsPDFClass({
-            orientation: orientation,
-            unit: 'px',
-            format: [pdfWidth, pdfHeight]
-        });
-
-        for (let i = 0; i < wrappers.length; i++) {
-            loadingNotice.innerText = `⏳ กำลังประมวลผลแชร์หน้าเอกสารที่ ${i + 1}/${wrappers.length}...`;
-            
-            const canvas = await html2canvas(wrappers[i], {
-                scale: 1.0, 
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                width: pdfWidth,
-                height: pdfHeight
-            });
-
-            const imgData = canvas.toDataURL('image/jpeg', 0.85);
-            
-            if (i > 0) {
-                pdf.addPage([pdfWidth, pdfHeight], orientation);
-            }
-            
-            pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-            
-            canvas.width = 0;
-            canvas.height = 0;
-
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
-
-        const pdfBlob = pdf.output('blob');
+        const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
-
-        loadingNotice.remove();
-
+        
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: 'Nawee Document',
-                text: 'ส่งไฟล์เอกสาร PDF จากแอปพลิเคชันค่ะ'
-            });
+            await navigator.share({ files: [file] });
         } else {
-            pdf.save(`${originalFileName || 'Document'}_Output.pdf`);
+            alert("อุปกรณ์นี้ไม่รองรับการแชร์โดยตรง");
         }
-    } catch (error) {
-        console.error("Error during PDF sharing queue:", error);
-        alert("เกิดข้อผิดพลาดในระบบแชร์ส่งออกไฟล์ค่ะ (หน่วยความจำแรมของเครื่องไม่พอ)");
-        loadingNotice.remove();
-    } finally {
-        styleTag.remove();
-        currentScale = originalScale;
-        applyZoom();
+    } catch (err) {
+        alert("เกิดข้อผิดพลาดในการแชร์ค่ะ");
     }
 }
 
