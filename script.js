@@ -279,13 +279,13 @@ async function shareToLine() {
 
     try {
     const originalStyle = element.style.cssText;
-    element.style.width = '800px'; 
-    element.style.height = 'auto'; 
+    element.style.width = '794px';        //
+    element.style.height = '1120px';       
     element.style.maxWidth = '100%';
-    element.style.minHeight = '0';
+    element.style.overflow = 'hidden';
     element.style.margin = '0px';
     element.style.padding = '0px';
-    element.style.overflow = 'hidden';
+    element.style.boxSizing = 'border-box';
     
        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
        element.style.cssText = originalStyle;
