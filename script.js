@@ -279,7 +279,7 @@ async function shareToLine() {
 
     try {
     const originalStyle = element.style.cssText;
-    element.style.width = '800px';  
+    element.style.width = '850px';  
     element.style.height = '1130px';  
     element.style.maxWidth = '100%';
     element.style.maxHeight = '100%';
