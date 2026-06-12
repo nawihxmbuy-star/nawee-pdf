@@ -14,8 +14,8 @@ body {
     font-family: 'Sarabun', sans-serif; 
 }
 
-/* 📱 ป้องกันการกดคลุมดำโดน UI หลัก (ย้ายมาจาก body เพื่อป้องกันบั๊กพิมพ์ข้อความไม่ได้บนมือถือ) */
-.top-bar, .toolbar, .word-formatting-bar, .pen-sub-panel, .ai-sidebar, .text-node-controls {
+/* 📱 ป้องกันการกดคลุมดำโดน UI หลัก */
+.top-bar, .toolbar, .word-formatting-bar, .pen-sub-panel, .ai-sidebar, .text-node-floating-bar {
     user-select: none;
     -webkit-user-select: none;
 }
@@ -71,24 +71,34 @@ body.mode-word .badge { background: #2b579a; }
 .text-size-selector { color: #94a3b8; font-size: 13px; display: flex; align-items: center; gap: 6px;}
 .text-size-selector select { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 4px; outline: none;}
 
-/* พื้นที่สเตจทำงาน */
+/* พื้นที่ทำงานหลัก ป้องกันขอบตารางขาดตกขอบ */
 .workspace {
-    height: 100vh; width: 100vw; overflow: auto;
-    padding: 85px 20px 180px 20px; 
+    height: 100vh; width: 100vw; 
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; 
+    padding: 95px 50px 180px 50px; 
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
 }
-body.mode-word .workspace { padding-top: 130px; }
+body.mode-word .workspace { padding-top: 140px; }
 
 .initial-notice { background: #1e293b; border: 1px dashed rgba(255,255,255,0.1); padding: 50px; max-width: 500px; margin: 50px auto; border-radius: 12px; text-align: center; color: #94a3b8; }
 
-/* โครงสร้างเพจแบบรวมศูนย์คู่ขนาน */
-#pdf-container { margin: 0 auto; width: fit-content; transform-origin: top left; transition: transform 0.1s ease-out; }
+/* บล็อก Container คุมหน้าเพจ */
+#pdf-container { 
+    margin: 0 auto; 
+    min-width: fit-content; 
+    width: fit-content; 
+    transform-origin: top left; 
+    transition: transform 0.05s ease-out; 
+}
 .page-wrapper { position: relative; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); background: #ffffff; }
 .pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: block; }
 .drawing-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
 
-/* เลเยอร์ครอบกล่องอักษรสัมบูรณ์ */
+/* เลเยอร์ควบคุมกล่องข้อความ */
 .text-overlay-layer { 
     position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; 
     overflow: hidden; pointer-events: none; 
@@ -96,419 +106,101 @@ body.mode-word .workspace { padding-top: 130px; }
 body.mode-pdf .drawing-page-canvas { pointer-events: auto; }
 body.mode-word .drawing-page-canvas { pointer-events: none; }
 
-/* เพิ่มความคมชัดสูงสุดให้กับเนื้อความอักษรต้นฉบับภาษาไทย */
 .word-text-node {
-    position: absolute;
-    background: transparent;
-    color: #000000;
-    border: 1px solid transparent;
-    outline: none;
-    white-space: nowrap;
-    overflow: visible;
-    padding: 0;
-    margin: 0;
-    transform-origin: left top;
-    user-select: text;
-    -webkit-user-select: text;
-    font-family: 'Sarabun', sans-serif;
-    line-height: 1.0;
-    text-rendering: optimizeLegibility !important;
-    -webkit-font-smoothing: antialiased !important;
-    -moz-osx-font-smoothing: grayscale !important;
+    position: absolute; background: transparent; color: #000000; border: 1px solid transparent; outline: none;
+    white-space: nowrap; overflow: visible; padding: 0; margin: 0; transform-origin: left top;
+    user-select: text; -webkit-user-select: text; font-family: 'Sarabun', sans-serif; line-height: 1.0;
+    text-rendering: optimizeLegibility !important; -webkit-font-smoothing: antialiased !important;
 }
 
 body.mode-pdf .word-text-node { display: none; }
-body.mode-pdf .word-text-node.is-edited { 
-    display: block; 
-    background: #ffffff; 
-    color: #000000;
-    pointer-events: none; 
-}
+body.mode-pdf .word-text-node.is-edited { display: block; background: #ffffff; color: #000000; pointer-events: none; }
 
 body.mode-word .word-text-node { 
-    display: block;
-    background: rgba(255, 255, 255, 0.85); 
-    color: #000000;
-    border: 1px dashed rgba(34, 211, 238, 0.3);
-    cursor: text; 
-    pointer-events: auto;
+    display: block; background: rgba(255, 255, 255, 0.85); color: #000000;
+    border: 1px dashed rgba(34, 211, 238, 0.3); cursor: text; pointer-events: auto;
 }
 body.mode-word .word-text-node:hover { border: 1px dashed var(--accent-color); background: #f0fdfa; }
 body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); background: #ffffff !important; color: #000000 !important; z-index: 999; }
+.word-text-node.is-edited { background: #ffffff !important; color: #000000 !important; }
 
-.word-text-node.is-edited {
-    background: #ffffff !important; 
-    color: #000000 !important;
-}
-
-/* สไตล์พิเศษสำหรับบล็อกข้อความลอยอิสระ (Draggable) */
+/* สไตล์กล่องพิมพ์ข้อความลอยอิสระ (Draggable) */
 .custom-draggable-text-node {
-    position: absolute;
-    white-space: pre-wrap; 
-    cursor: move; 
-    user-select: none; 
-    touch-action: none;
-    padding: 6px 10px; 
-    border-radius: 6px;
-    display: inline-block; 
-    transform: translate(-50%, -50%); 
-    background: transparent !important;
-    z-index: 5000;
-    pointer-events: auto !important; 
-    text-rendering: optimizeLegibility !important;
-    -webkit-font-smoothing: antialiased !important;
-    -moz-osx-font-smoothing: grayscale !important;
+    position: absolute; white-space: pre-wrap; cursor: move; user-select: none; touch-action: none;
+    padding: 6px 10px; border-radius: 6px; display: inline-block; transform: translate(-50%, -50%);
+    background: transparent !important; z-index: 5000; pointer-events: auto !important;
 }
 
-/* แถบเครื่องมือควบคุมด้านล่าง */
+/* แถบเครื่องมือหลักด้านล่าง */
 .toolbar {
     position: fixed; bottom: 0; left: 0; width: 100%; height: 70px;
-    display: flex; justify-content: center; gap: 15px; align-items: center;
-    background: var(--toolbar-bg); border-top: 2px solid var(--accent-color); z-index: 9999;
-    padding: 0 15px;
+    display: flex; justify-content: center; gap: 12px; align-items: center;
+    background: var(--toolbar-bg); border-top: 2px solid var(--accent-color); z-index: 9999; padding: 0 15px;
 }
-.toolbar button { color: var(--accent-color); font-size: 24px; cursor: pointer; background: none; border: none; width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center;}
+.toolbar button { color: var(--accent-color); font-size: 22px; cursor: pointer; background: none; border: none; width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center;}
 .toolbar button.active { background: var(--accent-color); color: #0f172a; }
-.toolbar button.nav-btn { color: #f8fafc; font-size: 28px; }
+.toolbar button.nav-btn { color: #f8fafc; font-size: 26px; }
 .toolbar button.nav-btn:hover { color: var(--accent-color); }
-.toolbar button.nav-btn-action { color: #94a3b8; font-size: 22px; }
+.toolbar button.nav-btn-action { color: #94a3b8; font-size: 20px; }
 .toolbar button.nav-btn-action:hover { color: #fff; }
 .divider { width: 1px; height: 24px; background: rgba(255,255,255,0.15); }
 
-/* กล่องตั้งค่าแผงควบคุมย่อยลอยเหนือทูลบาร์ */
-.pen-sub-panel {
-    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-    background: #1e293b; border: 2px solid var(--accent-color); border-radius: 12px;
-    padding: 10px 20px; display: none; gap: 20px; align-items: center; z-index: 9998;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-}
-.panel-item { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 14px; }
-.panel-item input[type="color"] { border: none; background: transparent; width: 32px; height: 32px; cursor: pointer; }
-.panel-item input[type="range"] { accent-color: var(--accent-color); cursor: pointer; width: 120px; }
+/* แผงย่อยคุมขนาดปากกา/สี */
+.pen-sub-panel { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid var(--accent-color); padding: 10px 16px; border-radius: 12px; display: none; align-items: center; gap: 15px; z-index: 10000; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.panel-item { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 13px; }
+.panel-item input[type="range"] { accent-color: var(--accent-color); cursor: pointer; }
+.brush-preview-box { width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
+#brush-preview { border-radius: 50%; }
 
-/* กล่องพรีวิวพิกเซลปลายพู่กันวาดเขียน */
-.brush-preview-box {
-    width: 36px; height: 36px; background: rgba(0,0,0,0.3); 
-    border-radius: 6px; display: flex; align-items: center; justify-content: center;
-    border: 1px solid rgba(255,255,255,0.1); margin-left: 4px;
+/* แจ้งเตือนแบบกำหนดเอง */
+.custom-notification {
+    position: fixed; top: 20px; right: 20px; background: #1e293b; color: #fff;
+    padding: 14px 22px; border-radius: 10px; z-index: 99999;
+    border-left: 5px solid var(--accent-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    font-size: 14px; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
-#brush-preview {
-    border-radius: 50%; background: var(--accent-color);
-    width: 6px; height: 6px; transition: width 0.1s, height 0.1s, background-color 0.1s;
-}
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-/* 🛠️ ซ่อนแถบเครื่องมือเก่าของ HTML ที่ไม่ได้ใช้แล้ว เพื่อป้องกันพื้นที่หน้าจอด้านล่างบวมค้าง */
+/* UI แผงควบคุมลอย Bottom Sheet */
 .text-node-floating-bar {
-    display: none !important;
+    position: fixed; bottom: -320px; left: 0; width: 100%;
+    background: var(--toolbar-bg); padding: 20px; z-index: 9990;
+    transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border-top: 2px solid var(--accent-color); border-radius: 20px 20px 0 0;
+    box-shadow: 0 -5px 25px rgba(0,0,0,0.6);
 }
+.text-node-floating-bar.active { bottom: 0; }
 
-@media (max-width: 650px) {
-    .top-bar { padding: 0 8px; height: 60px; }
-    .brand span { font-size: 13px; }
-    .brand small { display: none; }
-    .action-group { gap: 4px; }
-    .action-group button { padding: 6px 8px; font-size: 13px; gap: 4px; }
-    .action-group button .lbl { display: none; }
-    body.mode-word .workspace { padding-top: 115px; }
-    .toolbar { gap: 4px; }
-    .toolbar button { width: 34px; height: 34px; font-size: 16px; }
-    .toolbar button.nav-btn { font-size: 18px; }
-    .toolbar button.nav-btn-action { font-size: 16px; }
-    .pen-sub-panel { flex-direction: column; gap: 10px; width: 90%; bottom: 75px; }
-}
-
-/* 🛠️ ลบเครื่องหมาย Backslash (\) ที่ผิดโครงสร้าง CSS ออก เพื่อให้ดาวน์โหลด PDF ได้เนี๊ยบ */
-@media print {
-    @page { margin: 0; size: auto; }
-    
-    body, html { 
-        height: auto !important; 
-        overflow: visible !important; 
-        background: white !important; 
-    }
-    
-    .top-bar, .toolbar, .nav-btn, .action-group, 
-    .pen-sub-panel, .text-settings-panel, .brand, .word-formatting-bar,
-    .text-node-controls, .ai-sidebar { 
-        display: none !important; 
-    }
-
-    #pdf-container {
-        width: 100% !important;
-        max-width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: block !important;
-        background: white !important;
-        transform: none !important;
-    }
-
-    .page-wrapper {
-        box-shadow: none !important;
-        margin: 0 !important;
-        page-break-after: always !important;
-        break-after: page !important;
-    }
-}
-
-.ai-sidebar {
-    position: fixed;
-    top: 0;
-    right: -380px; 
-    width: 360px;
-    height: 100%;
-    background: #111827; 
-    border-left: 2px solid #22d3ee;
-    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.7);
-    z-index: 99999;
-    display: flex;
-    flex-direction: column;
-    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.ai-sidebar.open {
-    right: 0; 
-}
-
-.ai-sidebar-header {
-    padding: 16px;
-    background: #1f2937;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.ai-sidebar-header h3 {
-    margin: 0;
-    font-size: 16px;
-    color: #fff;
-    font-weight: 600;
-}
-
-.close-sidebar-btn {
-    background: none;
+.text-node-controls button {
     border: none;
-    color: #9ca3af;
-    font-size: 28px;
     cursor: pointer;
-    line-height: 1;
-}
-
-.close-sidebar-btn:hover {
-    color: #ef4444;
-}
-
-.ai-sidebar-body {
-    padding: 16px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    gap: 14px;
-}
-
-.api-key-container {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.api-key-container label {
-    font-size: 13px;
-    color: #9ca3af;
-}
-
-.api-key-container input {
-    background: #1f2937;
-    border: 1px solid #374151;
-    border-radius: 6px;
-    padding: 8px 12px;
-    color: #fff;
-    font-size: 13px;
-    outline: none;
-}
-
-.api-key-container input:focus {
-    border-color: #22d3ee;
-}
-
-.ai-divider {
-    border: 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    margin: 4px 0;
-}
-
-.btn-ai-action {
-    width: 100%;
-    background: #22d3ee;
-    color: #0f172a;
-    border: none;
-    padding: 10px;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 14px;
-    transition: transform 0.1s;
-}
-
-.btn-ai-action:active {
-    transform: scale(0.98);
-}
-
-.ai-chat-box {
-    flex: 1;
-    background: #0f172a;
-    border: 1px solid #1e293b;
-    border-radius: 8px;
-    padding: 12px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    font-size: 14px;
-    line-height: 1.6;
-}
-
-.ai-message {
-    padding: 8px 12px;
-    border-radius: 8px;
-    max-width: 85%;
-    word-break: break-word;
-}
-
-.system-msg {
-    background: #1e293b;
-    color: #cbd5e1;
-    align-self: flex-start;
-    border-left: 3px solid #64748b;
-}
-
-.user-msg {
-    background: #22d3ee;
-    color: #0f172a;
-    align-self: flex-end;
-    font-weight: 500;
-}
-
-.ai-msg {
-    background: #1e1b4b;
-    color: #e0e7ff;
-    align-self: flex-start;
-    border-left: 3px solid #818cf8;
-}
-
-.ai-sidebar-footer {
-    padding: 12px 16px;
-    background: #1f2937;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    gap: 8px;
-}
-
-.ai-sidebar-footer input {
-    flex: 1;
-    background: #0f172a;
-    border: 1px solid #374151;
-    border-radius: 6px;
-    padding: 8px 12px;
-    color: #fff;
-    outline: none;
-    font-size: 14px;
-}
-
-.ai-sidebar-footer input:focus {
-    border-color: #22d3ee;
-}
-
-.ai-sidebar-footer button {
-    background: #22d3ee;
-    color: #0f172a;
-    border: none;
-    width: 38px;
-    height: 38px;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* ==========================================================================
-   🛠️ ชุดแก้ไขแถบเครื่องมือลอย (.text-node-controls) สำหรับคุณนาวี
-   ========================================================================== */
-
-/* ตัวกล่องแถบเครื่องมือลอย */
-.text-node-controls {
-    position: absolute;
-    top: -46px; 
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1e293b;
-    border: 1px solid #22d3ee;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 6px 10px;
-    z-index: 6000;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    white-space: nowrap;
-    min-width: max-content; 
-    box-sizing: border-box;
-}
-
-/* สไตล์ปุ่มกดทุกตัวในแถบควบคุมลอย และไอคอนด้านใน */
-.text-node-controls button,
-.text-node-controls button i {
-    background: transparent;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
     transition: background 0.1s, transform 0.1s;
 }
-
-/* เอฟเฟกต์ตอนเอานิ้วจิ้มปุ่ม หรือเอาเมาส์ชี้ปุ่มลบถังขยะขวาสุด */
 .text-node-controls button:active {
-    background: rgba(255, 255, 255, 0.1);
     transform: scale(0.92);
 }
 
-/* 🎯 แก้ไขทางเทคนิค: บล็อกไม่ให้ช่องเลือกสีของ Android บวมล้นขอบ */
-.text-node-controls input[type="color"] {
-    width: 24px;
-    height: 24px;
-    border: 2px solid #ffffff;
-    padding: 0;
-    margin: 0 4px;
-    cursor: pointer;
-    background: transparent;
-    border-radius: 50%;
-    overflow: hidden;
-    box-sizing: border-box;
-    -webkit-appearance: none; 
+/* พรีวิววงกลมยางลบใต้เมาส์ */
+#eraser-cursor-preview {
+    position: fixed; pointer-events: none; border: 2px dashed var(--accent-color);
+    background: rgba(34, 211, 238, 0.15); z-index: 9998; display: none;
 }
 
-/* ล้าง Padding ส่วนเกินในกล่องสีของ Chrome/Webview */
-.text-node-controls input[type="color"]::-webkit-color-swatch-wrapper {
-    padding: 0;
-}
-.text-node-controls input[type="color"]::-webkit-color-swatch {
-    border: none;
-    border-radius: 50%;
-}
+/* แถบข้าง AI Chat Sidebar */
+.ai-sidebar { position: fixed; top: 0; right: -380px; width: 380px; height: 100vh; background: #1e293b; border-left: 2px solid var(--accent-color); z-index: 5000; display: flex; flex-direction: column; transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
+.ai-sidebar.open { right: 0; }
+.ai-sidebar-header { padding: 20px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; color: #fff; }
+.close-sidebar-btn { background: none; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; }
+.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+.api-key-container { display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 13px; }
+.api-key-container input { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 6px; color: #fff; outline: none; }
+.ai-quick-actions { width: 100%; }
+.btn-ai-action { width: 100%; background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05)); border: 1px solid var(--accent-color); color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
+.ai-chat-box { flex: 1; background: #0f172a; border-radius: 10px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 200px; border: 1px solid rgba(255,255,255,0.05); }
+.ai-message { padding: 10px 14px; border-radius: 8px; font-size: 13px; max-width: 85%; line-height: 1.4; word-wrap: break-word; }
+.system-msg { background: rgba(255,255,255,0.05); color: #94a3b8; align-self: center; text-align: center; max-width: 100%; }
+.user-msg { background: var(--accent-color); color: #0f172a; align-self: flex-end; font-weight: 500; }
+.ai-msg { background: #1e293b; color: #fff; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
+.ai-sidebar-footer { padding: 15px; background: #0f172a; display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.1); }
+.ai-sidebar-footer input { flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
+.ai-sidebar-footer button { background: var(--accent-color); border: none; width: 40px; height: 40px; border-radius: 8px; color: #0f172a; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }

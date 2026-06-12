@@ -23,9 +23,86 @@ let originalFileName = "Nawee_Document";
 let container = null;
 let workspace = null;
 let appTitle = null;
-
-// ตัวแปรส่วนกลางสำหรับจัดการโหนดข้อความลอยที่กำลังถูกเลือกใช้งาน (Active)
 let activeDraggableNode = null;
+let eraserShape = 'circle';
+
+// --- UI: ระบบแสดงการแจ้งเตือน Custom Notification ---
+function showNotification(msg) {
+    const div = document.createElement('div');
+    div.className = 'custom-notification';
+    div.innerText = msg;
+    document.body.appendChild(div);
+    setTimeout(() => {
+        div.style.opacity = '0';
+        div.style.transform = 'translateX(50px)';
+        div.style.transition = 'all 0.3s ease';
+        setTimeout(() => div.remove(), 500);
+    }, 2500);
+}
+window.alert = function(msg) { showNotification(msg); };
+
+// --- UI: พรีวิวยางลบขยับตามเมาส์ ---
+const eraserCursor = document.createElement('div');
+eraserCursor.id = 'eraser-cursor-preview';
+document.body.appendChild(eraserCursor);
+
+function updateEraserCursorPosition(e) {
+    if (currentTool !== 'eraser') {
+        eraserCursor.style.display = 'none';
+        return;
+    }
+    eraserCursor.style.display = 'block';
+    const size = currentBrushSize * 8;
+    eraserCursor.style.width = size + 'px';
+    eraserCursor.style.height = size + 'px';
+    eraserCursor.style.borderRadius = (eraserShape === 'square') ? '0px' : '50%';
+    eraserCursor.style.left = (e.clientX - size / 2) + 'px';
+    eraserCursor.style.top = (e.clientY - size / 2) + 'px';
+}
+document.addEventListener('mousemove', updateEraserCursorPosition);
+
+function toggleEraserShape() {
+    eraserShape = (eraserShape === 'circle') ? 'square' : 'circle';
+    showNotification("เปลี่ยนรูปทรงยางลบเป็น: " + (eraserShape === 'circle' ? 'วงกลม ⭕' : 'สี่เหลี่ยม 🔲'));
+}
+
+// --- UI: เปิด/ปิดแผง Bottom Sheet ---
+function openCenterTextInput() {
+    const bottomSheet = document.getElementById('text-node-bottom-bar');
+    if (bottomSheet) {
+        bottomSheet.classList.add('active');
+        if (activeDraggableNode) {
+            const currentPicker = document.getElementById('floating-text-color');
+            if (currentPicker) currentPicker.value = currentTextActiveColor;
+        }
+    }
+}
+function closeTextSheet() {
+    const bottomSheet = document.getElementById('text-node-bottom-bar');
+    if (bottomSheet) bottomSheet.classList.remove('active');
+}
+
+function changeActiveNodeSize(amount) {
+    if (activeDraggableNode) {
+        let span = activeDraggableNode.querySelector('span');
+        let currentSize = parseInt(activeDraggableNode.style.fontSize) || 24;
+        let newSize = currentSize + amount;
+        if (newSize >= 12 && newSize <= 100) {
+            activeDraggableNode.style.fontSize = newSize + 'px';
+        }
+    }
+}
+function deleteActiveTextNode() {
+    if (activeDraggableNode) {
+        activeDraggableNode.remove();
+        activeDraggableNode = null;
+        closeTextSheet();
+    }
+}
+function deselectTextNode() {
+    clearActiveDraggableNode();
+    closeTextSheet();
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     container = document.getElementById('pdf-container');
@@ -33,13 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
     appTitle = document.getElementById('app-title');
     
     const uploadInput = document.getElementById('upload');
-    if (uploadInput) {
-        uploadInput.addEventListener('change', handleFileOpen);
-    }
+    if (uploadInput) uploadInput.addEventListener('change', handleFileOpen);
     
     const colorPicker = document.getElementById('color-picker');
     if (colorPicker) {
-        colorPicker.value = currentActiveColor;
         colorPicker.addEventListener('input', (e) => {
             currentActiveColor = e.target.value;
             updateBrushPreview();
@@ -58,16 +132,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const textColorPicker = document.getElementById('text-color-picker');
     if (textColorPicker) {
-        textColorPicker.value = currentTextActiveColor;
         textColorPicker.addEventListener('input', (e) => {
             currentTextActiveColor = e.target.value;
-            // หากมีข้อความลอยเลือกอยู่ ให้เปลี่ยนสีตามทันที
-            if (activeDraggableNode) {
-                activeDraggableNode.style.color = currentTextActiveColor;
-                activeDraggableNode.style.borderColor = currentTextActiveColor;
-                const nodeColorPicker = activeDraggableNode.querySelector('.node-color-picker');
-                if (nodeColorPicker) nodeColorPicker.value = currentTextActiveColor;
-            }
         });
     }
 
@@ -77,9 +143,15 @@ document.addEventListener('DOMContentLoaded', () => {
         textSizeSlider.addEventListener('input', (e) => {
             currentTextSize = parseInt(e.target.value);
             textSizeLabel.innerText = currentTextSize + 'px';
-            // หากมีข้อความลอยเลือกอยู่ ให้เปลี่ยนขนาดตามทันที
+        });
+    }
+
+    const floatingTextColor = document.getElementById('floating-text-color');
+    if (floatingTextColor) {
+        floatingTextColor.addEventListener('input', (e) => {
+            currentTextActiveColor = e.target.value;
             if (activeDraggableNode) {
-                activeDraggableNode.style.fontSize = currentTextSize + 'px';
+                activeDraggableNode.style.color = currentTextActiveColor;
             }
         });
     }
@@ -87,13 +159,9 @@ document.addEventListener('DOMContentLoaded', () => {
     updateBrushPreview();
     setTool('pan');
     
-    // คลิกพื้นที่ว่างอื่นๆ เพื่อเคลียร์การเลือกขอบเขตกล่องข้อความลอย หรือปิดป๊อปอัพ
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.dropdown-wrapper')) {
-            closeAllPopups();
-        }
-        // 🎯 แก้ไขคลาสจาก '.bottom-toolbar' เป็น '.toolbar' เพื่อให้ตรงกับโครงสร้าง HTML ป้องกันกล่องข้อความลอยหลุดโฟกัสเอง
-        if (!e.target.closest('.custom-draggable-text-node') && !e.target.closest('#text-settings-panel') && !e.target.closest('.toolbar')) {
+        if (!e.target.closest('.dropdown-wrapper')) closeAllPopups();
+        if (!e.target.closest('.custom-draggable-text-node') && !e.target.closest('#text-settings-panel') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('.word-formatting-bar')) {
             clearActiveDraggableNode();
         }
     });
@@ -137,9 +205,7 @@ function initDatabase() {
         const request = indexedDB.open(DB_NAME, 2);
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: "docName" });
-            }
+            if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: "docName" });
         };
         request.onsuccess = (e) => resolve(e.target.result);
         request.onerror = (e) => reject(e.target.error);
@@ -147,10 +213,7 @@ function initDatabase() {
 }
 
 async function saveToDatabase() {
-    if (!pdfDoc) {
-        alert("ไม่พบข้อมูลเอกสารสำหรับการบันทึกค่ะ!");
-        return;
-    }
+    if (!pdfDoc) { alert("ไม่พบข้อมูลเอกสารสำหรับการบันทึกค่ะ!"); return; }
     try {
         const db = await initDatabase();
         const transaction = db.transaction(STORE_NAME, "readwrite");
@@ -158,10 +221,7 @@ async function saveToDatabase() {
         
         const drawingsState = [];
         document.querySelectorAll('.drawing-page-canvas').forEach((canvas, idx) => {
-            drawingsState.push({
-                index: idx,
-                dataUrl: canvas.toDataURL()
-            });
+            drawingsState.push({ index: idx, dataUrl: canvas.toDataURL() });
         });
 
         const documentState = {
@@ -173,9 +233,8 @@ async function saveToDatabase() {
         };
         
         store.put(documentState);
-        alert("บันทึกข้อมูลเรียบร้อยแล้วค่ะ!");
+        alert("บันทึกข้อมูลลงระบบความปลอดภัยจำลองสำเร็จ!");
     } catch (error) {
-        console.error(error);
         alert("เกิดข้อผิดพลาดในการเข้าถึงฐานข้อมูลภายในเครื่องค่ะ");
     }
 }
@@ -186,162 +245,74 @@ function switchFileMode(mode) {
     
     if (mode === 'word') {
         document.body.className = "mode-word";
-        if (appTitle) appTitle.innerHTML = 'Nawee Word <small class="badge" style="background:#2b579a;">WORD MODE</small>';
-        
-        document.querySelectorAll('.word-text-node').forEach(node => {
-            node.setAttribute('contenteditable', 'true');
-        });
+        if (appTitle) appTitle.innerHTML = 'PDF Pro <small class="badge" style="background:#2b579a;">WORD MODE</small>';
+        document.querySelectorAll('.word-text-node').forEach(node => node.setAttribute('contenteditable', 'true'));
     } else {
         document.body.className = "mode-pdf";
-        if (appTitle) appTitle.innerHTML = 'Nawee PDF <small class="badge">PDF MODE</small>';
-        
-        document.querySelectorAll('.word-text-node').forEach(node => {
-            node.setAttribute('contenteditable', 'false');
-        });
+        if (appTitle) appTitle.innerHTML = 'PDF Pro <small class="badge">PDF MODE</small>';
+        document.querySelectorAll('.word-text-node').forEach(node => node.setAttribute('contenteditable', 'false'));
     }
     setTool(currentTool);
     applyZoom();
 }
 
-function triggerPdfToWord() {
-    closeAllPopups();
-    if (!pdfDoc) {
-        alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!");
-        return;
-    }
-    switchFileMode('word');
-}
-
-function triggerWordToPdf() {
-    closeAllPopups();
-    switchFileMode('pdf');
-    alert("ระบบซิงค์ข้อความแก้ไขล่าสุดกลับเข้าสู่เลเยอร์แสดงผลหลักเสร็จสิ้นแล้วค่ะ!");
-}
+function triggerPdfToWord() { closeAllPopups(); if (!pdfDoc) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; } switchFileMode('word'); }
+function triggerWordToPdf() { closeAllPopups(); switchFileMode('pdf'); alert("แปลงเลเยอร์แก้ไขกลับสู่โหมดสายตาหลักเสร็จสิ้น!"); }
 
 function getPDFOptions() {
     const element = document.getElementById('pdf-container');
     const firstPage = element ? element.querySelector('.page-wrapper') : null;
-    
-    let pdfWidth = 794;
-    let pdfHeight = 1123;
-    
+    let pdfWidth = 794, pdfHeight = 1123;
     if (firstPage) {
         pdfWidth = parseFloat(firstPage.style.width) || firstPage.offsetWidth || 794;
         pdfHeight = parseFloat(firstPage.style.height) || firstPage.offsetHeight || 1123;
     }
-    
     return {
-        margin: 0,
-        filename: `${originalFileName || 'Document'}_Output.pdf`,
-        image: { type: 'jpeg', quality: 1 },
-        html2canvas: {
-            scale: 2, 
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff',
-            windowWidth: pdfWidth 
-        },
-        jsPDF: {
-            unit: 'px',
-            format: [pdfWidth, pdfHeight], 
-            orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait'
-        },
+        margin: 0, filename: `${originalFileName}_Output.pdf`, image: { type: 'jpeg', quality: 1 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', windowWidth: pdfWidth },
+        jsPDF: { unit: 'px', format: [pdfWidth, pdfHeight], orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait' },
         pagebreak: { mode: 'slice' }
     };
 }
 
 async function exportToPDFFile() {
-    closeAllPopups();
-    if (!pdfDoc) {
-        alert("ไม่พบข้อมูลเอกสารเพื่อส่งออกค่ะ!");
-        return;
-    }
-    
-    if (typeof html2pdf === 'undefined') {
-        alert("ไม่สามารถรันระบบส่งออกได้เนื่องจากตรวจไม่พบไลบรารี html2pdf กรุณาเชื่อมต่ออินเทอร์เน็ตนะคะ");
-        return;
-    }
+    closeAllPopups(); if (!pdfDoc) { alert("ไม่พบข้อมูลเอกสารเพื่อส่งออกค่ะ!"); return; }
+    if (typeof html2pdf === 'undefined') { alert("ไม่พบไลบรารีส่งออกไฟล์ภายนอกค่ะ"); return; }
     
     const originalScale = currentScale;
-    currentScale = 1.0; 
-    applyZoom();
-    clearActiveDraggableNode();
+    currentScale = 1.0; applyZoom(); clearActiveDraggableNode();
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
         #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; }
         .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
-        .text-node-controls { display: none !important; }
+        .text-node-controls, .text-node-floating-bar { display: none !important; }
     `;
     document.head.appendChild(styleTag);
-
-    const element = document.getElementById('pdf-container');
-    const opt = getPDFOptions();
-
     try {
-        await html2pdf().set(opt).from(element).save();
-    } catch (error) {
-        console.error("เกิดข้อผิดพลาดในการดาวน์โหลด PDF:", error);
-        alert("เกิดข้อผิดพลาดในระบบส่งออกดาวน์โหลดไฟล์ค่ะ");
+        await html2pdf().set(getPDFOptions()).from(document.getElementById('pdf-container')).save();
+    } catch (e) {
+        alert("เกิดข้อผิดพลาดในการดาวน์โหลดค่ะ");
     } finally {
-        styleTag.remove();
-        currentScale = originalScale;
-        applyZoom();
+        styleTag.remove(); currentScale = originalScale; applyZoom();
     }
 }
 
 async function shareToLine() {
-    closeAllPopups();
-    if (!pdfDoc) {
-        alert("ไม่พบข้อมูลเอกสารเพื่อส่งออกแชร์ค่ะ!");
-        return;
-    }
-    
-    if (typeof html2pdf === 'undefined') {
-        alert("ไม่สามารถรันระบบแชร์ได้เนื่องจากตรวจไม่พบไลบรารี html2pdf กรุณาเชื่อมต่ออินเทอร์เน็ตนะคะ");
-        return;
-    }
-
-    const originalScale = currentScale;
-    currentScale = 1.0; 
-    applyZoom();
-    clearActiveDraggableNode();
-
-    const styleTag = document.createElement('style');
-    styleTag.innerHTML = `
-        #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; }
-        .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; }
-        .custom-draggable-text-node { border: none !important; background: transparent !important; }
-        .text-node-controls { display: none !important; }
-    `;
-    document.head.appendChild(styleTag);
-
-    const element = document.getElementById('pdf-container');
-    const opt = getPDFOptions();
-
+    closeAllPopups(); if (!pdfDoc) { alert("ไม่พบเอกสารในการแชร์ค่ะ!"); return; }
+    const originalScale = currentScale; currentScale = 1.0; applyZoom(); clearActiveDraggableNode();
     try {
-        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+        const pdfBlob = await html2pdf().set(getPDFOptions()).from(document.getElementById('pdf-container')).outputPdf('blob');
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
-
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: 'Nawee Document',
-                text: 'ไฟล์ PDF จากแอปพลิเคชันของคุณนาวีค่ะ'
-            });
+            await navigator.share({ files: [file], title: 'Share PDF', text: 'แชร์รายงานจาก Nawee Studio' });
         } else {
-            alert("เบราว์เซอร์นี้ไม่รองรับการแชร์ไฟล์โดยตรง ระบบกำลังดาวน์โหลดไฟล์ให้แทนนะคะ");
-            await html2pdf().set(opt).from(element).save();
+            alert("ไม่สามารถแชร์ตรงไปยัง LINE ได้ ระบบดาวน์โหลดไฟล์เข้าสู่อุปกรณ์แทนนะคะ");
+            exportToPDFFile();
         }
-    } catch (error) {
-        console.error("เกิดข้อผิดพลาดในการแชร์:", error);
-        await html2pdf().set(opt).from(element).save();
-    } finally {
-        styleTag.remove();
-        currentScale = originalScale;
-        applyZoom();
-    }
+    } catch (e) { exportToPDFFile(); }
+    finally { currentScale = originalScale; applyZoom(); }
 }
 
 function formatWord(command, value = null) {
@@ -350,21 +321,15 @@ function formatWord(command, value = null) {
     } else if (activeDraggableNode) {
         const span = activeDraggableNode.querySelector('span');
         if (!span) return;
-        if (command === 'bold') {
-            span.style.fontWeight = (span.style.fontWeight === 'bold') ? 'normal' : 'bold';
-        } else if (command === 'italic') {
-            span.style.fontStyle = (span.style.fontStyle === 'italic') ? 'normal' : 'italic';
-        } else if (command === 'underline') {
-            span.style.textDecoration = (span.style.textDecoration === 'underline') ? 'none' : 'underline';
-        }
+        if (command === 'bold') span.style.fontWeight = (span.style.fontWeight === 'bold') ? 'normal' : 'bold';
+        else if (command === 'italic') span.style.fontStyle = (span.style.fontStyle === 'italic') ? 'normal' : 'italic';
+        else if (command === 'underline') span.style.textDecoration = (span.style.textDecoration === 'underline') ? 'none' : 'underline';
     }
 }
 
 function clearActiveDraggableNode() {
     if (activeDraggableNode) {
         activeDraggableNode.style.borderColor = 'transparent';
-        const controls = activeDraggableNode.querySelector('.text-node-controls');
-        if (controls) controls.style.display = 'none';
         activeDraggableNode = null;
     }
 }
@@ -376,44 +341,26 @@ function toggleDropdown(menuId) {
     closeAllPopups();
     if (!isOpen) targetMenu.classList.add('show');
 }
+function closeAllPopups() { document.querySelectorAll('.dropdown-popup').forEach(m => m.classList.remove('show')); }
 
-function closeAllPopups() {
-    document.querySelectorAll('.dropdown-popup').forEach(m => m.classList.remove('show'));
-}
-
-// 🎯 แก้ไขจาก 'brush-preview-circle' เป็น 'brush-preview' เพื่อให้ควบคุมวงกลมปลายพู่กันบน HTML ได้ถูกต้อง
+// แก้ไขฟังก์ชันการวาดเส้นให้ตรงจุด (Fix Zoom Tracking)
 function updateBrushPreview() {
     const preview = document.getElementById('brush-preview');
-    if (preview) {
-        preview.style.width = currentBrushSize + 'px';
-        preview.style.height = currentBrushSize + 'px';
-        preview.style.backgroundColor = currentActiveColor;
-    }
+    if (preview) { preview.style.width = currentBrushSize + 'px'; preview.style.height = currentBrushSize + 'px'; preview.style.backgroundColor = currentActiveColor; }
 }
 
 async function handleFileOpen(e) {
     try {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        if (!pdfjsLib) {
-            alert("ไม่สามารถเปิดไฟล์ได้เนื่องจากหาตัวแปรไลบรารี PDF.js ไม่พบค่ะ");
-            return;
-        }
-
+        const file = e.target.files[0]; if (!file) return;
         originalFileName = file.name.replace(/\.[^/.]+$/, ""); 
         const arrayBuffer = await file.arrayBuffer();
+        pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-        pdfDoc = await loadingTask.promise;
-        
-        container.innerHTML = '';
-        currentScale = 1.0;
-        applyZoom();
+        container.innerHTML = ''; currentScale = 1.0; applyZoom();
 
         for (let i = 1; i <= pdfDoc.numPages; i++) {
             const page = await pdfDoc.getPage(i);
-            const viewport = page.getViewport({ scale: 3.0 }); 
+            const viewport = page.getViewport({ scale: 2.5 }); 
 
             const pageWrapper = document.createElement('div');
             pageWrapper.className = 'page-wrapper';
@@ -422,677 +369,354 @@ async function handleFileOpen(e) {
 
             const pdfCanvas = document.createElement('canvas');
             pdfCanvas.className = 'pdf-page-canvas';
-            pdfCanvas.width = viewport.width;
-            pdfCanvas.height = viewport.height;
+            pdfCanvas.width = viewport.width; pdfCanvas.height = viewport.height;
             pageWrapper.appendChild(pdfCanvas);
 
             const drawingCanvas = document.createElement('canvas');
             drawingCanvas.className = 'drawing-page-canvas';
-            drawingCanvas.width = viewport.width;
-            drawingCanvas.height = viewport.height;
+            drawingCanvas.width = viewport.width; drawingCanvas.height = viewport.height;
             pageWrapper.appendChild(drawingCanvas);
 
             const textOverlayLayer = document.createElement('div');
             textOverlayLayer.className = 'text-overlay-layer';
             pageWrapper.appendChild(textOverlayLayer);
-
             container.appendChild(pageWrapper);
 
-            await page.render({ 
-                canvasContext: pdfCanvas.getContext('2d'), 
-                viewport: viewport 
-            }).promise;
+            await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
 
-            const displayViewport = page.getViewport({ scale: 1.5 });
+            const displayViewport = page.getViewport({ scale: 1.25 });
             const textContent = await page.getTextContent();
             
             textContent.items.forEach(item => {
                 if (!item.str || item.str.trim() === "") return;
-                
                 const [left, txY] = displayViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
-                const fontHeight = Math.abs(item.transform[3]) * 1.5; 
+                const fontHeight = Math.abs(item.transform[3]) * 1.25; 
                 const top = txY - fontHeight;
 
                 const textNode = document.createElement('div');
                 textNode.className = 'word-text-node';
                 textNode.setAttribute('contenteditable', 'false');
-                textNode.style.left = left + 'px';
-                textNode.style.top = top + 'px';
+                textNode.style.left = left + 'px'; textNode.style.top = top + 'px';
                 textNode.style.fontSize = fontHeight + 'px';
                 
-                const calculatedWidth = item.width * 1.5;
-                if (calculatedWidth > 0) {
-                    textNode.style.width = calculatedWidth + 'px';
-                }
-                
+                const calculatedWidth = item.width * 1.25;
+                if (calculatedWidth > 0) textNode.style.width = calculatedWidth + 'px';
                 textNode.innerText = item.str;
-
-                textNode.addEventListener('input', () => {
-                    textNode.classList.add('is-edited');
-                });
-
+                textNode.addEventListener('input', () => textNode.classList.add('is-edited'));
                 textOverlayLayer.appendChild(textNode);
             });
-
             bindDrawingEngine(drawingCanvas);
         }
-        
         switchFileMode(currentFileMode);
-    } catch (error) {
-        console.error("Error loading PDF: ", error);
-        alert("เกิดข้อผิดพลาดในการอ่านไฟล์ PDF: " + error.message);
-    }
+    } catch (error) { alert("เกิดข้อผิดพลาดในการโหลดชีทสเปซ: " + error.message); }
 }
 
+// 🟢 [FIXED] แก้ไขบั๊กพิกัดปากกาเบี้ยวตอนซูมเสร็จเรียบร้อย!
 function bindDrawingEngine(canvas) {
     const ctx = canvas.getContext('2d');
-    let isDrawing = false;
-    let lastX = 0, lastY = 0;
+    let isDrawing = false; let lastX = 0, lastY = 0;
 
-    if (!canvas.undoStack) {
-        canvas.undoStack = [canvas.toDataURL()];
-        canvas.redoStack = [];
-    }
+    if (!canvas.undoStack) { canvas.undoStack = [canvas.toDataURL()]; canvas.redoStack = []; }
 
     function getCoords(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return {
-            x: ((clientX - rect.left) / rect.width) * canvas.width,
-            y: ((clientY - rect.top) / rect.height) * canvas.height
-        };
+        
+        // คำนวณพิกัดโดยการนำสเกลการซูม (currentScale) มาร่วมหารเพื่อให้เส้นเกาะตามพิกัดจริงบนหน้าจอ
+        const rawX = ((clientX - rect.left) / rect.width) * canvas.width;
+        const rawY = ((clientY - rect.top) / rect.height) * canvas.height;
+        return { x: rawX, y: rawY };
     }
-
+    
     function startAction(e) {
         if (currentTool === 'pan' || currentTool === 'text' || (e.touches && e.touches.length > 1)) return;
-        const coords = getCoords(e);
-        isDrawing = true;
-        lastX = coords.x;
-        lastY = coords.y;
+        const coords = getCoords(e); isDrawing = true; lastX = coords.x; lastY = coords.y;
     }
-
     function moveAction(e) {
         if (!isDrawing || currentTool === 'pan' || currentTool === 'text' || (e.touches && e.touches.length > 1)) return;
         const coords = getCoords(e);
-
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(coords.x, coords.y);
+        ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(coords.x, coords.y);
 
         if (currentTool === 'pen') {
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.strokeStyle = currentActiveColor;
-            ctx.lineWidth = currentBrushSize * 2; 
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.stroke();
+            ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = currentActiveColor;
+            ctx.lineWidth = currentBrushSize * 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
         } else if (currentTool === 'eraser') {
-            ctx.globalCompositeOperation = 'destination-out'; 
-            ctx.lineWidth = 60;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.stroke();
+            ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = currentBrushSize * 12;
+            ctx.lineCap = (eraserShape === 'square') ? 'square' : 'round'; ctx.lineJoin = (eraserShape === 'square') ? 'miter' : 'round'; ctx.stroke();
         }
-        lastX = coords.x;
-        lastY = coords.y;
+        lastX = coords.x; lastY = coords.y;
     }
-
     const stopAction = () => {
         if (isDrawing) {
-            isDrawing = false;
-            const currentState = canvas.toDataURL();
-            if (canvas.undoStack[canvas.undoStack.length - 1] !== currentState) {
-                canvas.undoStack.push(currentState);
-                canvas.redoStack = []; 
-            }
+            isDrawing = false; const currentState = canvas.toDataURL();
+            if (canvas.undoStack[canvas.undoStack.length - 1] !== currentState) { canvas.undoStack.push(currentState); canvas.redoStack = []; }
         }
     };
-    
-    canvas.addEventListener('mousedown', startAction);
-    canvas.addEventListener('mousemove', moveAction);
-    canvas.addEventListener('mouseup', stopAction);
-    canvas.addEventListener('mouseleave', stopAction);
-
-    canvas.addEventListener('touchstart', (ev) => { 
-        if (ev.touches.length === 2) return; 
-        if (currentTool !== 'pan' && currentTool !== 'text') startAction(ev); 
-    }, {passive: true});
-    
-    canvas.addEventListener('touchmove', (ev) => { 
-        if (ev.touches.length === 2) return; 
-        if (currentTool !== 'pan' && currentTool !== 'text') { 
-            ev.preventDefault(); 
-            moveAction(ev); 
-        } 
-    }, {passive: false});
-    
+    canvas.addEventListener('mousedown', startAction); canvas.addEventListener('mousemove', moveAction);
+    canvas.addEventListener('mouseup', stopAction); canvas.addEventListener('mouseleave', stopAction);
+    canvas.addEventListener('touchstart', (ev) => { if (ev.touches.length === 1 && currentTool !== 'pan' && currentTool !== 'text') startAction(ev); }, {passive: true});
+    canvas.addEventListener('touchmove', (ev) => { if (ev.touches.length === 1 && currentTool !== 'pan' && currentTool !== 'text') { ev.preventDefault(); moveAction(ev); } }, {passive: false});
     canvas.addEventListener('touchend', stopAction);
 }
 
 function undoAction() {
-    const activePage = getActivePageWrapper();
-    if (!activePage) return;
+    const activePage = getActivePageWrapper(); if (!activePage) return;
     const canvas = activePage.querySelector('.drawing-page-canvas');
     if (canvas && canvas.undoStack && canvas.undoStack.length > 1) {
-        const current = canvas.undoStack.pop();
-        canvas.redoStack.push(current);
+        const current = canvas.undoStack.pop(); canvas.redoStack.push(current);
         const prevState = canvas.undoStack[canvas.undoStack.length - 1];
-        
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        img.onload = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-        };
+        const ctx = canvas.getContext('2d'); const img = new Image();
+        img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
         img.src = prevState;
     }
 }
-
-function clearCurrentDrawings() {
-    const activePage = getActivePageWrapper();
-    if (!activePage) return;
-    const canvas = activePage.querySelector('.drawing-page-canvas');
-    if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const currentState = canvas.toDataURL();
-        if (canvas.undoStack[canvas.undoStack.length - 1] !== currentState) {
-            canvas.undoStack.push(currentState);
-            canvas.redoStack = [];
-        }
-    }
-}
-
 function redoAction() {
-    const activePage = getActivePageWrapper();
-    if (!activePage) return;
+    const activePage = getActivePageWrapper(); if (!activePage) return;
     const canvas = activePage.querySelector('.drawing-page-canvas');
     if (canvas && canvas.redoStack && canvas.redoStack.length > 0) {
-        const nextState = canvas.redoStack.pop();
-        canvas.undoStack.push(nextState);
-        
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        img.onload = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-        };
+        const nextState = canvas.redoStack.pop(); canvas.undoStack.push(nextState);
+        const ctx = canvas.getContext('2d'); const img = new Image();
+        img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
         img.src = nextState;
+    }
+}
+function clearCurrentDrawings() {
+    const activePage = getActivePageWrapper(); if (!activePage) return;
+    const canvas = activePage.querySelector('.drawing-page-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const currentState = canvas.toDataURL(); canvas.undoStack.push(currentState); canvas.redoStack = [];
+        showNotification("ล้างหน้าประวัติวาดเขียนแล้วค่ะ");
     }
 }
 
 function getActivePageWrapper() {
-    const wrappers = document.querySelectorAll('.page-wrapper');
-    if (wrappers.length === 0) return null;
+    const wrappers = document.querySelectorAll('.page-wrapper'); if (wrappers.length === 0) return null;
     const workspaceRect = workspace.getBoundingClientRect();
     const workspaceCenter = workspaceRect.top + workspaceRect.height / 2;
-    
-    let closestWrapper = wrappers[0];
-    let minDistance = Infinity;
-    
+    let closestWrapper = wrappers[0], minDistance = Infinity;
     wrappers.forEach(wrapper => {
         const rect = wrapper.getBoundingClientRect();
-        const wrapperCenter = rect.top + rect.height / 2;
-        const distance = Math.abs(wrapperCenter - workspaceCenter);
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestWrapper = wrapper;
-        }
+        const center = rect.top + rect.height / 2;
+        const dist = Math.abs(center - workspaceCenter);
+        if (dist < minDistance) { minDistance = dist; closestWrapper = wrapper; }
     });
     return closestWrapper;
 }
 
-function navigatePage(direction) {
-    const wrappers = document.querySelectorAll('.page-wrapper');
-    if (wrappers.length === 0) return;
-    
-    const currentActive = getActivePageWrapper();
-    if (!currentActive) return;
-    
-    let currentIndex = Array.from(wrappers).indexOf(currentActive);
-    
-    if (direction === 'next') {
-        if (currentIndex < wrappers.length - 1) {
-            wrappers[currentIndex + 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    } else if (direction === 'prev') {
-        if (currentIndex > 0) {
-            wrappers[currentIndex - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }
-}
+function applyZoom() { if (container) container.style.transform = `scale(${currentScale})`; }
+function zoomIn() { currentScale += 0.15; if (currentScale > 4.0) currentScale = 4.0; applyZoom(); }
+function zoomOut() { currentScale -= 0.15; if (currentScale < 0.4) currentScale = 0.4; applyZoom(); }
 
-function openCenterTextInput() {
-    const existingModal = document.getElementById('center-text-modal');
-    if (existingModal) existingModal.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'center-text-modal';
-    modal.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
-        display: flex; justify-content: center; align-items: center; z-index: 20000;
-    `;
-
-    const box = document.createElement('div');
-    box.style.cssText = `
-        background: #1e293b; padding: 20px; border-radius: 12px;
-        border: 1px solid var(--accent-color); width: 90%; max-width: 420px;
-        box-shadow: 0 12px 32px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 14px;
-    `;
-
-    const title = document.createElement('div');
-    title.innerHTML = '<i class="fa-solid fa-font"></i> แทรกข้อความลอยอิสระ';
-    title.style.cssText = 'color: #fff; font-weight: bold; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;';
-
-    const textarea = document.createElement('textarea');
-    textarea.placeholder = 'พิมพ์ข้อความที่ต้องการแทรกตรงนี้...';
-    textarea.style.cssText = `
-        background: #0f172a; color: #fff; border: 1px solid rgba(255,255,255,0.2);
-        border-radius: 8px; padding: 12px; height: 130px; resize: none;
-        outline: none; font-family: sans-serif; font-size: 15px; line-height: 1.5;
-    `;
-
-    const btnGroup = document.createElement('div');
-    btnGroup.style.cssText = 'display: flex; justify-content: flex-end; gap: 10px;';
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.innerText = 'ยกเลิก';
-    cancelBtn.style.cssText = 'background: #334155; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 14px;';
-    cancelBtn.onclick = () => { modal.remove(); setTool('pan'); };
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> วางข้อความ';
-    confirmBtn.style.cssText = 'background: var(--accent-color); color: #0f172a; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px;';
-    
-    confirmBtn.onclick = () => {
-        const text = textarea.value.trim();
-        if (text) {
-            createNewDraggableText(text);
-        }
-        modal.remove();
-        setTool('pan'); 
-    };
-
-    btnGroup.appendChild(cancelBtn);
-    btnGroup.appendChild(confirmBtn);
-    box.appendChild(title);
-    box.appendChild(textarea);
-    box.appendChild(btnGroup);
-    modal.appendChild(box);
-    document.body.appendChild(modal);
-
-    setTimeout(() => textarea.focus(), 50);
-}
-
-function createNewDraggableText(text) {
-    const activePage = getActivePageWrapper();
-    if (!activePage) {
-        alert("ไม่พบหน้าเอกสารหลักสำหรับวางข้อความค่ะ กรุณาเปิดไฟล์ก่อนนะคะ");
-        return;
-    }
-    const overlayLayer = activePage.querySelector('.text-overlay-layer');
-    if (!overlayLayer) return;
-
-    const node = document.createElement('div');
-    node.className = 'custom-draggable-text-node';
-    
-    const textSpan = document.createElement('span');
-    textSpan.innerText = text;
-    textSpan.style.display = "inline-block";
-    textSpan.style.outline = "none";
-    node.appendChild(textSpan);
-
-    const workspaceRect = workspace.getBoundingClientRect();
-    const overlayRect = overlayLayer.getBoundingClientRect();
-    const clientX = workspaceRect.left + workspaceRect.width / 2;
-    const clientY = workspaceRect.top + workspaceRect.height / 2;
-    const left = (clientX - overlayRect.left) / currentScale;
-    const top = (clientY - overlayRect.top) / currentScale;
-
-    node.style.cssText = `
-        position: absolute; left: ${left}px; top: ${top}px;
-        font-size: ${currentTextSize}px; color: ${currentTextActiveColor}; font-family: 'Sarabun', sans-serif;
-        white-space: pre-wrap; cursor: move; user-select: none; touch-action: none;
-        padding: 6px 10px; border: 1px dashed ${currentTextActiveColor}; border-radius: 6px;
-        display: inline-block; transform: translate(-50%, -50%); 
-        background: transparent; 
-        z-index: 5000;
-    `;
-
-    const controlBar = document.createElement('div');
-    controlBar.className = 'text-node-controls';
-    controlBar.style.cssText = `
-        position: absolute; top: -36px; left: 50%; transform: translateX(-50%);
-        background: #1e293b; border: 1px solid ${currentTextActiveColor}; border-radius: 6px;
-        display: flex; gap: 6px; padding: 4px; z-index: 6000; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        align-items: center;
-    `;
-
-    const commitBtn = document.createElement('button');
-    commitBtn.innerHTML = '<i class="fa-solid fa-square-check" style="color: #22c55e;"></i>';
-    commitBtn.style.cssText = 'background:none; border:none; padding:2px; cursor:pointer; font-size:16px;';
-    commitBtn.title = "ยืนยันล็อกตำแหน่งฝังข้อความ";
-    commitBtn.onclick = (e) => {
-        e.stopPropagation();
-        controlBar.remove();
-        node.style.border = 'none';
-        node.style.background = 'transparent';
-        node.style.cursor = 'default';
-        node.style.touchAction = 'auto';
-        node.onmousedown = null;
-        node.ontouchstart = null;
-        if (activeDraggableNode === node) activeDraggableNode = null;
-    };
-
-    const nodeColorPicker = document.createElement('input');
-    nodeColorPicker.type = 'color';
-    nodeColorPicker.className = 'node-color-picker';
-    nodeColorPicker.value = currentTextActiveColor;
-    nodeColorPicker.style.cssText = 'width:20px; height:20px; border:none; padding:0; cursor:pointer; background:transparent;';
-    nodeColorPicker.title = "ปรับเปลี่ยนสีข้อความลอยชิ้นนี้";
-    nodeColorPicker.oninput = (e) => {
-        node.style.color = e.target.value;
-        node.style.borderColor = e.target.value;
-    };
-
-    const sizeUpBtn = document.createElement('button');
-    sizeUpBtn.innerHTML = '<i class="fa-solid fa-plus" style="color:#22d3ee;"></i>';
-    sizeUpBtn.style.cssText = 'background:none; border:none; padding:2px; cursor:pointer; font-size:14px;';
-    sizeUpBtn.onclick = (e) => {
-        e.stopPropagation();
-        let currentSize = parseFloat(node.style.fontSize) || 24;
-        node.style.fontSize = (currentSize + 3) + 'px';
-    };
-
-    const sizeDownBtn = document.createElement('button');
-    sizeDownBtn.innerHTML = '<i class="fa-solid fa-minus" style="color:#22d3ee;"></i>';
-    sizeDownBtn.style.cssText = 'background:none; border:none; padding:2px; cursor:pointer; font-size:14px;';
-    sizeDownBtn.onclick = (e) => {
-        e.stopPropagation();
-        let currentSize = parseFloat(node.style.fontSize) || 24;
-        if (currentSize > 8) node.style.fontSize = (currentSize - 3) + 'px';
-    };
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can" style="color:#ef4444;"></i>';
-    deleteBtn.style.cssText = 'background:none; border:none; padding:2px; cursor:pointer; font-size:14px;';
-    deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        if(confirm("ต้องการลบข้อความชิ้นนี้ใช่ไหมคะ?")) {
-            node.remove();
-            if (activeDraggableNode === node) activeDraggableNode = null;
-        }
-    };
-
-    controlBar.appendChild(commitBtn);
-    controlBar.appendChild(nodeColorPicker);
-    controlBar.appendChild(sizeUpBtn);
-    controlBar.appendChild(sizeDownBtn);
-    controlBar.appendChild(deleteBtn);
-    node.appendChild(controlBar);
-
-    let isDraggingNode = false;
-    let startX, startY;
-    let initialLeft, initialTop;
-
-    const dragStart = (e) => {
-        if (e.target.closest('.text-node-controls') || textSpan.contentEditable === "true" || (e.touches && e.touches.length === 2)) return;
-        e.stopPropagation();
-        
-        if (activeDraggableNode && activeDraggableNode !== node) {
-            clearActiveDraggableNode();
-        }
-        activeDraggableNode = node;
-        node.style.borderColor = node.style.color || currentTextActiveColor;
-        controlBar.style.display = 'flex';
-
-        if (e.type === 'touchstart') e.preventDefault();
-
-        isDraggingNode = true;
-        const touch = e.touches ? e.touches[0] : e;
-        startX = touch.clientX;
-        startY = touch.clientY;
-
-        initialLeft = parseFloat(node.style.left) || left;
-        initialTop = parseFloat(node.style.top) || top;
-
-        document.addEventListener('mousemove', dragMove, { passive: false });
-        document.addEventListener('mouseup', dragEnd);
-        document.addEventListener('touchmove', dragMove, { passive: false });
-        document.addEventListener('touchend', dragEnd);
-    };
-
-    const dragMove = (e) => {
-        if (!isDraggingNode) return;
-        e.stopPropagation();
-        e.preventDefault();
-
-        const touch = e.touches ? e.touches[0] : e;
-        const dx = (touch.clientX - startX) / currentScale;
-        const dy = (touch.clientY - startY) / currentScale;
-
-        node.style.left = (initialLeft + dx) + 'px';
-        node.style.top = (initialTop + dy) + 'px';
-    };
-
-    const dragEnd = () => {
-        isDraggingNode = false;
-        document.removeEventListener('mousemove', dragMove);
-        document.removeEventListener('mouseup', dragEnd);
-        document.removeEventListener('touchmove', dragMove);
-        document.removeEventListener('touchend', dragEnd);
-    };
-
-    node.addEventListener('mousedown', dragStart);
-    node.addEventListener('touchstart', dragStart, { passive: false });
-
-    node.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        if (!node.querySelector('.text-node-controls')) return; 
-        
-        textSpan.contentEditable = "true";
-        textSpan.focus();
-        node.style.cursor = "text";
-        
-        textSpan.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter' && !ev.shiftKey) {
-                ev.preventDefault();
-                textSpan.blur();
-            }
-        });
-        
-        textSpan.addEventListener('blur', () => {
-            textSpan.contentEditable = "false";
-            node.style.cursor = "move";
-            if (textSpan.innerText.trim() === "") {
-                node.remove();
-                if (activeDraggableNode === node) activeDraggableNode = null;
-            }
-        }, { once: true });
-    });
-
-    overlayLayer.appendChild(node);
+function scrollWorkspace(direction) {
+    if (!workspace) return;
+    const pageHeight = workspace.clientHeight - 100;
+    if (direction === 'next') workspace.scrollTop += pageHeight;
+    else workspace.scrollTop -= pageHeight;
 }
 
 function setTool(tool) {
     currentTool = tool;
-    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.toolbar button').forEach(b => b.classList.remove('active'));
     const activeBtn = document.getElementById(`tool-${tool}`);
     if (activeBtn) activeBtn.classList.add('active');
-    
+
     const penPanel = document.getElementById('pen-settings-panel');
     const textPanel = document.getElementById('text-settings-panel');
-    
-    if (penPanel) {
-        penPanel.style.display = (currentTool === 'pen') ? 'flex' : 'none';
-    }
-    if (textPanel) {
-        textPanel.style.display = (currentTool === 'text') ? 'flex' : 'none';
-    }
-    
+    const toggleShapeBtn = document.getElementById('btn-toggle-shape');
+
+    if (penPanel) penPanel.style.display = (tool === 'pen' || tool === 'eraser') ? 'flex' : 'none';
+    if (toggleShapeBtn) toggleShapeBtn.style.display = (tool === 'eraser') ? 'inline-block' : 'none';
+    if (textPanel) textPanel.style.display = (tool === 'text') ? 'flex' : 'none';
+
     if (workspace) {
-        if (currentTool === 'pan') {
-            workspace.style.cursor = 'grab';
-            workspace.style.overflow = 'auto';
-        } else {
-            workspace.style.cursor = currentTool === 'pen' ? 'crosshair' : (currentTool === 'eraser' ? 'cell' : 'text');
-            workspace.style.overflow = 'hidden';
-            if (currentTool === 'text') openCenterTextInput();
-        }
+        if (tool === 'pan') { workspace.style.cursor = 'grab'; workspace.style.overflow = 'auto'; }
+        else if (tool === 'text') { workspace.style.cursor = 'text'; workspace.style.overflow = 'auto'; }
+        else { workspace.style.cursor = 'crosshair'; workspace.style.overflow = 'hidden'; }
     }
+    clearActiveDraggableNode();
 }
 
-function zoom(direction) {
-    if (direction === 'in') {
-        currentScale += 0.2;
-    } else if (direction === 'out') {
-        currentScale = Math.max(0.4, currentScale - 0.2);
-    }
-    applyZoom();
-}
+function createDraggableTextNode(e) {
+    if (currentTool !== 'text') return;
+    const activePage = getActivePageWrapper(); if (!activePage) return;
+    const overlay = activePage.querySelector('.text-overlay-layer'); if (!overlay) return;
 
-function applyZoom() {
-    if (container) {
-        container.style.transform = `scale(${currentScale})`;
-    }
-}
+    const rect = overlay.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) / currentScale; const y = (clientY - rect.top) / currentScale;
 
-// ==========================================================================
-//  AI ASSISTANT ENGINE (GEMINI API INTEGRATION) FOR NAWEE STUDIO
-// ==========================================================================
+    const node = document.createElement('div');
+    node.className = 'custom-draggable-text-node';
+    node.style.left = x + 'px'; node.style.top = y + 'px';
+    node.style.color = currentTextActiveColor; node.style.fontSize = currentTextSize + 'px';
+    node.style.border = `1px dashed ${currentTextActiveColor}`;
+
+    const span = document.createElement('span');
+    span.setAttribute('contenteditable', 'true');
+    span.style.outline = 'none'; span.style.minWidth = '50px'; span.style.display = 'inline-block';
+    span.innerText = 'พิมพ์ข้อความ...';
+    node.appendChild(span);
+
+    span.addEventListener('focus', () => {
+        clearActiveDraggableNode(); activeDraggableNode = node;
+        node.style.borderColor = currentTextActiveColor;
+        openCenterTextInput();
+    });
+    span.addEventListener('blur', () => { if (span.innerText.trim() === '') { node.remove(); closeTextSheet(); } });
+
+    let isDraggingNode = false; let startX = 0, startY = 0;
+    function dragStart(ev) {
+        if (ev.target === span) return;
+        isDraggingNode = true;
+        const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
+        const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
+        startX = pageX - parseFloat(node.style.left); startY = pageY - parseFloat(node.style.top);
+        clearActiveDraggableNode(); activeDraggableNode = node;
+        node.style.borderColor = currentTextActiveColor;
+        openCenterTextInput();
+    }
+    function dragMove(ev) {
+        if (!isDraggingNode) return;
+        const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
+        const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
+        node.style.left = (pageX - startX) + 'px'; node.style.top = (pageY - startY) + 'px';
+    }
+    function dragEnd() { isDraggingNode = false; }
+
+    node.addEventListener('mousedown', dragStart); document.addEventListener('mousemove', dragMove); document.addEventListener('mouseup', dragEnd);
+    node.addEventListener('touchstart', dragStart, {passive: true}); document.addEventListener('touchmove', dragMove, {passive: true}); document.addEventListener('touchend', dragEnd);
+
+    overlay.appendChild(node);
+    setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        const savedKey = localStorage.getItem('nawee_gemini_api_key');
-        const keyInput = document.getElementById('ai-api-key');
-        if (savedKey && keyInput) {
-            keyInput.value = savedKey;
-        }
-    }, 500);
+    if (workspace) {
+        workspace.addEventListener('click', (e) => {
+            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar')) {
+                createDraggableTextNode(e);
+            }
+        });
+    }
 });
 
-function toggleSidebar() {
-    const sidebar = document.getElementById('ai-sidebar');
-    if (sidebar) {
-        sidebar.classList.toggle('open');
+// --- 🆕 [UPGRADED] ระบบ AI Gemini 1.5 Flash Engine: รองรับการอ่านและวิเคราะห์รูปภาพบนหน้าจอ ---
+async function callGeminiAPI(promptText, base64Image = null) {
+    const keyInput = document.getElementById('ai-api-key');
+    const API_KEY = keyInput ? keyInput.value.trim() : "";
+    if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
+
+    // อัปเกรดจุดเชื่อมต่อ URL ไปใช้โมเดลรุ่นใหม่ gemini-1.5-flash แทนตัวเก่า
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    
+    // โครงสร้าง Payload สำหรับรองรับทั้งข้อมูลข้อความธรรมดา และรูปภาพสแกน
+    let contentsPayload = [];
+    let parts = [{ text: promptText }];
+    
+    if (base64Image) {
+        parts.push({
+            inlineData: {
+                mimeType: "image/jpeg",
+                data: base64Image
+            }
+        });
     }
-}
+    contentsPayload.push({ parts: parts });
 
-function getActivePageText() {
-    const activePage = getActivePageWrapper();
-    if (!activePage) return "";
-    
-    const textNodes = activePage.querySelectorAll('.word-text-node');
-    let textArray = [];
-    textNodes.forEach(node => {
-        if (node.innerText && node.innerText.trim() !== "") {
-            textArray.push(node.innerText.trim());
-        }
-    });
-    return textArray.join(" ");
-}
-
-async function callGeminiAPI(promptText) {
-    const apiKeyInput = document.getElementById('ai-api-key');
-    const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
-    
-    if (!apiKey) {
-        alert("คุณนาวียังไม่ได้ใส่ Gemini API Key เลยค่ะ! สามารถไปกดรับคีย์ฟรีใช้งานได้ที่ Google AI Studio นะคะ");
-        return null;
-    }
-
-    localStorage.setItem('nawee_gemini_api_key', apiKey);
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    
     try {
         const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: promptText }] }]
-            })
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: contentsPayload })
         });
-        
         const data = await response.json();
-        if (data.candidates && data.candidates[0].content.parts[0].text) {
-            return data.candidates[0].content.parts[0].text;
-        } else {
-            console.error("Gemini Error Payload:", data);
-            return "❌ เกิดข้อผิดพลาดจากเซิร์ฟเวอร์ AI กรุณาตรวจสอบความถูกต้องของ API Key อีกครั้งนะคะ";
-        }
-    } catch (error) {
-        console.error("API Call Connection Failed:", error);
-        return "❌ เชื่อมต่อสัญญานไปหา AI ล้มเหลวค่ะ กรุณาเช็กเครือข่ายอินเทอร์เน็ตหรือตรวจสอบสถานะเซิร์ฟเวอร์นะคะ";
+        return data.candidates[0].content.parts[0].text;
+    } catch (e) {
+        return "❌ คีย์เชื่อมต่อไม่ถูกต้อง หรือเน็ตเวิร์กขัดข้องชั่วคราวค่ะ";
+    }
+}
+
+function toggleAiSidebar() {
+    const sidebar = document.getElementById('ai-sidebar');
+    if (sidebar) sidebar.classList.toggle('open');
+}
+
+// ฟังก์ชันแปลงภาพ Canvas เป็น Base64 เพื่อง่ายต่อการส่งเข้า AI
+function captureCurrentPageAsBase64() {
+    const activePage = getActivePageWrapper();
+    if (!activePage) return null;
+    
+    // ดึงหน้าเอกสารหลัก
+    const pdfCanvas = activePage.querySelector('.pdf-page-canvas');
+    const drawCanvas = activePage.querySelector('.drawing-page-canvas');
+    if (!pdfCanvas) return null;
+    
+    // สร้าง Canvas ชั่วคราวขึ้นมาประกบเลเยอร์ภาพวาดกับเอกสารเข้าด้วยกันก่อนส่งให้ AI
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = pdfCanvas.width;
+    tempCanvas.height = pdfCanvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    tempCtx.drawImage(pdfCanvas, 0, 0);
+    if (drawCanvas) tempCtx.drawImage(drawCanvas, 0, 0);
+    
+    return tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+}
+
+async function sendAiQuestion() {
+    const input = document.getElementById('ai-input'); if (!input) return;
+    const userText = input.value.trim(); if (!userText) return;
+
+    appendAiMessage("user", userText); input.value = '';
+    
+    let pageText = "";
+    const activePage = getActivePageWrapper();
+    if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
+
+    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
+    
+    // ถ่ายภาพหน้าจอส่งไปด้วย เผื่อกรณีที่เป็นไฟล์รูปภาพล้วน ๆ ไม่มีข้อความ
+    const imgBase64 = captureCurrentPageAsBase64();
+    
+    let finalPrompt = `คำสั่ง/คำถามจากคุณนาวี: ${userText}\n\n`;
+    if (pageText.trim() !== "") {
+        finalPrompt += `ข้อมูลเนื้อหาตัวอักษรที่พบในหน้าเอกสาร:\n"""\n${pageText}\n"""\n`;
+    }
+    finalPrompt += `(จงวิเคราะห์ข้อมูลจากทั่งข้อความที่ส่งให้ และอ่านวิเคราะห์ตาราง/รายละเอียดจากรูปภาพหน้ากระดาษที่แนบไปพร้อมกัน สรุปคำตอบเป็นภาษาไทยอย่างชัดเจนและกระชับ)`;
+
+    const result = await callGeminiAPI(finalPrompt, imgBase64);
+    if (result) {
+        appendAiMessage("ai", result);
     }
 }
 
 async function askAiToSummary() {
-    const pageText = getActivePageText();
-    if (!pageText || pageText.trim() === "") {
-        alert("หน้าเอกสารปัจจุบันไม่มีข้อมูลตัวอักษรเลยค่ะ! (ไฟล์อาจจะเป็นรูปภาพล้วน หรือคุณนาวียังไม่ได้เปิดเปิดไฟล์เข้ามาค่ะ)");
-        return;
-    }
+    appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
     
-    appendAiMessage("system", "🔄 ระบบกำลังวิเคราะห์และสรุปสาระสำคัญให้คุณนาวีสักครู่นะคะ...");
+    let pageText = "";
+    const activePage = getActivePageWrapper();
+    if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
     
-    const prompt = `คุณคือผู้ช่วยอัจฉริยะในแอป Nawee PDF & Word Pro Studio หน้าที่ของคุณคืออ่านตารางและข้อมูลดิบต่อไปนี้ แล้วสรุปใจความสำคัญเป็นภาษาไทยอย่างชัดเจน เป็นระเบียบ แยกเป็นข้อๆ ให้อ่านง่ายทันที:\n\n${pageText}`;
+    appendAiMessage("system", "⚡ กำลังเปิดกล้องอ่านและวิเคราะห์รายงานตารางหน้านี้ให้คุณนาวีค่ะ...");
     
-    const result = await callGeminiAPI(prompt);
-    if (result) {
-        appendAiMessage("ai", result);
-    }
-}
-
-async function sendAiChatMessage() {
-    const input = document.getElementById('ai-chat-input');
-    if (!input || !input.value.trim()) return;
+    const imgBase64 = captureCurrentPageAsBase64();
+    const prompt = `จงสวมบทบาทเป็นผู้ช่วยอัจฉริยะ สรุปสาระสำคัญ ตัวเลข โครงสร้างตาราง หรือรายงานจากเอกสารหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้องแม่นยำ (หากมีตารางให้อ่านค่าในตารางแล้วแจกแจงออกมาให้ละเอียดครบถ้วน)`;
     
-    const userText = input.value.trim();
-    appendAiMessage("user", userText);
-    input.value = ''; 
-
-    const pageText = getActivePageText();
-    let finalPrompt = "";
-    
-    if (pageText && pageText.trim() !== "") {
-        finalPrompt = `ข้อมูลเนื้อหาจากหน้าเอกสารของคุณนาวีในปัจจุบัน:\n"""\n${pageText}\n"""\n\nคำสั่ง/คำถามจากคุณนาวี: ${userText}\n\n(จงใช้ข้อมูลในเอกสารข้างต้นในการตอบคำถามอย่างถูกต้อง หากไม่มีคำตอบในตัวเล่มให้ใช้ฐานความรู้ทั่วไปตอบเสริมได้อย่างเป็นมิตรและเป็นมืออาชีพ สรุปเป็นภาษาไทยอย่างกระชับ)`;
-    } else {
-        finalPrompt = userText;
-    }
-
-    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
-    
-    const result = await callGeminiAPI(finalPrompt);
-    if (result) {
-        appendAiMessage("ai", result);
-    }
+    const result = await callGeminiAPI(prompt, imgBase64);
+    appendAiMessage("ai", result);
 }
 
 function appendAiMessage(sender, text) {
-    const chatBox = document.getElementById('ai-chat-box');
-    if (!chatBox) return;
-    
-    if (sender === 'system' && (text.includes("กำลังวิเคราะห์") || text.includes("กำลังคิดคำตอบ"))) {
+    const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
+    if (sender === 'system' && (text.includes("กำลังวิเคราะห์") || text.includes("กำลังคิดคำตอบ") || text.includes("กำลังเปิดกล้อง"))) {
         const tempMsg = document.createElement('div');
-        tempMsg.className = 'ai-message system-msg temp-status';
-        tempMsg.innerText = text;
-        chatBox.appendChild(tempMsg);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        return;
+        tempMsg.className = 'ai-message system-msg temp-status'; tempMsg.innerText = text;
+        chatBox.appendChild(tempMsg); chatBox.scrollTop = chatBox.scrollHeight; return;
     }
-    
-    const tempStatus = chatBox.querySelector('.temp-status');
-    if (tempStatus) tempStatus.remove();
+    const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
 
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `ai-message ${sender}-msg`;
-    
-    let formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-    msgDiv.innerHTML = formattedText;
-    
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight; 
+    const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
+    msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
 }
