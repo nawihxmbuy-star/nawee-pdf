@@ -147,6 +147,37 @@
         </div>
     </div>
 
+    <div id="text-node-bottom-bar" class="text-node-floating-bar">
+        <div class="floating-bar-content">
+            <span class="bar-title"><i class="fa-solid fa-font text-glow"></i> ปรับแต่งข้อความ</span>
+            <div class="text-node-controls">
+                <input type="color" id="floating-text-color" title="เปลี่ยนสีตัวอักษร" style="width: 36px; height: 36px; border: none; background: transparent; cursor: pointer; padding: 0;">
+                
+                <button onclick="applyStylesToSelectedText('bold')" title="ตัวหนา"><i class="fa-solid fa-bold"></i></button>
+                <button onclick="applyStylesToSelectedText('italic')" title="ตัวเอียง"><i class="fa-solid fa-italic"></i></button>
+                <button onclick="changeSelectedTextSize(2)" title="ขยายขนาดฟอนต์"><i class="fa-solid fa-square-plus" style="color: #22d3ee;"></i></button>
+                <button onclick="changeSelectedTextSize(-2)" title="ย่อขนาดฟอนต์"><i class="fa-solid fa-square-minus" style="color: #22d3ee;"></i></button>
+                <button onclick="deleteSelectedTextNode()" class="btn-delete-node" title="ลบข้อความชิ้นนี้"><i class="fa-solid fa-trash-can"></i></button>
+                
+                <div class="divider" style="height: 24px; margin: 0 4px; background: rgba(255,255,255,0.15); width: 1px;"></div>
+                
+                <button onclick="deselectTextNode()" class="btn-confirm-node" title="ยืนยันตำแหน่งและปิดการแก้ไข" style="background: var(--accent-color); color: #0f172a; width: auto; padding: 0 12px; font-size: 13px; font-weight: bold; gap: 4px; display: flex; align-items: center; border-radius: 10px; border: none;">
+                    <i class="fa-solid fa-circle-check"></i> ยืนยัน
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
+    
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('Service Worker ลงทะเบียนสำเร็จแล้วค่ะ! ✅'))
+                    .catch(err => console.error('การลงทะเบียน Service Worker ล้มเหลว: ', err));
+            });
+        }
+    </script>
 </body>
 </html>

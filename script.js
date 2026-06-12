@@ -24,6 +24,9 @@ let container = null;
 let workspace = null;
 let appTitle = null;
 
+// ตัวแปรส่วนกลางสำหรับจัดการโหนดข้อความลอยที่กำลังถูกเลือกใช้งาน (Active)
+let activeDraggableNode = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     container = document.getElementById('pdf-container');
     workspace = document.querySelector('.workspace');
@@ -58,6 +61,13 @@ document.addEventListener('DOMContentLoaded', () => {
         textColorPicker.value = currentTextActiveColor;
         textColorPicker.addEventListener('input', (e) => {
             currentTextActiveColor = e.target.value;
+            // หากมีข้อความลอยเลือกอยู่ ให้เปลี่ยนสีตามทันที
+            if (activeDraggableNode) {
+                activeDraggableNode.style.color = currentTextActiveColor;
+                activeDraggableNode.style.borderColor = currentTextActiveColor;
+                const nodeColorPicker = activeDraggableNode.querySelector('.node-color-picker');
+                if (nodeColorPicker) nodeColorPicker.value = currentTextActiveColor;
+            }
         });
     }
 
@@ -67,15 +77,24 @@ document.addEventListener('DOMContentLoaded', () => {
         textSizeSlider.addEventListener('input', (e) => {
             currentTextSize = parseInt(e.target.value);
             textSizeLabel.innerText = currentTextSize + 'px';
+            // หากมีข้อความลอยเลือกอยู่ ให้เปลี่ยนขนาดตามทันที
+            if (activeDraggableNode) {
+                activeDraggableNode.style.fontSize = currentTextSize + 'px';
+            }
         });
     }
 
     updateBrushPreview();
     setTool('pan');
     
+    // คลิกพื้นที่ว่างอื่นๆ เพื่อเคลียร์การเลือกขอบเขตกล่องข้อความลอย หรือปิดป๊อปอัพ
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.dropdown-wrapper')) {
             closeAllPopups();
+        }
+        // 🎯 แก้ไขคลาสจาก '.bottom-toolbar' เป็น '.toolbar' เพื่อให้ตรงกับโครงสร้าง HTML ป้องกันกล่องข้อความลอยหลุดโฟกัสเอง
+        if (!e.target.closest('.custom-draggable-text-node') && !e.target.closest('#text-settings-panel') && !e.target.closest('.toolbar')) {
+            clearActiveDraggableNode();
         }
     });
 
@@ -199,16 +218,13 @@ function triggerWordToPdf() {
     alert("ระบบซิงค์ข้อความแก้ไขล่าสุดกลับเข้าสู่เลเยอร์แสดงผลหลักเสร็จสิ้นแล้วค่ะ!");
 }
 
-// 🌟 ฟังก์ชันระดับ AI Smart-Fit: คำนวณสัดส่วนกระดาษตามไฟล์จริงโดยอัตโนมัติ 1:1
 function getPDFOptions() {
     const element = document.getElementById('pdf-container');
     const firstPage = element ? element.querySelector('.page-wrapper') : null;
     
-    // ตั้งค่าเริ่มต้นมาตรฐาน A4 (ถ้ายังไม่ได้โหลดไฟล์)
     let pdfWidth = 794;
     let pdfHeight = 1123;
     
-    // ตรวจสอบขนาดจริงของหน้ากระดาษที่เปิดอยู่ เพื่อขยายขอบเขต PDF ให้พอดีขอบขวา
     if (firstPage) {
         pdfWidth = parseFloat(firstPage.style.width) || firstPage.offsetWidth || 794;
         pdfHeight = parseFloat(firstPage.style.height) || firstPage.offsetHeight || 1123;
@@ -230,7 +246,6 @@ function getPDFOptions() {
             format: [pdfWidth, pdfHeight], 
             orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait'
         },
-        // 🛠️ อัปเดต: เปลี่ยนมาใช้โหมด 'slice' เพื่อล็อกตัดแบ่งหน้าตามพิกเซลความสูงจริง ป้องกันเนื้อหาเลื่อนหลุดตำแหน่ง
         pagebreak: { mode: 'slice' }
     };
 }
@@ -242,32 +257,20 @@ async function exportToPDFFile() {
         return;
     }
     
+    if (typeof html2pdf === 'undefined') {
+        alert("ไม่สามารถรันระบบส่งออกได้เนื่องจากตรวจไม่พบไลบรารี html2pdf กรุณาเชื่อมต่ออินเทอร์เน็ตนะคะ");
+        return;
+    }
+    
     const originalScale = currentScale;
     currentScale = 1.0; 
     applyZoom();
+    clearActiveDraggableNode();
 
-    // สร้าง Tag พิเศษชั่วคราวเพื่อทำลาย Margin และซ่อน UI ควบคุม ป้องกันหน้ากระดาษงอกเพิ่ม
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        /* 🛠️ ปรับตัวแม่: ล้างช่องว่างและ Gap ของ Flexbox ทั้งหมดให้ต่อสนิทกัน */
-        #pdf-container { 
-            padding: 0 !important; 
-            margin: 0 !important; 
-            gap: 0 !important; 
-            display: block !important; 
-        }
-        
-        /* 🛠️ ปรับหน้าย่อย: ล้างขอบเงาและบังคับไม่ให้เนื้อหาฉีกขาดกลางคัน */
-        .page-wrapper { 
-            margin: 0 !important; 
-            padding: 0 !important;
-            border: none !important; 
-            box-shadow: none !important; 
-            display: block !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-        }
-        
+        #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; }
+        .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls { display: none !important; }
     `;
@@ -294,32 +297,21 @@ async function shareToLine() {
         alert("ไม่พบข้อมูลเอกสารเพื่อส่งออกแชร์ค่ะ!");
         return;
     }
+    
+    if (typeof html2pdf === 'undefined') {
+        alert("ไม่สามารถรันระบบแชร์ได้เนื่องจากตรวจไม่พบไลบรารี html2pdf กรุณาเชื่อมต่ออินเทอร์เน็ตนะคะ");
+        return;
+    }
 
     const originalScale = currentScale;
     currentScale = 1.0; 
     applyZoom();
+    clearActiveDraggableNode();
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        /* 🛠️ ปรับตัวแม่: ล้างช่องว่างและ Gap ของ Flexbox ทั้งหมดให้ต่อสนิทกัน */
-        #pdf-container { 
-            padding: 0 !important; 
-            margin: 0 !important; 
-            gap: 0 !important; 
-            display: block !important; 
-        }
-        
-        /* 🛠️ ปรับหน้าย่อย: ล้างขอบเงาและบังคับไม่ให้เนื้อหาฉีกขาดกลางคัน */
-        .page-wrapper { 
-            margin: 0 !important; 
-            padding: 0 !important;
-            border: none !important; 
-            box-shadow: none !important; 
-            display: block !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-        }
-        
+        #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; }
+        .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls { display: none !important; }
     `;
@@ -353,7 +345,28 @@ async function shareToLine() {
 }
 
 function formatWord(command, value = null) {
-    document.execCommand(command, false, value);
+    if (currentFileMode === 'word') {
+        document.execCommand(command, false, value);
+    } else if (activeDraggableNode) {
+        const span = activeDraggableNode.querySelector('span');
+        if (!span) return;
+        if (command === 'bold') {
+            span.style.fontWeight = (span.style.fontWeight === 'bold') ? 'normal' : 'bold';
+        } else if (command === 'italic') {
+            span.style.fontStyle = (span.style.fontStyle === 'italic') ? 'normal' : 'italic';
+        } else if (command === 'underline') {
+            span.style.textDecoration = (span.style.textDecoration === 'underline') ? 'none' : 'underline';
+        }
+    }
+}
+
+function clearActiveDraggableNode() {
+    if (activeDraggableNode) {
+        activeDraggableNode.style.borderColor = 'transparent';
+        const controls = activeDraggableNode.querySelector('.text-node-controls');
+        if (controls) controls.style.display = 'none';
+        activeDraggableNode = null;
+    }
 }
 
 function toggleDropdown(menuId) {
@@ -366,6 +379,16 @@ function toggleDropdown(menuId) {
 
 function closeAllPopups() {
     document.querySelectorAll('.dropdown-popup').forEach(m => m.classList.remove('show'));
+}
+
+// 🎯 แก้ไขจาก 'brush-preview-circle' เป็น 'brush-preview' เพื่อให้ควบคุมวงกลมปลายพู่กันบน HTML ได้ถูกต้อง
+function updateBrushPreview() {
+    const preview = document.getElementById('brush-preview');
+    if (preview) {
+        preview.style.width = currentBrushSize + 'px';
+        preview.style.height = currentBrushSize + 'px';
+        preview.style.backgroundColor = currentActiveColor;
+    }
 }
 
 async function handleFileOpen(e) {
@@ -515,7 +538,7 @@ function bindDrawingEngine(canvas) {
         lastY = coords.y;
     }
 
-const stopAction = () => {
+    const stopAction = () => {
         if (isDrawing) {
             isDrawing = false;
             const currentState = canvas.toDataURL();
@@ -563,6 +586,21 @@ function undoAction() {
             ctx.drawImage(img, 0, 0);
         };
         img.src = prevState;
+    }
+}
+
+function clearCurrentDrawings() {
+    const activePage = getActivePageWrapper();
+    if (!activePage) return;
+    const canvas = activePage.querySelector('.drawing-page-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const currentState = canvas.toDataURL();
+        if (canvas.undoStack[canvas.undoStack.length - 1] !== currentState) {
+            canvas.undoStack.push(currentState);
+            canvas.redoStack = [];
+        }
     }
 }
 
@@ -702,6 +740,8 @@ function createNewDraggableText(text) {
     
     const textSpan = document.createElement('span');
     textSpan.innerText = text;
+    textSpan.style.display = "inline-block";
+    textSpan.style.outline = "none";
     node.appendChild(textSpan);
 
     const workspaceRect = workspace.getBoundingClientRect();
@@ -743,14 +783,15 @@ function createNewDraggableText(text) {
         node.style.touchAction = 'auto';
         node.onmousedown = null;
         node.ontouchstart = null;
+        if (activeDraggableNode === node) activeDraggableNode = null;
     };
 
     const nodeColorPicker = document.createElement('input');
     nodeColorPicker.type = 'color';
+    nodeColorPicker.className = 'node-color-picker';
     nodeColorPicker.value = currentTextActiveColor;
     nodeColorPicker.style.cssText = 'width:20px; height:20px; border:none; padding:0; cursor:pointer; background:transparent;';
     nodeColorPicker.title = "ปรับเปลี่ยนสีข้อความลอยชิ้นนี้";
-    
     nodeColorPicker.oninput = (e) => {
         node.style.color = e.target.value;
         node.style.borderColor = e.target.value;
@@ -779,7 +820,10 @@ function createNewDraggableText(text) {
     deleteBtn.style.cssText = 'background:none; border:none; padding:2px; cursor:pointer; font-size:14px;';
     deleteBtn.onclick = (e) => {
         e.stopPropagation();
-        if(confirm("ต้องการลบข้อความชิ้นนี้ใช่ไหมคะ?")) node.remove();
+        if(confirm("ต้องการลบข้อความชิ้นนี้ใช่ไหมคะ?")) {
+            node.remove();
+            if (activeDraggableNode === node) activeDraggableNode = null;
+        }
     };
 
     controlBar.appendChild(commitBtn);
@@ -794,8 +838,16 @@ function createNewDraggableText(text) {
     let initialLeft, initialTop;
 
     const dragStart = (e) => {
-        if (e.target.closest('.text-node-controls') || (e.touches && e.touches.length === 2)) return;
+        if (e.target.closest('.text-node-controls') || textSpan.contentEditable === "true" || (e.touches && e.touches.length === 2)) return;
         e.stopPropagation();
+        
+        if (activeDraggableNode && activeDraggableNode !== node) {
+            clearActiveDraggableNode();
+        }
+        activeDraggableNode = node;
+        node.style.borderColor = node.style.color || currentTextActiveColor;
+        controlBar.style.display = 'flex';
+
         if (e.type === 'touchstart') e.preventDefault();
 
         isDraggingNode = true;
@@ -839,11 +891,26 @@ function createNewDraggableText(text) {
     node.addEventListener('dblclick', (e) => {
         e.stopPropagation();
         if (!node.querySelector('.text-node-controls')) return; 
-        const newText = prompt("แก้ไขเนื้อหาข้อความลอย:", textSpan.innerText);
-        if (newText !== null) {
-            if (newText.trim() === "") node.remove();
-            else textSpan.innerText = newText;
-        }
+        
+        textSpan.contentEditable = "true";
+        textSpan.focus();
+        node.style.cursor = "text";
+        
+        textSpan.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' && !ev.shiftKey) {
+                ev.preventDefault();
+                textSpan.blur();
+            }
+        });
+        
+        textSpan.addEventListener('blur', () => {
+            textSpan.contentEditable = "false";
+            node.style.cursor = "move";
+            if (textSpan.innerText.trim() === "") {
+                node.remove();
+                if (activeDraggableNode === node) activeDraggableNode = null;
+            }
+        }, { once: true });
     });
 
     overlayLayer.appendChild(node);
@@ -896,7 +963,6 @@ function applyZoom() {
 //  AI ASSISTANT ENGINE (GEMINI API INTEGRATION) FOR NAWEE STUDIO
 // ==========================================================================
 
-// คอยดึงคีย์เดิมที่คุณนาวีเคยเซฟไว้ในเครื่องมาโชว์ตอนเปิดหน้าจอใหม่
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         const savedKey = localStorage.getItem('nawee_gemini_api_key');
@@ -907,7 +973,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 500);
 });
 
-// ฟังก์ชันเปิด-ปิดแถบเมนู AI ด้านข้าง
 function toggleSidebar() {
     const sidebar = document.getElementById('ai-sidebar');
     if (sidebar) {
@@ -915,12 +980,10 @@ function toggleSidebar() {
     }
 }
 
-// ฟังก์ชันตรวจจับแกะตัวหนังสือและข้อความตารางจากหน้าจอที่คุณนาวีกำลังส่องอยู่ ณ ปัจจุบัน
 function getActivePageText() {
     const activePage = getActivePageWrapper();
     if (!activePage) return "";
     
-    // ดึงตัวหนังสือภาษาไทยทั้งหมดที่มีการแกะเลเยอร์ไว้ในหน้านั้นๆ
     const textNodes = activePage.querySelectorAll('.word-text-node');
     let textArray = [];
     textNodes.forEach(node => {
@@ -931,7 +994,6 @@ function getActivePageText() {
     return textArray.join(" ");
 }
 
-// แกนหลักในการยิงคำสั่งข้ามเน็ตไปหาเซิร์ฟเวอร์สมองกล Google Gemini 2.5 Flash แบบฟรี
 async function callGeminiAPI(promptText) {
     const apiKeyInput = document.getElementById('ai-api-key');
     const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
@@ -941,10 +1003,8 @@ async function callGeminiAPI(promptText) {
         return null;
     }
 
-    // เซฟเก็บลงเครื่องไว้เลยกันลืมและไม่ต้องคอยพิมพ์ใหม่
     localStorage.setItem('nawee_gemini_api_key', apiKey);
 
-    // ยิงไปที่โมเดล Gemini 2.5 Flash ตัวล่าสุดที่ประมวลผลเร็วและใช้สิทธิ์พัฒนาฟรีได้
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     
     try {
@@ -969,7 +1029,6 @@ async function callGeminiAPI(promptText) {
     }
 }
 
-// คำสั่งด่วน: จัดการสรุปเนื้อหาตาราง/รายงานประจำหน้ากระดาษ
 async function askAiToSummary() {
     const pageText = getActivePageText();
     if (!pageText || pageText.trim() === "") {
@@ -987,19 +1046,17 @@ async function askAiToSummary() {
     }
 }
 
-// คำสั่งแชท: พิมพ์คุยตอบโต้แบบพ่วงเนื้อหาไฟล์ในหน้ากระดาษเข้าไปเป็นบริบทเบื้องหลังด้วย
 async function sendAiChatMessage() {
     const input = document.getElementById('ai-chat-input');
     if (!input || !input.value.trim()) return;
     
     const userText = input.value.trim();
     appendAiMessage("user", userText);
-    input.value = ''; // เคลียร์ช่องพิมพ์
+    input.value = ''; 
 
     const pageText = getActivePageText();
     let finalPrompt = "";
     
-    // ถ้าในหน้านั้นมีข้อความ ให้พ่วงข้อความนั้นเป็นสมองดิบให้ AI อ่านก่อนตอบทุกครั้ง
     if (pageText && pageText.trim() !== "") {
         finalPrompt = `ข้อมูลเนื้อหาจากหน้าเอกสารของคุณนาวีในปัจจุบัน:\n"""\n${pageText}\n"""\n\nคำสั่ง/คำถามจากคุณนาวี: ${userText}\n\n(จงใช้ข้อมูลในเอกสารข้างต้นในการตอบคำถามอย่างถูกต้อง หากไม่มีคำตอบในตัวเล่มให้ใช้ฐานความรู้ทั่วไปตอบเสริมได้อย่างเป็นมิตรและเป็นมืออาชีพ สรุปเป็นภาษาไทยอย่างกระชับ)`;
     } else {
@@ -1014,12 +1071,10 @@ async function sendAiChatMessage() {
     }
 }
 
-// ฟังก์ชันสำหรับต่อกล่องแชทพ่นกล่องข้อความลงบน UI หน้าจอ
 function appendAiMessage(sender, text) {
     const chatBox = document.getElementById('ai-chat-box');
     if (!chatBox) return;
     
-    // ลบข้อความจำพวก "กำลังประมวลผล..." ชั่วคราวออกไปก่อน เพื่อให้แชทสะอาด
     if (sender === 'system' && (text.includes("กำลังวิเคราะห์") || text.includes("กำลังคิดคำตอบ"))) {
         const tempMsg = document.createElement('div');
         tempMsg.className = 'ai-message system-msg temp-status';
@@ -1035,10 +1090,9 @@ function appendAiMessage(sender, text) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `ai-message ${sender}-msg`;
     
-    // ตกแต่งฟอร์แมตตัวหนังสือเบื้องต้น แปลงเครื่องหมาย ** เป็นตัวหนาแท็ก <b> เพื่อความสวยงามในการแสดงผล
     let formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
     msgDiv.innerHTML = formattedText;
     
     chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight; // ออโต้สกรอลล์ลงล่างสุดตามข้อความใหม่
+    chatBox.scrollTop = chatBox.scrollHeight; 
 }

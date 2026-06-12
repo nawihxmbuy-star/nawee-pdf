@@ -12,16 +12,17 @@ body {
     height: 100vh; 
     overflow: hidden; 
     font-family: 'Sarabun', sans-serif; 
+}
+
+/* 📱 ป้องกันการกดคลุมดำโดน UI หลัก (ย้ายมาจาก body เพื่อป้องกันบั๊กพิมพ์ข้อความไม่ได้บนมือถือ) */
+.top-bar, .toolbar, .word-formatting-bar, .pen-sub-panel, .ai-sidebar, .text-node-controls {
     user-select: none;
     -webkit-user-select: none;
 }
 
 /* --- ระบบเปิด-ปิดส่วนควบคุม UI ตามสถานะโหมดการทำงาน --- */
 body.mode-pdf .word-formatting-bar { display: none; }
-body.mode-pdf .toolbar { display: flex; }
-
 body.mode-word .word-formatting-bar { display: flex; }
-body.mode-word .toolbar { display: flex; }
 
 /* แถบเมนูด้านบน */
 .top-bar {
@@ -196,6 +197,11 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
     width: 6px; height: 6px; transition: width 0.1s, height 0.1s, background-color 0.1s;
 }
 
+/* 🛠️ ซ่อนแถบเครื่องมือเก่าของ HTML ที่ไม่ได้ใช้แล้ว เพื่อป้องกันพื้นที่หน้าจอด้านล่างบวมค้าง */
+.text-node-floating-bar {
+    display: none !important;
+}
+
 @media (max-width: 650px) {
     .top-bar { padding: 0 8px; height: 60px; }
     .brand span { font-size: 13px; }
@@ -211,6 +217,7 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
     .pen-sub-panel { flex-direction: column; gap: 10px; width: 90%; bottom: 75px; }
 }
 
+/* 🛠️ ลบเครื่องหมาย Backslash (\) ที่ผิดโครงสร้าง CSS ออก เพื่อให้ดาวน์โหลด PDF ได้เนี๊ยบ */
 @media print {
     @page { margin: 0; size: auto; }
     
@@ -220,9 +227,10 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
         background: white !important; 
     }
     
-    .top-bar, .toolbar, .nav-btn, .action-group, \
-    .pen-sub-panel, .text-settings-panel, .brand, .word-formatting-bar { \
-        display: none !important; \
+    .top-bar, .toolbar, .nav-btn, .action-group, 
+    .pen-sub-panel, .text-settings-panel, .brand, .word-formatting-bar,
+    .text-node-controls, .ai-sidebar { 
+        display: none !important; 
     }
 
     #pdf-container {
@@ -248,10 +256,10 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 .ai-sidebar {
     position: fixed;
     top: 0;
-    right: -380px; /* ซ่อนไว้ขวาจอเริ่มต้น */
+    right: -380px; 
     width: 360px;
     height: 100%;
-    background: #111827; /* เข้มเนียนตา */
+    background: #111827; 
     border-left: 2px solid #22d3ee;
     box-shadow: -10px 0 30px rgba(0, 0, 0, 0.7);
     z-index: 99999;
@@ -261,7 +269,7 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 }
 
 .ai-sidebar.open {
-    right: 0; /* สไลด์โผล่ออกมา */
+    right: 0; 
 }
 
 .ai-sidebar-header {
@@ -430,4 +438,77 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* ==========================================================================
+   🛠️ ชุดแก้ไขแถบเครื่องมือลอย (.text-node-controls) สำหรับคุณนาวี
+   ========================================================================== */
+
+/* ตัวกล่องแถบเครื่องมือลอย */
+.text-node-controls {
+    position: absolute;
+    top: -46px; 
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    border: 1px solid #22d3ee;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 10px;
+    z-index: 6000;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
+    min-width: max-content; 
+    box-sizing: border-box;
+}
+
+/* สไตล์ปุ่มกดทุกตัวในแถบควบคุมลอย และไอคอนด้านใน */
+.text-node-controls button,
+.text-node-controls button i {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    transition: background 0.1s, transform 0.1s;
+}
+
+/* เอฟเฟกต์ตอนเอานิ้วจิ้มปุ่ม หรือเอาเมาส์ชี้ปุ่มลบถังขยะขวาสุด */
+.text-node-controls button:active {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(0.92);
+}
+
+/* 🎯 แก้ไขทางเทคนิค: บล็อกไม่ให้ช่องเลือกสีของ Android บวมล้นขอบ */
+.text-node-controls input[type="color"] {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #ffffff;
+    padding: 0;
+    margin: 0 4px;
+    cursor: pointer;
+    background: transparent;
+    border-radius: 50%;
+    overflow: hidden;
+    box-sizing: border-box;
+    -webkit-appearance: none; 
+}
+
+/* ล้าง Padding ส่วนเกินในกล่องสีของ Chrome/Webview */
+.text-node-controls input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+.text-node-controls input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
 }
