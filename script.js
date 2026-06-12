@@ -26,6 +26,17 @@ let appTitle = null;
 let activeDraggableNode = null;
 let eraserShape = 'circle';
 
+// ฟังก์ชันแปลงค่าสี RGB จากเบราว์เซอร์ให้เป็น Hex เพื่อซิงค์กับช่องเลือกสี
+function rgbToHex(rgb) {
+    if (!rgb || !rgb.startsWith('rgb')) return rgb;
+    const rgbValues = rgb.match(/\d+/g);
+    if (!rgbValues || rgbValues.length < 3) return null;
+    return "#" + rgbValues.slice(0,3).map(x => {
+        const hex = parseInt(x).toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+    }).join("");
+}
+
 // --- UI: ระบบแสดงการแจ้งเตือน Custom Notification ---
 function showNotification(msg) {
     const div = document.createElement('div');
@@ -82,13 +93,19 @@ function closeTextSheet() {
     if (bottomSheet) bottomSheet.classList.remove('active');
 }
 
+// ฟังก์ชันเสริมสำหรับควบคุมตกแต่งข้อความลอยล่างสุด
 function changeActiveNodeSize(amount) {
     if (activeDraggableNode) {
-        let span = activeDraggableNode.querySelector('span');
         let currentSize = parseInt(activeDraggableNode.style.fontSize) || 24;
         let newSize = currentSize + amount;
         if (newSize >= 12 && newSize <= 100) {
             activeDraggableNode.style.fontSize = newSize + 'px';
+            const textSizeSlider = document.getElementById('text-size-slider');
+            const textSizeLabel = document.getElementById('text-size-val');
+            if (textSizeSlider && textSizeLabel) {
+                textSizeSlider.value = newSize;
+                textSizeLabel.innerText = newSize + 'px';
+            }
         }
     }
 }
@@ -130,19 +147,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // 🟢 [FIXED] เลือกสีจากแผงหลักแล้วให้ข้อความเปลี่ยนสีตามทันที (ใช้ได้ทั้ง PDF/WORD Mode)
     const textColorPicker = document.getElementById('text-color-picker');
     if (textColorPicker) {
         textColorPicker.addEventListener('input', (e) => {
             currentTextActiveColor = e.target.value;
+            if (activeDraggableNode) {
+                activeDraggableNode.style.color = currentTextActiveColor;
+                activeDraggableNode.style.borderColor = currentTextActiveColor;
+            }
         });
     }
 
+    // 🟢 [FIXED] เลื่อนสไลเดอร์ปรับขนาดแล้วให้ข้อความขยายใหญ่ตามทันที (ใช้ได้ทั้ง PDF/WORD Mode)
     const textSizeSlider = document.getElementById('text-size-slider');
     const textSizeLabel = document.getElementById('text-size-val');
     if (textSizeSlider && textSizeLabel) {
         textSizeSlider.addEventListener('input', (e) => {
             currentTextSize = parseInt(e.target.value);
             textSizeLabel.innerText = currentTextSize + 'px';
+            if (activeDraggableNode) {
+                activeDraggableNode.style.fontSize = currentTextSize + 'px';
+            }
         });
     }
 
@@ -152,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentTextActiveColor = e.target.value;
             if (activeDraggableNode) {
                 activeDraggableNode.style.color = currentTextActiveColor;
+                activeDraggableNode.style.borderColor = currentTextActiveColor;
             }
         });
     }
@@ -330,8 +357,17 @@ function formatWord(command, value = null) {
 function clearActiveDraggableNode() {
     if (activeDraggableNode) {
         activeDraggableNode.style.borderColor = 'transparent';
+        activeDraggableNode.classList.remove('is-active-focused');
         activeDraggableNode = null;
     }
+}
+
+// ระบบเลื่อนเปลี่ยนหน้ากระดาษ
+function scrollWorkspace(direction) {
+    if (!workspace) return;
+    const pageHeight = workspace.clientHeight - 100;
+    if (direction === 'next') workspace.scrollTop += pageHeight;
+    else workspace.scrollTop -= pageHeight;
 }
 
 function toggleDropdown(menuId) {
@@ -343,7 +379,6 @@ function toggleDropdown(menuId) {
 }
 function closeAllPopups() { document.querySelectorAll('.dropdown-popup').forEach(m => m.classList.remove('show')); }
 
-// แก้ไขฟังก์ชันการวาดเส้นให้ตรงจุด (Fix Zoom Tracking)
 function updateBrushPreview() {
     const preview = document.getElementById('brush-preview');
     if (preview) { preview.style.width = currentBrushSize + 'px'; preview.style.height = currentBrushSize + 'px'; preview.style.backgroundColor = currentActiveColor; }
@@ -411,7 +446,6 @@ async function handleFileOpen(e) {
     } catch (error) { alert("เกิดข้อผิดพลาดในการโหลดชีทสเปซ: " + error.message); }
 }
 
-// 🟢 [FIXED] แก้ไขบั๊กพิกัดปากกาเบี้ยวตอนซูมเสร็จเรียบร้อย!
 function bindDrawingEngine(canvas) {
     const ctx = canvas.getContext('2d');
     let isDrawing = false; let lastX = 0, lastY = 0;
@@ -422,13 +456,8 @@ function bindDrawingEngine(canvas) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        
-        // คำนวณพิกัดโดยการนำสเกลการซูม (currentScale) มาร่วมหารเพื่อให้เส้นเกาะตามพิกัดจริงบนหน้าจอ
-        const rawX = ((clientX - rect.left) / rect.width) * canvas.width;
-        const rawY = ((clientY - rect.top) / rect.height) * canvas.height;
-        return { x: rawX, y: rawY };
+        return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height };
     }
-    
     function startAction(e) {
         if (currentTool === 'pan' || currentTool === 'text' || (e.touches && e.touches.length > 1)) return;
         const coords = getCoords(e); isDrawing = true; lastX = coords.x; lastY = coords.y;
@@ -509,13 +538,6 @@ function applyZoom() { if (container) container.style.transform = `scale(${curre
 function zoomIn() { currentScale += 0.15; if (currentScale > 4.0) currentScale = 4.0; applyZoom(); }
 function zoomOut() { currentScale -= 0.15; if (currentScale < 0.4) currentScale = 0.4; applyZoom(); }
 
-function scrollWorkspace(direction) {
-    if (!workspace) return;
-    const pageHeight = workspace.clientHeight - 100;
-    if (direction === 'next') workspace.scrollTop += pageHeight;
-    else workspace.scrollTop -= pageHeight;
-}
-
 function setTool(tool) {
     currentTool = tool;
     document.querySelectorAll('.toolbar button').forEach(b => b.classList.remove('active'));
@@ -538,6 +560,7 @@ function setTool(tool) {
     clearActiveDraggableNode();
 }
 
+// 🟢 [FIXED COMPLETELY] ระบบกล่องข้อความอัจฉริยะลากย้าย ปรับฟอนต์ เปลี่ยนสีได้เรียลไทม์ (ใช้งานได้ทั้ง 2 โหมดอิสระ)
 function createDraggableTextNode(e) {
     if (currentTool !== 'text') return;
     const activePage = getActivePageWrapper(); if (!activePage) return;
@@ -560,36 +583,79 @@ function createDraggableTextNode(e) {
     span.innerText = 'พิมพ์ข้อความ...';
     node.appendChild(span);
 
-    span.addEventListener('focus', () => {
-        clearActiveDraggableNode(); activeDraggableNode = node;
-        node.style.borderColor = currentTextActiveColor;
-        openCenterTextInput();
+    // จิ้มที่ตัวหนังสือเบา ๆ เพื่อเข้าโหมดพิมพ์ทันที
+    span.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        node.classList.add('is-editing');
+        span.focus();
     });
-    span.addEventListener('blur', () => { if (span.innerText.trim() === '') { node.remove(); closeTextSheet(); } });
+
+    span.addEventListener('blur', () => {
+        node.classList.remove('is-editing');
+        if (span.innerText.trim() === '' || span.innerText === 'พิมพ์ข้อความ...') { 
+            node.remove(); 
+            closeTextSheet(); 
+        }
+    });
 
     let isDraggingNode = false; let startX = 0, startY = 0;
+    
     function dragStart(ev) {
-        if (ev.target === span) return;
+        if (node.classList.contains('is-editing')) return; // ถ้าพิมพ์อยู่ ห้ามลากย้ายขยับ
         isDraggingNode = true;
         const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
         const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
-        startX = pageX - parseFloat(node.style.left); startY = pageY - parseFloat(node.style.top);
-        clearActiveDraggableNode(); activeDraggableNode = node;
-        node.style.borderColor = currentTextActiveColor;
+        startX = pageX - parseFloat(node.style.left); 
+        startY = pageY - parseFloat(node.style.top);
+        
+        clearActiveDraggableNode(); 
+        activeDraggableNode = node;
+        node.style.borderColor = node.style.color || currentTextActiveColor;
+        node.classList.add('is-active-focused');
+
+        // 🔥 ซิงค์ค่าฟอนต์และสีของกล่องนี้กลับมาแสดงที่แถบควบคุมหลักด้านล่างทันที
+        const textSizeSlider = document.getElementById('text-size-slider');
+        const textSizeLabel = document.getElementById('text-size-val');
+        if (textSizeSlider && textSizeLabel) {
+            const size = parseInt(node.style.fontSize) || 24;
+            textSizeSlider.value = size;
+            textSizeLabel.innerText = size + 'px';
+            currentTextSize = size;
+        }
+        
+        const textColorPicker = document.getElementById('text-color-picker');
+        if (textColorPicker) {
+            const hexColor = rgbToHex(node.style.color) || currentTextActiveColor;
+            textColorPicker.value = hexColor;
+            currentTextActiveColor = hexColor;
+        }
         openCenterTextInput();
     }
+
     function dragMove(ev) {
         if (!isDraggingNode) return;
         const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
         const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
-        node.style.left = (pageX - startX) + 'px'; node.style.top = (pageY - startY) + 'px';
+        node.style.left = (pageX - startX) + 'px'; 
+        node.style.top = (pageY - startY) + 'px';
     }
+
     function dragEnd() { isDraggingNode = false; }
 
-    node.addEventListener('mousedown', dragStart); document.addEventListener('mousemove', dragMove); document.addEventListener('mouseup', dragEnd);
-    node.addEventListener('touchstart', dragStart, {passive: true}); document.addEventListener('touchmove', dragMove, {passive: true}); document.addEventListener('touchend', dragEnd);
+    node.addEventListener('mousedown', dragStart); 
+    document.addEventListener('mousemove', dragMove); 
+    document.addEventListener('mouseup', dragEnd);
+    
+    node.addEventListener('touchstart', dragStart, {passive: true}); 
+    document.addEventListener('touchmove', dragMove, {passive: true}); 
+    document.addEventListener('touchend', dragEnd);
 
     overlay.appendChild(node);
+    
+    // โฟกัสพร้อมเปิดพิมพ์คำออโต้ทันทีที่คลิกสร้างบนกระดาษ
+    clearActiveDraggableNode();
+    activeDraggableNode = node;
+    node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
 
@@ -603,33 +669,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- 🆕 [UPGRADED] ระบบ AI Gemini 1.5 Flash Engine: รองรับการอ่านและวิเคราะห์รูปภาพบนหน้าจอ ---
-async function callGeminiAPI(promptText, base64Image = null) {
+// --- AI Gemini Engine Integration ---
+async function callGeminiAPI(promptText) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
-    // อัปเกรดจุดเชื่อมต่อ URL ไปใช้โมเดลรุ่นใหม่ gemini-1.5-flash แทนตัวเก่า
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-    
-    // โครงสร้าง Payload สำหรับรองรับทั้งข้อมูลข้อความธรรมดา และรูปภาพสแกน
-    let contentsPayload = [];
-    let parts = [{ text: promptText }];
-    
-    if (base64Image) {
-        parts.push({
-            inlineData: {
-                mimeType: "image/jpeg",
-                data: base64Image
-            }
-        });
-    }
-    contentsPayload.push({ parts: parts });
-
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
     try {
         const response = await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: contentsPayload })
+            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         });
         const data = await response.json();
         return data.candidates[0].content.parts[0].text;
@@ -643,74 +693,40 @@ function toggleAiSidebar() {
     if (sidebar) sidebar.classList.toggle('open');
 }
 
-// ฟังก์ชันแปลงภาพ Canvas เป็น Base64 เพื่อง่ายต่อการส่งเข้า AI
-function captureCurrentPageAsBase64() {
-    const activePage = getActivePageWrapper();
-    if (!activePage) return null;
-    
-    // ดึงหน้าเอกสารหลัก
-    const pdfCanvas = activePage.querySelector('.pdf-page-canvas');
-    const drawCanvas = activePage.querySelector('.drawing-page-canvas');
-    if (!pdfCanvas) return null;
-    
-    // สร้าง Canvas ชั่วคราวขึ้นมาประกบเลเยอร์ภาพวาดกับเอกสารเข้าด้วยกันก่อนส่งให้ AI
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = pdfCanvas.width;
-    tempCanvas.height = pdfCanvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    
-    tempCtx.drawImage(pdfCanvas, 0, 0);
-    if (drawCanvas) tempCtx.drawImage(drawCanvas, 0, 0);
-    
-    return tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-}
-
 async function sendAiQuestion() {
     const input = document.getElementById('ai-input'); if (!input) return;
     const userText = input.value.trim(); if (!userText) return;
 
     appendAiMessage("user", userText); input.value = '';
-    
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
 
-    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
-    
-    // ถ่ายภาพหน้าจอส่งไปด้วย เผื่อกรณีที่เป็นไฟล์รูปภาพล้วน ๆ ไม่มีข้อความ
-    const imgBase64 = captureCurrentPageAsBase64();
-    
-    let finalPrompt = `คำสั่ง/คำถามจากคุณนาวี: ${userText}\n\n`;
-    if (pageText.trim() !== "") {
-        finalPrompt += `ข้อมูลเนื้อหาตัวอักษรที่พบในหน้าเอกสาร:\n"""\n${pageText}\n"""\n`;
-    }
-    finalPrompt += `(จงวิเคราะห์ข้อมูลจากทั่งข้อความที่ส่งให้ และอ่านวิเคราะห์ตาราง/รายละเอียดจากรูปภาพหน้ากระดาษที่แนบไปพร้อมกัน สรุปคำตอบเป็นภาษาไทยอย่างชัดเจนและกระชับ)`;
+    let finalPrompt = pageText.trim() !== "" ? 
+        `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถาม: ${userText}\n(วิเคราะห์และสรุปภาษาไทยแบบกระชับและเป็นมิตร)` : userText;
 
-    const result = await callGeminiAPI(finalPrompt, imgBase64);
-    if (result) {
-        appendAiMessage("ai", result);
-    }
+    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
+    const result = await callGeminiAPI(finalPrompt);
+    appendAiMessage("ai", result);
 }
 
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
-    
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
     
-    appendAiMessage("system", "⚡ กำลังเปิดกล้องอ่านและวิเคราะห์รายงานตารางหน้านี้ให้คุณนาวีค่ะ...");
+    if(!pageText.trim()) { appendAiMessage("ai", "❌ หน้านี้ไม่มีข้อความธรรมดาให้ดึงไปวิเคราะห์ค่ะ"); return; }
     
-    const imgBase64 = captureCurrentPageAsBase64();
-    const prompt = `จงสวมบทบาทเป็นผู้ช่วยอัจฉริยะ สรุปสาระสำคัญ ตัวเลข โครงสร้างตาราง หรือรายงานจากเอกสารหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้องแม่นยำ (หากมีตารางให้อ่านค่าในตารางแล้วแจกแจงออกมาให้ละเอียดครบถ้วน)`;
-    
-    const result = await callGeminiAPI(prompt, imgBase64);
+    appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
+    const prompt = `จงสรุปสาระสำคัญ ตัวเลข หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้อง:\n"""\n${pageText}\n"""`;
+    const result = await callGeminiAPI(prompt);
     appendAiMessage("ai", result);
 }
 
 function appendAiMessage(sender, text) {
     const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
-    if (sender === 'system' && (text.includes("กำลังวิเคราะห์") || text.includes("กำลังคิดคำตอบ") || text.includes("กำลังเปิดกล้อง"))) {
+    if (sender === 'system') {
         const tempMsg = document.createElement('div');
         tempMsg.className = 'ai-message system-msg temp-status'; tempMsg.innerText = text;
         chatBox.appendChild(tempMsg); chatBox.scrollTop = chatBox.scrollHeight; return;

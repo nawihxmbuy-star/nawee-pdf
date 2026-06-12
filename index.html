@@ -48,13 +48,6 @@
             <button onclick="formatWord('underline')" title="ขีดเส้นใต้"><i class="fa-solid fa-underline"></i></button>
         </div>
         <div class="divider"></div>
-        <div class="format-group">
-            <button onclick="openCenterTextInput()" title="แทรกข้อความลอยอิสระ" style="color: #f59e0b; background: rgba(245, 158, 11, 0.1); width: auto; padding: 0 12px; gap: 6px; display: flex; align-items: center; border-radius: 6px;">
-                <i class="fa-solid fa-font"></i>
-                <span style="font-size: 13px; font-weight: bold;">แทรกข้อความลอย</span>
-            </button>
-        </div>
-        <div class="divider"></div>
         <div class="format-group text-size-selector">
             <label>ขนาดฟอนต์แก้ไขหลัก:</label>
             <select onchange="formatWord('fontSize', this.value)">
@@ -96,11 +89,11 @@
 
     <div id="text-settings-panel" class="pen-sub-panel">
         <div class="panel-item">
-            <label><i class="fa-solid fa-palette"></i> สีข้อความ:</label>
+            <label><i class="fa-solid fa-palette"></i> สีข้อความลอย:</label>
             <input type="color" id="text-color-picker" value="#f59e0b">
         </div>
         <div class="panel-item">
-            <label><i class="fa-solid fa-text-height"></i> ขนาดฟอนต์: <span id="text-size-val">24px</span></label>
+            <label><i class="fa-solid fa-text-height"></i> ขนาดฟอนต์ลอย: <span id="text-size-val">24px</span></label>
             <input type="range" id="text-size-slider" min="12" max="72" value="24">
         </div>
     </div>
@@ -116,7 +109,9 @@
         
         <button onclick="setTool('pan')" id="tool-pan" class="tool-btn active" title="โหมดเลื่อนดูงาน"><i class="fa-solid fa-hand"></i></button>
         <button onclick="setTool('pen')" id="tool-pen" class="tool-btn" title="ปากกาวาดเขียน"><i class="fa-solid fa-pen-fancy"></i></button>
+        
         <button onclick="setTool('text')" id="tool-text" class="tool-btn" title="พิมพ์ข้อความลอย"><i class="fa-solid fa-font"></i></button>
+        
         <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn" title="ยางลบ"><i class="fa-solid fa-eraser"></i></button>
         <div class="divider"></div>
         <button onclick="zoomIn()" title="ขยาย"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
