@@ -329,15 +329,18 @@ function getPDFOptions() {
         pdfHeight = parseFloat(firstPage.style.height) || firstPage.offsetHeight || 1123;
     }
     return {
-        margin: 0, filename: `${originalFileName}_Output.pdf`, image: { type: 'jpeg', quality: 1 },
+        margin: 0, 
+        filename: `${originalFileName}_Output.pdf`, 
+        image: { type: 'jpeg', quality: 1 },
         html2canvas: { 
             scale: 2, 
             useCORS: true, 
             logging: false, 
             backgroundColor: '#ffffff', 
-            windowWidth: pdfWidth,
-            scrollX: 0, // 🎯 แก้บั๊กไฟล์หาย: บังคับให้เริ่มจับภาพจากจุดพิกัด X ซ้ายสุดเสมอ
-            scrollY: 0  // บังคับให้เริ่มจับภาพจากจุดพิกัด Y บนสุดเสมอ ป้องกันหน้าจอเลื่อนแล้วหลุดเฟรม
+            windowWidth: pdfWidth, // 🎯 หมัดเด็ดแท็บเล็ต 1: จำลองความกว้างเบราว์เซอร์ให้เท่าขนาดกระดาษจริง ไม่สนจออุปกรณ์
+            width: pdfWidth,       // ล็อกความกว้างการถ่ายภาพให้เท่ากับกระดาษเป๊ะ ๆ
+            scrollX: 0,
+            scrollY: 0
         },
         jsPDF: { unit: 'px', format: [pdfWidth, pdfHeight], orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait' },
         pagebreak: { mode: 'slice' }
@@ -351,11 +354,19 @@ async function exportToPDFFile() {
     const originalScale = currentScale;
     const element = document.getElementById('pdf-container');
     
-    // 🎯 แก้บั๊กไฟล์ซ้ายมือหายบนมือถือ: บันทึกสถานะการแปลงพิกัดและจุดหมุนดั้งเดิมไว้
+    // บันทึกตำแหน่งการเลื่อนหน้าจอเดิมของผู้ใช้
+    const originalScrollTop = workspace ? workspace.scrollTop : 0;
+    const originalScrollLeft = workspace ? workspace.scrollLeft : 0;
+    
+    // วาร์ปหน้าจอกลับไปจุดเริ่มต้นเพื่อความแม่นยำในการจับพิกัด
+    if (workspace) {
+        workspace.scrollTop = 0;
+        workspace.scrollLeft = 0;
+    }
+
     const originalTransform = element ? element.style.transform : '';
     const originalTransformOrigin = element ? element.style.transformOrigin : '';
 
-    // รีเซ็ตขนาดหน้าจอให้กลับเป็นสเกล 1.0 และบังคับจุดหมุนชิดซ้ายบนชั่วคราว เพื่อให้ html2pdf จับภาพได้เต็มขอบ
     if (element) {
         element.style.transform = 'scale(1)';
         element.style.transformOrigin = 'top left';
@@ -363,24 +374,60 @@ async function exportToPDFFile() {
     currentScale = 1.0; 
     clearActiveDraggableNode();
 
+    const firstPage = element ? element.querySelector('.page-wrapper') : null;
+    let pdfWidth = 794, pdfHeight = 1123;
+    if (firstPage) {
+        pdfWidth = parseFloat(firstPage.style.width) || firstPage.offsetWidth || 794;
+        pdfHeight = parseFloat(firstPage.style.height) || firstPage.offsetHeight || 1123;
+    }
+
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; }
-        .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; }
+        /* 🎯 หมัดเด็ดแท็บเล็ต 2: บังคับล็อกขนาดโครงสร้างแบบเด็ดขาด (Absolute Standard Dimensions) */
+        #pdf-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            gap: 0 !important; 
+            display: block !important; 
+            width: ${pdfWidth}px !important; 
+            min-width: ${pdfWidth}px !important; 
+            max-width: ${pdfWidth}px !important;
+            transform: none !important; 
+        }
+        .page-wrapper { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            border: none !important; 
+            box-shadow: none !important; 
+            display: block !important; 
+            page-break-inside: avoid !important; 
+            break-inside: avoid !important; 
+            width: ${pdfWidth}px !important; 
+            min-width: ${pdfWidth}px !important; 
+            max-width: ${pdfWidth}px !important;
+            height: ${pdfHeight}px !important; 
+            position: relative !important; 
+        }
+        .pdf-page-canvas, .drawing-page-canvas { width: 100% !important; height: 100% !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls, .text-node-floating-bar { display: none !important; }
     `;
     document.head.appendChild(styleTag);
+
     try {
         await html2pdf().set(getPDFOptions()).from(element).save();
     } catch (e) {
         alert("เกิดข้อผิดพลาดในการดาวน์โหลดค่ะ");
     } finally {
         styleTag.remove(); 
-        // 🎯 คืนค่าหน้าจอดั้งเดิมหลังจากดาวน์โหลดเสร็จสิ้นทันที
         if (element) {
             element.style.transform = originalTransform;
             element.style.transformOrigin = originalTransformOrigin;
+        }
+        // คืนค่าตำแหน่งหน้าจอเดิมให้ผู้ใช้งาน
+        if (workspace) {
+            workspace.scrollTop = originalScrollTop;
+            workspace.scrollLeft = originalScrollLeft;
         }
         currentScale = originalScale; 
         applyZoom();
@@ -392,7 +439,14 @@ async function shareToLine() {
     const originalScale = currentScale; 
     const element = document.getElementById('pdf-container');
     
-    // 🎯 แก้บั๊กไฟล์ซ้ายมือหายบนโหมดแชร์ไลน์: บันทึกและรีเซ็ตสเกลชั่วคราวเหมือนฟังก์ชันดาวน์โหลดหลัก
+    const originalScrollTop = workspace ? workspace.scrollTop : 0;
+    const originalScrollLeft = workspace ? workspace.scrollLeft : 0;
+    
+    if (workspace) {
+        workspace.scrollTop = 0;
+        workspace.scrollLeft = 0;
+    }
+
     const originalTransform = element ? element.style.transform : '';
     const originalTransformOrigin = element ? element.style.transformOrigin : '';
 
@@ -402,6 +456,46 @@ async function shareToLine() {
     }
     currentScale = 1.0; 
     clearActiveDraggableNode();
+
+    const firstPage = element ? element.querySelector('.page-wrapper') : null;
+    let pdfWidth = 794, pdfHeight = 1123;
+    if (firstPage) {
+        pdfWidth = parseFloat(firstPage.style.width) || firstPage.offsetWidth || 794;
+        pdfHeight = parseFloat(firstPage.style.height) || firstPage.offsetHeight || 1123;
+    }
+
+    const styleTag = document.createElement('style');
+    styleTag.innerHTML = `
+        #pdf-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            gap: 0 !important; 
+            display: block !important; 
+            width: ${pdfWidth}px !important; 
+            min-width: ${pdfWidth}px !important; 
+            max-width: ${pdfWidth}px !important;
+            transform: none !important; 
+        }
+        .page-wrapper { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            border: none !important; 
+            box-shadow: none !important; 
+            display: block !important; 
+            page-break-inside: avoid !important; 
+            break-inside: avoid !important; 
+            width: ${pdfWidth}px !important; 
+            min-width: ${pdfWidth}px !important; 
+            max-width: ${pdfWidth}px !important;
+            height: ${pdfHeight}px !important; 
+            position: relative !important; 
+        }
+        .pdf-page-canvas, .drawing-page-canvas { width: 100% !important; height: 100% !important; }
+        .custom-draggable-text-node { border: none !important; background: transparent !important; }
+        .text-node-controls, .text-node-floating-bar { display: none !important; }
+    `;
+    document.head.appendChild(styleTag);
+
     try {
         const pdfBlob = await html2pdf().set(getPDFOptions()).from(element).outputPdf('blob');
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
@@ -413,10 +507,14 @@ async function shareToLine() {
         }
     } catch (e) { exportToPDFFile(); }
     finally { 
-        // คืนค่าหน้าจอดั้งเดิม
+        styleTag.remove();
         if (element) {
             element.style.transform = originalTransform;
             element.style.transformOrigin = originalTransformOrigin;
+        }
+        if (workspace) {
+            workspace.scrollTop = originalScrollTop;
+            workspace.scrollLeft = originalScrollLeft;
         }
         currentScale = originalScale; 
         applyZoom();
