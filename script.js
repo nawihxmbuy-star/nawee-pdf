@@ -330,7 +330,15 @@ function getPDFOptions() {
     }
     return {
         margin: 0, filename: `${originalFileName}_Output.pdf`, image: { type: 'jpeg', quality: 1 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', windowWidth: pdfWidth },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false, 
+            backgroundColor: '#ffffff', 
+            windowWidth: pdfWidth,
+            scrollX: 0, // 🎯 แก้บั๊กไฟล์หาย: บังคับให้เริ่มจับภาพจากจุดพิกัด X ซ้ายสุดเสมอ
+            scrollY: 0  // บังคับให้เริ่มจับภาพจากจุดพิกัด Y บนสุดเสมอ ป้องกันหน้าจอเลื่อนแล้วหลุดเฟรม
+        },
         jsPDF: { unit: 'px', format: [pdfWidth, pdfHeight], orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait' },
         pagebreak: { mode: 'slice' }
     };
@@ -341,7 +349,19 @@ async function exportToPDFFile() {
     if (typeof html2pdf === 'undefined') { alert("ไม่พบไลบรารีส่งออกไฟล์ภายนอกค่ะ"); return; }
     
     const originalScale = currentScale;
-    currentScale = 1.0; applyZoom(); clearActiveDraggableNode();
+    const element = document.getElementById('pdf-container');
+    
+    // 🎯 แก้บั๊กไฟล์ซ้ายมือหายบนมือถือ: บันทึกสถานะการแปลงพิกัดและจุดหมุนดั้งเดิมไว้
+    const originalTransform = element ? element.style.transform : '';
+    const originalTransformOrigin = element ? element.style.transformOrigin : '';
+
+    // รีเซ็ตขนาดหน้าจอให้กลับเป็นสเกล 1.0 และบังคับจุดหมุนชิดซ้ายบนชั่วคราว เพื่อให้ html2pdf จับภาพได้เต็มขอบ
+    if (element) {
+        element.style.transform = 'scale(1)';
+        element.style.transformOrigin = 'top left';
+    }
+    currentScale = 1.0; 
+    clearActiveDraggableNode();
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
@@ -352,19 +372,38 @@ async function exportToPDFFile() {
     `;
     document.head.appendChild(styleTag);
     try {
-        await html2pdf().set(getPDFOptions()).from(document.getElementById('pdf-container')).save();
+        await html2pdf().set(getPDFOptions()).from(element).save();
     } catch (e) {
         alert("เกิดข้อผิดพลาดในการดาวน์โหลดค่ะ");
     } finally {
-        styleTag.remove(); currentScale = originalScale; applyZoom();
+        styleTag.remove(); 
+        // 🎯 คืนค่าหน้าจอดั้งเดิมหลังจากดาวน์โหลดเสร็จสิ้นทันที
+        if (element) {
+            element.style.transform = originalTransform;
+            element.style.transformOrigin = originalTransformOrigin;
+        }
+        currentScale = originalScale; 
+        applyZoom();
     }
 }
 
 async function shareToLine() {
     closeAllPopups(); if (!pdfDoc) { alert("ไม่พบเอกสารในการแชร์ค่ะ!"); return; }
-    const originalScale = currentScale; currentScale = 1.0; applyZoom(); clearActiveDraggableNode();
+    const originalScale = currentScale; 
+    const element = document.getElementById('pdf-container');
+    
+    // 🎯 แก้บั๊กไฟล์ซ้ายมือหายบนโหมดแชร์ไลน์: บันทึกและรีเซ็ตสเกลชั่วคราวเหมือนฟังก์ชันดาวน์โหลดหลัก
+    const originalTransform = element ? element.style.transform : '';
+    const originalTransformOrigin = element ? element.style.transformOrigin : '';
+
+    if (element) {
+        element.style.transform = 'scale(1)';
+        element.style.transformOrigin = 'top left';
+    }
+    currentScale = 1.0; 
+    clearActiveDraggableNode();
     try {
-        const pdfBlob = await html2pdf().set(getPDFOptions()).from(document.getElementById('pdf-container')).outputPdf('blob');
+        const pdfBlob = await html2pdf().set(getPDFOptions()).from(element).outputPdf('blob');
         const file = new File([pdfBlob], `${originalFileName}.pdf`, { type: 'application/pdf' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({ files: [file], title: 'Share PDF', text: 'แชร์รายงานจาก Nawee Studio' });
@@ -373,18 +412,35 @@ async function shareToLine() {
             exportToPDFFile();
         }
     } catch (e) { exportToPDFFile(); }
-    finally { currentScale = originalScale; applyZoom(); }
+    finally { 
+        // คืนค่าหน้าจอดั้งเดิม
+        if (element) {
+            element.style.transform = originalTransform;
+            element.style.transformOrigin = originalTransformOrigin;
+        }
+        currentScale = originalScale; 
+        applyZoom();
+    }
 }
 
 function formatWord(command, value = null) {
-    if (currentFileMode === 'word') {
-        document.execCommand(command, false, value);
-    } else if (activeDraggableNode) {
+    // 🎯 แก้บั๊กปุ่มจัดแต่งอักษรไม่ทำงาน: ย้ายเงื่อนไขเช็กกล่องข้อความลอยขึ้นมาเป็นอันดับแรกสุดเพื่อให้ทำงานได้ทุกโหมด
+    if (activeDraggableNode) {
         const span = activeDraggableNode.querySelector('span');
         if (!span) return;
-        if (command === 'bold') span.style.fontWeight = (span.style.fontWeight === 'bold') ? 'normal' : 'bold';
-        else if (command === 'italic') span.style.fontStyle = (span.style.fontStyle === 'italic') ? 'normal' : 'italic';
-        else if (command === 'underline') span.style.textDecoration = (span.style.textDecoration === 'underline') ? 'none' : 'underline';
+        if (command === 'bold') {
+            span.style.fontWeight = (span.style.fontWeight === 'bold' || span.style.fontWeight === '700') ? 'normal' : 'bold';
+        } else if (command === 'italic') {
+            span.style.fontStyle = (span.style.fontStyle === 'italic') ? 'normal' : 'italic';
+        } else if (command === 'underline') {
+            span.style.textDecoration = (span.style.textDecoration === 'underline') ? 'none' : 'underline';
+        }
+        return; // ออกจากฟังก์ชันทันทีเมื่อจัดการกล่องอักษรลอยเสร็จแล้ว
+    }
+    
+    // โค้ดเดิมสำหรับจัดแต่งตัวอักษรใน Word Mode ปกติ
+    if (currentFileMode === 'word') {
+        document.execCommand(command, false, value);
     }
 }
 
@@ -594,7 +650,7 @@ function setTool(tool) {
     clearActiveDraggableNode();
 }
 
-// 🟢 [DYNAMIC DRAG & EDIT] แก้ไขระบบจัดการข้อความลอยแบบสมบูรณ์ ผูก Event กับทุกกล่องแบบเรียลไทม์
+// 🟢 [DYNAMIC DRAG & EDIT] จัดการข้อความลอยแบบสมบูรณ์ ผูก Event กับทุกกล่องแบบเรียลไทม์
 function createDraggableTextNode(e) {
     if (currentTool !== 'text') return;
     const activePage = getActivePageWrapper(); if (!activePage) return;
@@ -642,7 +698,7 @@ function createDraggableTextNode(e) {
         startX = pageX - parseFloat(node.style.left); 
         startY = pageY - parseFloat(node.style.top);
         
-        // 🎯 [KEY FIXED] จิ้มกล่องไหน ให้เรียกฟังก์ชันดึงกล่องเก่ากล่องนั้นขึ้นมาเป็น Active Node ทันที (แก้บั๊กย้ายได้แต่กล่องล่าสุด)
+        // จิ้มกล่องไหน ให้เรียกฟังก์ชันดึงกล่องเก่ากล่องนั้นขึ้นมาเป็น Active Node ทันที (แก้บั๊กย้ายได้แต่กล่องล่าสุด)
         selectTextNode(node);
     }
 
