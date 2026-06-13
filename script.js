@@ -23,7 +23,7 @@ let originalFileName = "Nawee_Document";
 let container = null;
 let workspace = null;
 let appTitle = null;
-let activeDraggableNode = null;
+let activeDraggableNode = null; // ตัวแปรหลักสำหรับเก็บกล่องข้อความลอยที่กำลังถูกเลือกใช้งานอยู่ปัจจุบัน
 let eraserShape = 'circle';
 
 // ฟังก์ชันแปลงค่าสี RGB จากเบราว์เซอร์ให้เป็น Hex เพื่อซิงค์กับช่องเลือกสี
@@ -77,14 +77,43 @@ function toggleEraserShape() {
     showNotification("เปลี่ยนรูปทรงยางลบเป็น: " + (eraserShape === 'circle' ? 'วงกลม ⭕' : 'สี่เหลี่ยม 🔲'));
 }
 
+// --- UI: ฟังก์ชันสำหรับเลือกกล่องข้อความเก่าขึ้นมาแก้ไขย้อนหลัง ---
+function selectTextNode(node) {
+    clearActiveDraggableNode();
+    activeDraggableNode = node;
+    node.style.borderColor = node.style.color || currentTextActiveColor;
+    node.classList.add('is-active-focused');
+
+    // ซิงค์ค่าขนาดฟอนต์ของกล่องที่จิ้ม กลับมาแสดงบนสไลเดอร์ควบคุมด้านล่าง
+    const textSizeSlider = document.getElementById('text-size-slider');
+    const textSizeLabel = document.getElementById('text-size-val');
+    if (textSizeSlider && textSizeLabel) {
+        const size = parseInt(node.style.fontSize) || 24;
+        textSizeSlider.value = size;
+        textSizeLabel.innerText = size + 'px';
+        currentTextSize = size;
+    }
+    
+    // ซิงค์ค่าสีของกล่องที่จิ้ม กลับมาแสดงบนตัวเลือกสีหลักและตัวเลือกสีลอยด้านล่าง
+    const hexColor = rgbToHex(node.style.color) || currentTextActiveColor;
+    const textColorPicker = document.getElementById('text-color-picker');
+    if (textColorPicker) textColorPicker.value = hexColor;
+    
+    const floatingTextColor = document.getElementById('floating-text-color');
+    if (floatingTextColor) floatingTextColor.value = hexColor;
+    
+    currentTextActiveColor = hexColor;
+    openCenterTextInput();
+}
+
 // --- UI: เปิด/ปิดแผง Bottom Sheet ---
 function openCenterTextInput() {
     const bottomSheet = document.getElementById('text-node-bottom-bar');
     if (bottomSheet) {
         bottomSheet.classList.add('active');
-        if (activeDraggableNode) {
-            const currentPicker = document.getElementById('floating-text-color');
-            if (currentPicker) currentPicker.value = currentTextActiveColor;
+        const currentPicker = document.getElementById('floating-text-color');
+        if (currentPicker && activeDraggableNode) {
+            currentPicker.value = rgbToHex(activeDraggableNode.style.color) || currentTextActiveColor;
         }
     }
 }
@@ -147,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // 🟢 [FIXED] เลือกสีจากแผงหลักแล้วให้ข้อความเปลี่ยนสีตามทันที (ใช้ได้ทั้ง PDF/WORD Mode)
+    // 🟢 เลือกสีจากแผงหลักแล้วให้ข้อความเปลี่ยนสีตามทันทีแบบ Real-time (ใช้ได้ทุกกล่องที่เลือก)
     const textColorPicker = document.getElementById('text-color-picker');
     if (textColorPicker) {
         textColorPicker.addEventListener('input', (e) => {
@@ -155,11 +184,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (activeDraggableNode) {
                 activeDraggableNode.style.color = currentTextActiveColor;
                 activeDraggableNode.style.borderColor = currentTextActiveColor;
+                const floatingTextColor = document.getElementById('floating-text-color');
+                if (floatingTextColor) floatingTextColor.value = currentTextActiveColor;
             }
         });
     }
 
-    // 🟢 [FIXED] เลื่อนสไลเดอร์ปรับขนาดแล้วให้ข้อความขยายใหญ่ตามทันที (ใช้ได้ทั้ง PDF/WORD Mode)
+    // 🟢 เลื่อนสไลเดอร์ปรับขนาดแล้วให้ข้อความขยายใหญ่ตามทันทีแบบ Real-time (ใช้ได้ทุกกล่องที่เลือก)
     const textSizeSlider = document.getElementById('text-size-slider');
     const textSizeLabel = document.getElementById('text-size-val');
     if (textSizeSlider && textSizeLabel) {
@@ -172,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 🟢 ปรับเปลี่ยนสีจากแผงควบคุมลอยด้านล่าง (Bottom Bar) แบบย้อนหลังและเรียลไทม์
     const floatingTextColor = document.getElementById('floating-text-color');
     if (floatingTextColor) {
         floatingTextColor.addEventListener('input', (e) => {
@@ -179,6 +211,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (activeDraggableNode) {
                 activeDraggableNode.style.color = currentTextActiveColor;
                 activeDraggableNode.style.borderColor = currentTextActiveColor;
+                const textColorPicker = document.getElementById('text-color-picker');
+                if (textColorPicker) textColorPicker.value = currentTextActiveColor;
             }
         });
     }
@@ -188,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.dropdown-wrapper')) closeAllPopups();
-        if (!e.target.closest('.custom-draggable-text-node') && !e.target.closest('#text-settings-panel') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('.word-formatting-bar')) {
+        if (!e.target.closest('.custom-draggable-text-node') && !e.target.closest('#text-settings-panel') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('.word-formatting-bar') && !e.target.closest('#text-node-bottom-bar')) {
             clearActiveDraggableNode();
         }
     });
@@ -560,7 +594,7 @@ function setTool(tool) {
     clearActiveDraggableNode();
 }
 
-// 🟢 [FIXED COMPLETELY] ระบบกล่องข้อความอัจฉริยะลากย้าย ปรับฟอนต์ เปลี่ยนสีได้เรียลไทม์ (ใช้งานได้ทั้ง 2 โหมดอิสระ)
+// 🟢 [DYNAMIC DRAG & EDIT] แก้ไขระบบจัดการข้อความลอยแบบสมบูรณ์ ผูก Event กับทุกกล่องแบบเรียลไทม์
 function createDraggableTextNode(e) {
     if (currentTool !== 'text') return;
     const activePage = getActivePageWrapper(); if (!activePage) return;
@@ -601,35 +635,15 @@ function createDraggableTextNode(e) {
     let isDraggingNode = false; let startX = 0, startY = 0;
     
     function dragStart(ev) {
-        if (node.classList.contains('is-editing')) return; // ถ้าพิมพ์อยู่ ห้ามลากย้ายขยับ
+        if (node.classList.contains('is-editing')) return; // ถ้ากำลังเปิดคีย์บอร์ดพิมพ์อยู่ ห้ามลากขยับตำแหน่ง
         isDraggingNode = true;
         const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
         const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
         startX = pageX - parseFloat(node.style.left); 
         startY = pageY - parseFloat(node.style.top);
         
-        clearActiveDraggableNode(); 
-        activeDraggableNode = node;
-        node.style.borderColor = node.style.color || currentTextActiveColor;
-        node.classList.add('is-active-focused');
-
-        // 🔥 ซิงค์ค่าฟอนต์และสีของกล่องนี้กลับมาแสดงที่แถบควบคุมหลักด้านล่างทันที
-        const textSizeSlider = document.getElementById('text-size-slider');
-        const textSizeLabel = document.getElementById('text-size-val');
-        if (textSizeSlider && textSizeLabel) {
-            const size = parseInt(node.style.fontSize) || 24;
-            textSizeSlider.value = size;
-            textSizeLabel.innerText = size + 'px';
-            currentTextSize = size;
-        }
-        
-        const textColorPicker = document.getElementById('text-color-picker');
-        if (textColorPicker) {
-            const hexColor = rgbToHex(node.style.color) || currentTextActiveColor;
-            textColorPicker.value = hexColor;
-            currentTextActiveColor = hexColor;
-        }
-        openCenterTextInput();
+        // 🎯 [KEY FIXED] จิ้มกล่องไหน ให้เรียกฟังก์ชันดึงกล่องเก่ากล่องนั้นขึ้นมาเป็น Active Node ทันที (แก้บั๊กย้ายได้แต่กล่องล่าสุด)
+        selectTextNode(node);
     }
 
     function dragMove(ev) {
@@ -652,9 +666,8 @@ function createDraggableTextNode(e) {
 
     overlay.appendChild(node);
     
-    // โฟกัสพร้อมเปิดพิมพ์คำออโต้ทันทีที่คลิกสร้างบนกระดาษ
-    clearActiveDraggableNode();
-    activeDraggableNode = node;
+    // ดึงโฟกัสเพื่อพิมพ์คำอัตโนมัติทันทีที่สร้างกล่อง
+    selectTextNode(node);
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
@@ -662,7 +675,7 @@ function createDraggableTextNode(e) {
 document.addEventListener('DOMContentLoaded', () => {
     if (workspace) {
         workspace.addEventListener('click', (e) => {
-            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar')) {
+            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('#text-node-bottom-bar')) {
                 createDraggableTextNode(e);
             }
         });
