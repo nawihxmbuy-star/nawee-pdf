@@ -153,6 +153,7 @@ function deselectTextNode() {
     closeTextSheet();
 }
 
+// 🌐 ยุบรวมการตั้งค่าและดักจับ Event ต่างๆ ไว้ที่สัญญานโหลดหน้าจอหลักจุดเดียว
 document.addEventListener('DOMContentLoaded', () => {
     container = document.getElementById('pdf-container');
     workspace = document.querySelector('.workspace');
@@ -232,14 +233,14 @@ document.addEventListener('DOMContentLoaded', () => {
     updateBrushPreview();
     setTool('pan');
     
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.dropdown-wrapper')) closeAllPopups();
-        if (!e.target.closest('.custom-draggable-text-node') && !e.target.closest('#text-settings-panel') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('.word-formatting-bar') && !e.target.closest('#text-node-bottom-bar')) {
-            clearActiveDraggableNode();
-        }
-    });
-
+    // 🟢 [RE-ORGANIZED] ย้ายระบบคลิกพื้นที่ทำงานว่างเพื่อสร้างกล่องข้อความลอยมารวมไว้ที่นี่
     if (workspace) {
+        workspace.addEventListener('click', (e) => {
+            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('#text-node-bottom-bar')) {
+                createDraggableTextNode(e);
+            }
+        });
+
         workspace.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
                 initialDistance = Math.hypot(
@@ -268,6 +269,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, { passive: false });
     }
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.dropdown-wrapper')) closeAllPopups();
+        if (!e.target.closest('.custom-draggable-text-node') && !e.target.closest('#text-settings-panel') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('.word-formatting-bar') && !e.target.closest('#text-node-bottom-bar')) {
+            clearActiveDraggableNode();
+        }
+    });
 });
 
 const DB_NAME = "NaweeStudio_Database_V2";
@@ -327,6 +335,25 @@ function switchFileMode(mode) {
     }
     setTool(currentTool);
     applyZoom();
+}
+
+// 🟢 [DEPRECATION WARNING INFO] การใช้ execCommand เหมาะกับระบบ Rich Text ดั้งเดิม ในอนาคตสามารถย้ายไปคุมโครงสร้าง DOM ตรงๆ ได้ค่ะ
+function formatWord(command, value = null) {
+    if (activeDraggableNode) {
+        const span = activeDraggableNode.querySelector('span');
+        if (!span) return;
+        if (command === 'bold') {
+            span.style.fontWeight = (span.style.fontWeight === 'bold' || span.style.fontWeight === '700') ? 'normal' : 'bold';
+        } else if (command === 'italic') {
+            span.style.fontStyle = (span.style.fontStyle === 'italic') ? 'normal' : 'italic';
+        } else if (command === 'underline') {
+            span.style.textDecoration = (span.style.textDecoration === 'underline') ? 'none' : 'underline';
+        }
+        return; 
+    }
+    if (currentFileMode === 'word') {
+        document.execCommand(command, false, value);
+    }
 }
 
 function triggerPdfToWord() { closeAllPopups(); if (!pdfDoc) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; } switchFileMode('word'); }
@@ -526,24 +553,6 @@ async function shareToLine() {
         }
         currentScale = originalScale; 
         applyZoom();
-    }
-}
-
-function formatWord(command, value = null) {
-    if (activeDraggableNode) {
-        const span = activeDraggableNode.querySelector('span');
-        if (!span) return;
-        if (command === 'bold') {
-            span.style.fontWeight = (span.style.fontWeight === 'bold' || span.style.fontWeight === '700') ? 'normal' : 'bold';
-        } else if (command === 'italic') {
-            span.style.fontStyle = (span.style.fontStyle === 'italic') ? 'normal' : 'italic';
-        } else if (command === 'underline') {
-            span.style.textDecoration = (span.style.textDecoration === 'underline') ? 'none' : 'underline';
-        }
-        return; 
-    }
-    if (currentFileMode === 'word') {
-        document.execCommand(command, false, value);
     }
 }
 
@@ -759,7 +768,7 @@ function setTool(tool) {
     clearActiveDraggableNode();
 }
 
-// 🟢 [DYNAMIC DRAG & EDIT] จัดการข้อความลอยแบบสมบูรณ์ ผูก Event กับทุกกล่องแบบเรียลไทม์
+// 🟢 [DYNAMIC DRAG & EDIT - UPDATED] จัดการข้อความลอยแบบสมบูรณ์ ตัดปัญหา Memory Leak อย่างเด็ดขาด
 function createDraggableTextNode(e) {
     if (currentTool !== 'text') return;
     const activePage = getActivePageWrapper(); if (!activePage) return;
@@ -806,25 +815,36 @@ function createDraggableTextNode(e) {
         startX = pageX - parseFloat(node.style.left); 
         startY = pageY - parseFloat(node.style.top);
         selectTextNode(node);
+
+        // 🎯 [FIXED] ลงทะเบียนสัญญานเฉพาะเมื่อเริ่มลากจับวัตถุเท่านั้น
+        document.addEventListener('mousemove', dragMove); 
+        document.addEventListener('mouseup', dragEnd);
+        document.addEventListener('touchmove', dragMove, { passive: false }); 
+        document.addEventListener('touchend', dragEnd);
     }
 
     function dragMove(ev) {
         if (!isDraggingNode) return;
+        if (ev.cancelable) ev.preventDefault(); // ป้องกันหน้าจอหลักเลื่อนขณะลากบนมือถือ
         const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
         const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
         node.style.left = (pageX - startX) + 'px'; 
         node.style.top = (pageY - startY) + 'px';
     }
 
-    function dragEnd() { isDraggingNode = false; }
+    function dragEnd() { 
+        if (isDraggingNode) {
+            isDraggingNode = false; 
+            // 🎯 [FIXED] ถอดถอนสัญญานออกทันทีเมื่อผู้ใช้ปล่อยเมาส์/ปล่อยมือ เพื่อไม่ให้เกิดปัญหาสะสมค้างในระบบ
+            document.removeEventListener('mousemove', dragMove);
+            document.removeEventListener('mouseup', dragEnd);
+            document.removeEventListener('touchmove', dragMove);
+            document.removeEventListener('touchend', dragEnd);
+        }
+    }
 
     node.addEventListener('mousedown', dragStart); 
-    document.addEventListener('mousemove', dragMove); 
-    document.addEventListener('mouseup', dragEnd);
-    
     node.addEventListener('touchstart', dragStart, {passive: true}); 
-    document.addEventListener('touchmove', dragMove, {passive: true}); 
-    document.addEventListener('touchend', dragEnd);
 
     overlay.appendChild(node);
     
@@ -832,16 +852,6 @@ function createDraggableTextNode(e) {
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    if (workspace) {
-        workspace.addEventListener('click', (e) => {
-            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('#text-node-bottom-bar')) {
-                createDraggableTextNode(e);
-            }
-        });
-    }
-});
 
 
 // ==========================================

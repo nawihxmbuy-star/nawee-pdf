@@ -205,14 +205,20 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 .ai-sidebar.open { right: 0; }
 .ai-sidebar-header { padding: 20px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; color: #fff; }
 .close-sidebar-btn { background: none; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; }
-.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+
+/* 🎯 FIXED: เพิ่ม min-height: 0; เพื่อคุมเลเยอร์ Flex Box ไม่ให้ขยายตัวดันองค์ประกอบอื่นทะลุขอบล่าง */
+.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; min-height: 0; }
+
 .api-key-container { display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 13px; }
 .api-key-container input { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 6px; color: #fff; outline: none; }
 .ai-quick-actions { width: 100%; }
 .btn-ai-action { width: 100%; background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05)); border: 1px solid var(--accent-color); color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
-.ai-chat-box { flex: 1; background: #0f172a; border-radius: 10px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 200px; border: 1px solid rgba(255,255,255,0.05); }
+
+/* 🎯 FIXED: เปลี่ยน min-height เป็น 0; เพื่อให้กล่องแชตยืดหยุ่นย่อขนาดตามอัตราพื้นที่คงเหลือจริง ป้องกันปุ่มและช่องพิมพ์แชตตกหน้าจอ */
+.ai-chat-box { flex: 1; background: #0f172a; border-radius: 10px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; border: 1px solid rgba(255,255,255,0.05); }
+
 .ai-message { padding: 10px 14px; border-radius: 8px; font-size: 13px; max-width: 85%; line-height: 1.4; word-wrap: break-word; }
-.system-msg { background: rgba(255,255,255,0.05); color: #94a3b8; align-self: center; text-align: center; max-width: 100%; }
+.system-msg { background: rgba(255, 255, 255, 0.05); color: #94a3b8; align-self: center; text-align: center; max-width: 100%; }
 .user-msg { background: var(--accent-color); color: #0f172a; align-self: flex-end; font-weight: 500; }
 .ai-msg { background: #1e293b; color: #fff; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
 .ai-sidebar-footer { padding: 15px; background: #0f172a; display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.1); }
