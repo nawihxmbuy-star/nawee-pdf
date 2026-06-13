@@ -76,6 +76,13 @@
         <div class="panel-item">
             <label><i class="fa-solid fa-palette"></i> สีปากกา:</label>
             <input type="color" id="color-picker" value="#22d3ee">
+            <div class="quick-color-palette">
+                <div class="color-palette-dot pen-palette-dot" data-color="#000000" style="background: #000000;" title="สีดำ"></div>
+                <div class="color-palette-dot pen-palette-dot" data-color="#ff0000" style="background: #ff0000;" title="สีแดง"></div>
+                <div class="color-palette-dot pen-palette-dot" data-color="#0000ff" style="background: #0000ff;" title="สีน้ำเงิน"></div>
+                <div class="color-palette-dot pen-palette-dot" data-color="#00ff00" style="background: #00ff00;" title="สีเขียว"></div>
+                <div class="color-palette-dot pen-palette-dot" data-color="#ffff00" style="background: #ffff00;" title="สีเหลือง"></div>
+            </div>
         </div>
         <div class="panel-item">
             <label><i class="fa-solid fa-paint-brush"></i> ขนาดปลาย: <span id="brush-size-val">6px</span></label>
@@ -91,6 +98,13 @@
         <div class="panel-item">
             <label><i class="fa-solid fa-palette"></i> สีข้อความลอย:</label>
             <input type="color" id="text-color-picker" value="#f59e0b">
+            <div class="quick-color-palette">
+                <div class="color-palette-dot text-palette-dot" data-color="#000000" style="background: #000000;" title="สีดำ"></div>
+                <div class="color-palette-dot text-palette-dot" data-color="#ff0000" style="background: #ff0000;" title="สีแดง"></div>
+                <div class="color-palette-dot text-palette-dot" data-color="#0000ff" style="background: #0000ff;" title="สีน้ำเงิน"></div>
+                <div class="color-palette-dot text-palette-dot" data-color="#00ff00" style="background: #00ff00;" title="สีเขียว"></div>
+                <div class="color-palette-dot text-palette-dot" data-color="#ffff00" style="background: #ffff00;" title="สีเหลือง"></div>
+            </div>
         </div>
         <div class="panel-item">
             <label><i class="fa-solid fa-text-height"></i> ขนาดฟอนต์ลอย: <span id="text-size-val">24px</span></label>
@@ -152,8 +166,17 @@
                     <i class="fa-solid fa-circle-check"></i> ยืนยันตำแหน่ง
                 </button>
             </div>
-            <div class="text-node-controls" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 12px; width: 100%; display: flex; justify-content: center; gap: 12px;">
-                <input type="color" id="floating-text-color" title="เปลี่ยนสีตัวอักษร" style="width: 34px; height: 34px; border: none; background: transparent; cursor: pointer; padding: 0;">
+            <div class="text-node-controls" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 12px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+                <input type="color" id="floating-text-color" title="เปลี่ยนสีตัวอักษร" style="width: 34px; height: 34px; border: none; background: transparent; cursor: pointer; padding: 0; flex-shrink: 0;">
+                
+                <div class="quick-color-palette" style="margin-right: 4px;">
+                    <div class="color-palette-dot text-palette-dot" data-color="#000000" style="background: #000000;" title="สีดำ"></div>
+                    <div class="color-palette-dot text-palette-dot" data-color="#ff0000" style="background: #ff0000;" title="สีแดง"></div>
+                    <div class="color-palette-dot text-palette-dot" data-color="#0000ff" style="background: #0000ff;" title="สีน้ำเงิน"></div>
+                    <div class="color-palette-dot text-palette-dot" data-color="#00ff00" style="background: #00ff00;" title="สีเขียว"></div>
+                    <div class="color-palette-dot text-palette-dot" data-color="#ffff00" style="background: #ffff00;" title="สีเหลือง"></div>
+                </div>
+
                 <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.15);"></div>
                 <button onclick="formatWord('bold')" title="ตัวหนา" style="background: rgba(255,255,255,0.05); color: #fff; width: 36px; height: 36px; border-radius: 8px;"><i class="fa-solid fa-bold"></i></button>
                 <button onclick="formatWord('italic')" title="ตัวเอียง" style="background: rgba(255,255,255,0.05); color: #fff; width: 36px; height: 36px; border-radius: 8px;"><i class="fa-solid fa-italic"></i></button>

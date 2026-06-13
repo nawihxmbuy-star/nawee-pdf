@@ -23,10 +23,9 @@ let originalFileName = "Nawee_Document";
 let container = null;
 let workspace = null;
 let appTitle = null;
-let activeDraggableNode = null; // ตัวแปรหลักสำหรับเก็บกล่องข้อความลอยที่กำลังถูกเลือกใช้งานอยู่ปัจจุบัน
+let activeDraggableNode = null; 
 let eraserShape = 'circle';
 
-// ฟังก์ชันแปลงค่าสี RGB จากเบราว์เซอร์ให้เป็น Hex เพื่อซิงค์กับช่องเลือกสี
 function rgbToHex(rgb) {
     if (!rgb || !rgb.startsWith('rgb')) return rgb;
     const rgbValues = rgb.match(/\d+/g);
@@ -37,7 +36,6 @@ function rgbToHex(rgb) {
     }).join("");
 }
 
-// --- UI: ระบบแสดงการแจ้งเตือน Custom Notification ---
 function showNotification(msg) {
     const div = document.createElement('div');
     div.className = 'custom-notification';
@@ -52,7 +50,6 @@ function showNotification(msg) {
 }
 window.alert = function(msg) { showNotification(msg); };
 
-// --- UI: พรีวิวยางลบขยับตามเมาส์ ---
 const eraserCursor = document.createElement('div');
 eraserCursor.id = 'eraser-cursor-preview';
 document.body.appendChild(eraserCursor);
@@ -77,14 +74,12 @@ function toggleEraserShape() {
     showNotification("เปลี่ยนรูปทรงยางลบเป็น: " + (eraserShape === 'circle' ? 'วงกลม ⭕' : 'สี่เหลี่ยม 🔲'));
 }
 
-// --- UI: ฟังก์ชันสำหรับเลือกกล่องข้อความเก่าขึ้นมาแก้ไขย้อนหลัง ---
 function selectTextNode(node) {
     clearActiveDraggableNode();
     activeDraggableNode = node;
     node.style.borderColor = node.style.color || currentTextActiveColor;
     node.classList.add('is-active-focused');
 
-    // ซิงค์ค่าขนาดฟอนต์ของกล่องที่จิ้ม กลับมาแสดงบนสไลเดอร์ควบคุมด้านล่าง
     const textSizeSlider = document.getElementById('text-size-slider');
     const textSizeLabel = document.getElementById('text-size-val');
     if (textSizeSlider && textSizeLabel) {
@@ -94,7 +89,6 @@ function selectTextNode(node) {
         currentTextSize = size;
     }
     
-    // ซิงค์ค่าสีของกล่องที่จิ้ม กลับมาแสดงบนตัวเลือกสีหลักและตัวเลือกสีลอยด้านล่าง
     const hexColor = rgbToHex(node.style.color) || currentTextActiveColor;
     const textColorPicker = document.getElementById('text-color-picker');
     if (textColorPicker) textColorPicker.value = hexColor;
@@ -103,10 +97,17 @@ function selectTextNode(node) {
     if (floatingTextColor) floatingTextColor.value = hexColor;
     
     currentTextActiveColor = hexColor;
+    
+    // 🎨 ซิงค์สถานะ Active ไปยังปุ่มจุดจานสีด่วนของกล่องข้อความให้ตรงกัน
+    document.querySelectorAll('.text-palette-dot').forEach(dot => {
+        const dotColor = dot.getAttribute('data-color');
+        if(dotColor && dotColor.toLowerCase() === hexColor.toLowerCase()) dot.classList.add('active');
+        else dot.classList.remove('active');
+    });
+
     openCenterTextInput();
 }
 
-// --- UI: เปิด/ปิดแผง Bottom Sheet ---
 function openCenterTextInput() {
     const bottomSheet = document.getElementById('text-node-bottom-bar');
     if (bottomSheet) {
@@ -122,7 +123,6 @@ function closeTextSheet() {
     if (bottomSheet) bottomSheet.classList.remove('active');
 }
 
-// ฟังก์ชันเสริมสำหรับควบคุมตกแต่งข้อความลอยล่างสุด
 function changeActiveNodeSize(amount) {
     if (activeDraggableNode) {
         let currentSize = parseInt(activeDraggableNode.style.fontSize) || 24;
@@ -162,6 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (colorPicker) {
         colorPicker.addEventListener('input', (e) => {
             currentActiveColor = e.target.value;
+            // เคลียร์สถานะ active ของจานสีสำเร็จรูปถ้าผู้ใช้เจาะจงเลือกสีเองพิสดาร
+            document.querySelectorAll('.pen-palette-dot').forEach(d => d.classList.remove('active'));
             updateBrushPreview();
         });
     }
@@ -176,11 +178,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // 🟢 เลือกสีจากแผงหลักแล้วให้ข้อความเปลี่ยนสีตามทันทีแบบ Real-time (ใช้ได้ทุกกล่องที่เลือก)
     const textColorPicker = document.getElementById('text-color-picker');
     if (textColorPicker) {
         textColorPicker.addEventListener('input', (e) => {
             currentTextActiveColor = e.target.value;
+            document.querySelectorAll('.text-palette-dot').forEach(d => d.classList.remove('active'));
             if (activeDraggableNode) {
                 activeDraggableNode.style.color = currentTextActiveColor;
                 activeDraggableNode.style.borderColor = currentTextActiveColor;
@@ -190,7 +192,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 🟢 เลื่อนสไลเดอร์ปรับขนาดแล้วให้ข้อความขยายใหญ่ตามทันทีแบบ Real-time (ใช้ได้ทุกกล่องที่เลือก)
     const textSizeSlider = document.getElementById('text-size-slider');
     const textSizeLabel = document.getElementById('text-size-val');
     if (textSizeSlider && textSizeLabel) {
@@ -203,11 +204,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 🟢 ปรับเปลี่ยนสีจากแผงควบคุมลอยด้านล่าง (Bottom Bar) แบบย้อนหลังและเรียลไทม์
     const floatingTextColor = document.getElementById('floating-text-color');
     if (floatingTextColor) {
         floatingTextColor.addEventListener('input', (e) => {
             currentTextActiveColor = e.target.value;
+            document.querySelectorAll('.text-palette-dot').forEach(d => d.classList.remove('active'));
             if (activeDraggableNode) {
                 activeDraggableNode.style.color = currentTextActiveColor;
                 activeDraggableNode.style.borderColor = currentTextActiveColor;
@@ -216,6 +217,38 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // 🎯 [NEW LOGIC] ตรวจจับการคลิกเลือกสีกึ่งสำเร็จรูปบนจานสีด่วนฝั่ง ปากกา (Pen Palette)
+    document.querySelectorAll('.pen-palette-dot').forEach(dot => {
+        dot.addEventListener('click', (e) => {
+            const pickedColor = e.target.getAttribute('data-color');
+            if (pickedColor) {
+                currentActiveColor = pickedColor;
+                if (colorPicker) colorPicker.value = pickedColor;
+                updateBrushPreview();
+                document.querySelectorAll('.pen-palette-dot').forEach(d => d.classList.remove('active'));
+                dot.classList.add('active');
+            }
+        });
+    });
+
+    // 🎯 [NEW LOGIC] ตรวจจับการคลิกเลือกสีกึ่งสำเร็จรูปบนจานสีด่วนฝั่ง ข้อความลอย (Text Palette)
+    document.querySelectorAll('.text-palette-dot').forEach(dot => {
+        dot.addEventListener('click', (e) => {
+            const pickedColor = e.target.getAttribute('data-color');
+            if (pickedColor) {
+                currentTextActiveColor = pickedColor;
+                if (textColorPicker) textColorPicker.value = pickedColor;
+                if (floatingTextColor) floatingTextColor.value = pickedColor;
+                if (activeDraggableNode) {
+                    activeDraggableNode.style.color = pickedColor;
+                    activeDraggableNode.style.borderColor = pickedColor;
+                }
+                document.querySelectorAll('.text-palette-dot').forEach(d => d.classList.remove('active'));
+                dot.classList.add('active');
+            }
+        });
+    });
 
     updateBrushPreview();
     setTool('pan');
@@ -337,10 +370,12 @@ function getPDFOptions() {
             useCORS: true, 
             logging: false, 
             backgroundColor: '#ffffff', 
-            windowWidth: pdfWidth, // 🎯 หมัดเด็ดแท็บเล็ต 1: จำลองความกว้างเบราว์เซอร์ให้เท่าขนาดกระดาษจริง ไม่สนจออุปกรณ์
-            width: pdfWidth,       // ล็อกความกว้างการถ่ายภาพให้เท่ากับกระดาษเป๊ะ ๆ
+            windowWidth: pdfWidth, 
+            width: pdfWidth,       
             scrollX: 0,
-            scrollY: 0
+            scrollY: 0,
+            x: 0,                  
+            y: 0
         },
         jsPDF: { unit: 'px', format: [pdfWidth, pdfHeight], orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait' },
         pagebreak: { mode: 'slice' }
@@ -354,11 +389,9 @@ async function exportToPDFFile() {
     const originalScale = currentScale;
     const element = document.getElementById('pdf-container');
     
-    // บันทึกตำแหน่งการเลื่อนหน้าจอเดิมของผู้ใช้
     const originalScrollTop = workspace ? workspace.scrollTop : 0;
     const originalScrollLeft = workspace ? workspace.scrollLeft : 0;
     
-    // วาร์ปหน้าจอกลับไปจุดเริ่มต้นเพื่อความแม่นยำในการจับพิกัด
     if (workspace) {
         workspace.scrollTop = 0;
         workspace.scrollLeft = 0;
@@ -383,7 +416,6 @@ async function exportToPDFFile() {
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        /* 🎯 หมัดเด็ดแท็บเล็ต 2: บังคับล็อกขนาดโครงสร้างแบบเด็ดขาด (Absolute Standard Dimensions) */
         #pdf-container { 
             padding: 0 !important; 
             margin: 0 !important; 
@@ -408,6 +440,7 @@ async function exportToPDFFile() {
             height: ${pdfHeight}px !important; 
             position: relative !important; 
         }
+        .text-overlay-layer { overflow: visible !important; position: absolute !important; }
         .pdf-page-canvas, .drawing-page-canvas { width: 100% !important; height: 100% !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls, .text-node-floating-bar { display: none !important; }
@@ -424,7 +457,6 @@ async function exportToPDFFile() {
             element.style.transform = originalTransform;
             element.style.transformOrigin = originalTransformOrigin;
         }
-        // คืนค่าตำแหน่งหน้าจอเดิมให้ผู้ใช้งาน
         if (workspace) {
             workspace.scrollTop = originalScrollTop;
             workspace.scrollLeft = originalScrollLeft;
@@ -490,6 +522,7 @@ async function shareToLine() {
             height: ${pdfHeight}px !important; 
             position: relative !important; 
         }
+        .text-overlay-layer { overflow: visible !important; position: absolute !important; }
         .pdf-page-canvas, .drawing-page-canvas { width: 100% !important; height: 100% !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls, .text-node-floating-bar { display: none !important; }
@@ -522,7 +555,6 @@ async function shareToLine() {
 }
 
 function formatWord(command, value = null) {
-    // 🎯 แก้บั๊กปุ่มจัดแต่งอักษรไม่ทำงาน: ย้ายเงื่อนไขเช็กกล่องข้อความลอยขึ้นมาเป็นอันดับแรกสุดเพื่อให้ทำงานได้ทุกโหมด
     if (activeDraggableNode) {
         const span = activeDraggableNode.querySelector('span');
         if (!span) return;
@@ -533,10 +565,9 @@ function formatWord(command, value = null) {
         } else if (command === 'underline') {
             span.style.textDecoration = (span.style.textDecoration === 'underline') ? 'none' : 'underline';
         }
-        return; // ออกจากฟังก์ชันทันทีเมื่อจัดการกล่องอักษรลอยเสร็จแล้ว
+        return; 
     }
     
-    // โค้ดเดิมสำหรับจัดแต่งตัวอักษรใน Word Mode ปกติ
     if (currentFileMode === 'word') {
         document.execCommand(command, false, value);
     }
@@ -550,7 +581,6 @@ function clearActiveDraggableNode() {
     }
 }
 
-// ระบบเลื่อนเปลี่ยนหน้ากระดาษ
 function scrollWorkspace(direction) {
     if (!workspace) return;
     const pageHeight = workspace.clientHeight - 100;
@@ -748,7 +778,6 @@ function setTool(tool) {
     clearActiveDraggableNode();
 }
 
-// 🟢 [DYNAMIC DRAG & EDIT] จัดการข้อความลอยแบบสมบูรณ์ ผูก Event กับทุกกล่องแบบเรียลไทม์
 function createDraggableTextNode(e) {
     if (currentTool !== 'text') return;
     const activePage = getActivePageWrapper(); if (!activePage) return;
@@ -771,7 +800,6 @@ function createDraggableTextNode(e) {
     span.innerText = 'พิมพ์ข้อความ...';
     node.appendChild(span);
 
-    // จิ้มที่ตัวหนังสือเบา ๆ เพื่อเข้าโหมดพิมพ์ทันที
     span.addEventListener('click', (ev) => {
         ev.stopPropagation();
         node.classList.add('is-editing');
@@ -786,26 +814,51 @@ function createDraggableTextNode(e) {
         }
     });
 
-    let isDraggingNode = false; let startX = 0, startY = 0;
+    let isDraggingNode = false; 
+    let startX = 0, startY = 0;
+    let startLeft = 0, startTop = 0; 
     
     function dragStart(ev) {
-        if (node.classList.contains('is-editing')) return; // ถ้ากำลังเปิดคีย์บอร์ดพิมพ์อยู่ ห้ามลากขยับตำแหน่ง
+        if (node.classList.contains('is-editing')) return; 
         isDraggingNode = true;
         const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
         const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
-        startX = pageX - parseFloat(node.style.left); 
-        startY = pageY - parseFloat(node.style.top);
         
-        // จิ้มกล่องไหน ให้เรียกฟังก์ชันดึงกล่องเก่ากล่องนั้นขึ้นมาเป็น Active Node ทันที (แก้บั๊กย้ายได้แต่กล่องล่าสุด)
+        startX = pageX;
+        startY = pageY;
+        startLeft = parseFloat(node.style.left) || 0;
+        startTop = parseFloat(node.style.top) || 0;
+        
         selectTextNode(node);
     }
 
     function dragMove(ev) {
         if (!isDraggingNode) return;
+        if (ev.cancelable) ev.preventDefault(); 
+        
         const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
         const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
-        node.style.left = (pageX - startX) + 'px'; 
-        node.style.top = (pageY - startY) + 'px';
+        
+        const deltaX = (pageX - startX) / currentScale;
+        const deltaY = (pageY - startY) / currentScale;
+        
+        let targetLeft = startLeft + deltaX;
+        let targetTop = startTop + deltaY;
+        
+        const parent = node.parentElement; 
+        if (parent) {
+            const halfWidth = node.offsetWidth / 2;
+            const halfHeight = node.offsetHeight / 2;
+            
+            if (targetLeft < halfWidth) targetLeft = halfWidth; 
+            if (targetLeft > parent.offsetWidth - halfWidth) targetLeft = parent.offsetWidth - halfWidth; 
+            
+            if (targetTop < halfHeight) targetTop = halfHeight; 
+            if (targetTop > parent.offsetHeight - halfHeight) targetTop = parent.offsetHeight - halfHeight; 
+        }
+        
+        node.style.left = targetLeft + 'px'; 
+        node.style.top = targetTop + 'px';
     }
 
     function dragEnd() { isDraggingNode = false; }
@@ -815,12 +868,11 @@ function createDraggableTextNode(e) {
     document.addEventListener('mouseup', dragEnd);
     
     node.addEventListener('touchstart', dragStart, {passive: true}); 
-    document.addEventListener('touchmove', dragMove, {passive: true}); 
+    document.addEventListener('touchmove', dragMove, {passive: false}); 
     document.addEventListener('touchend', dragEnd);
 
     overlay.appendChild(node);
     
-    // ดึงโฟกัสเพื่อพิมพ์คำอัตโนมัติทันทีที่สร้างกล่อง
     selectTextNode(node);
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
@@ -836,7 +888,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- AI Gemini Engine Integration ---
 async function callGeminiAPI(promptText) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";

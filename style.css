@@ -152,6 +152,20 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 .brush-preview-box { width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
 #brush-preview { border-radius: 50%; }
 
+/* 🎨 ระบบจานสีสำเร็จรูปด่วน (Quick Color Palette UI) */
+.quick-color-palette {
+    display: flex; gap: 6px; align-items: center; margin: 0 4px;
+}
+.color-palette-dot {
+    width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.3); transition: transform 0.1s, border-color 0.1s;
+}
+.color-palette-dot:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.7); }
+.color-palette-dot.active {
+    transform: scale(1.25); border-color: #ffffff !important;
+    box-shadow: 0 0 8px rgba(255,255,255,0.6);
+}
+
 /* แจ้งเตือนแบบกำหนดเอง */
 .custom-notification {
     position: fixed; top: 20px; right: 20px; background: #1e293b; color: #fff;
