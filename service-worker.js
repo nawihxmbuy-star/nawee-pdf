@@ -1,4 +1,5 @@
-const CACHE_NAME = 'nawee-pro-studio-v3';
+// 🎯 [UPDATED] ขยับเวอร์ชันจาก v3 เป็น v4 เพื่อบังคับให้บราวเซอร์โหลดไฟล์ index.html และ script.js ใบใหม่ที่เราเพิ่งแก้ไป
+const CACHE_NAME = 'nawee-pro-studio-v4'; 
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -13,13 +14,13 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
     }).then(() => {
-      // 🎯 เพิ่มเติม: สั่งให้ Service Worker ตัวใหม่ข้ามการรอคอย และทำงานทันทีเมื่อมีการอัปเดตโค้ด
+      // 🎯 สั่งให้ Service Worker ตัวใหม่ข้ามการรอคอย และทำงานทันทีเมื่อมีการอัปเดตโค้ด
       return self.skipWaiting();
     })
   );
 });
 
-// 2. 🌟 เพิ่มเติม: ระบบล้างแคชเวอร์ชันเก่าทิ้งเมื่อเปิดใช้งานเวอร์ชันใหม่ (ป้องกันพื้นที่มือถือผู้ใช้เต็ม)
+// 2. ระบบล้างแคชเวอร์ชันเก่าทิ้งเมื่อเปิดใช้งานเวอร์ชันใหม่ (ป้องกันพื้นที่มือถือผู้ใช้เต็ม)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
