@@ -916,6 +916,25 @@ async function captureActivePageBase64() {
 }
 
 // ⚡ ฟังก์ชันจัดการส่งและเชื่อมต่อ Streaming Data Reader กับ Gemini API (จำลอง Multi-turn + Streaming)
+// 🤖 ฟังก์ชันสำหรับ เปิด-ปิด แถบผู้ช่วย AI ด้านข้าง (Sidebar Toggle)
+function toggleAiSidebar() {
+    const sidebar = document.getElementById('ai-sidebar');
+    if (sidebar) {
+        // ทำการสลับคลาส active เพื่อแสดงหรือซ่อนแผงควบคุมตามเงื่อนไข CSS
+        sidebar.classList.toggle('active');
+        
+        // 📱 Option เสริม: ถ้าเปิดแถบขึ้นมาแล้ว ให้กล่องพิมพ์คำถามโฟกัสอัตโนมัติพร้อมใช้งานทันที
+        if (sidebar.classList.contains('active')) {
+            const aiInput = document.getElementById('ai-input');
+            if (aiInput) {
+                setTimeout(() => aiInput.focus(), 300); // รอเอฟเฟกต์สไลด์ทำงานแป๊บหนึ่งแล้วเปิดโฟกัส
+            }
+        }
+    } else {
+        showNotification("❌ ไม่พบแผงควบคุม #ai-sidebar ในระบบกรุณาตรวจสอบหน้า HTML นะคะ");
+    }
+}
+
 async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
