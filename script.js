@@ -29,6 +29,15 @@ let eraserShape = 'circle';
 // ✨ ✨ [NEW v2.0] ตัวแปรความจำสำหรับเก็บประวัติการคุยกับ AI ต่อเนื่อง (Chat History)
 let geminiChatHistory = [];
 
+// ฟังก์ชันเสริมสำหรับบันทึกสถานะแชทลงเครื่องแบบเรียลไทม์ (Chat Persistence)
+function saveChatToLocalStorage() {
+    const chatBox = document.getElementById('ai-chat-box');
+    if (chatBox) {
+        localStorage.setItem('nawee_studio_chat_html', chatBox.innerHTML);
+    }
+    localStorage.setItem('nawee_studio_chat_history', JSON.stringify(geminiChatHistory));
+}
+
 // ฟังก์ชันแปลงค่าสี RGB จากเบราว์เซอร์ให้เป็น Hex เพื่อซิงค์กับช่องเลือกสี
 function rgbToHex(rgb) {
     if (!rgb || !rgb.startsWith('rgb')) return rgb;
@@ -158,7 +167,26 @@ document.addEventListener('DOMContentLoaded', () => {
     container = document.getElementById('pdf-container');
     workspace = document.querySelector('.workspace');
     appTitle = document.getElementById('app-title');
+    const chatBox = document.getElementById('ai-chat-box');
     
+    // 💾 [NEW v2.0 - Chat Persistence] โหลดข้อความแชทเก่าและประวัติจากหน่วยความจำเครื่องกลับมาแสดงผลอัตโนมัติ
+    if (chatBox) {
+        const savedChatHtml = localStorage.getItem('nawee_studio_chat_html');
+        const savedHistory = localStorage.getItem('nawee_studio_chat_history');
+        
+        if (savedChatHtml) {
+            chatBox.innerHTML = savedChatHtml;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        if (savedHistory) {
+            try {
+                geminiChatHistory = JSON.parse(savedHistory);
+            } catch (e) {
+                console.error("โหลดประวัติแชทล้มเหลว:", e);
+            }
+        }
+    }
+
     const uploadInput = document.getElementById('upload');
     if (uploadInput) uploadInput.addEventListener('change', handleFileOpen);
     
@@ -354,6 +382,76 @@ function formatWord(command, value = null) {
     if (currentFileMode === 'word') {
         document.execCommand(command, false, value);
     }
+}
+
+// 🟢 เคลียร์ประวัติ AI และความจำแชทในเครื่องทุกครั้งเมื่อเปิดเอกสารชุดใหม่ เพื่อไม่ให้ข้อมูลผสมปนเปกันค่ะ
+async function handleFileOpen(e) {
+    try {
+        const file = e.target.files[0]; if (!file) return;
+        originalFileName = file.name.replace(/\.[^/.]+$/, ""); 
+        const arrayBuffer = await file.arrayBuffer();
+        pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        container.innerHTML = ''; currentScale = 1.0; applyZoom();
+        
+        // ล้างความจำแชททั้งในแรมและใน Storage เครื่อง
+        geminiChatHistory = []; 
+        localStorage.removeItem('nawee_studio_chat_html');
+        localStorage.removeItem('nawee_studio_chat_history');
+        const chatBox = document.getElementById('ai-chat-box');
+        if (chatBox) chatBox.innerHTML = '';
+
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
+            const viewport = page.getViewport({ scale: 2.5 }); 
+
+            const pageWrapper = document.createElement('div');
+            pageWrapper.className = 'page-wrapper';
+            pageWrapper.style.width = (viewport.width / 2) + 'px';
+            pageWrapper.style.height = (viewport.height / 2) + 'px';
+
+            const pdfCanvas = document.createElement('canvas');
+            pdfCanvas.className = 'pdf-page-canvas';
+            pdfCanvas.width = viewport.width; pdfCanvas.height = viewport.height;
+            pageWrapper.appendChild(pdfCanvas);
+
+            const drawingCanvas = document.createElement('canvas');
+            drawingCanvas.className = 'drawing-page-canvas';
+            drawingCanvas.width = viewport.width; drawingCanvas.height = viewport.height;
+            pageWrapper.appendChild(drawingCanvas);
+
+            const textOverlayLayer = document.createElement('div');
+            textOverlayLayer.className = 'text-overlay-layer';
+            pageWrapper.appendChild(textOverlayLayer);
+            container.appendChild(pageWrapper);
+
+            await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
+
+            const displayViewport = page.getViewport({ scale: 1.25 });
+            const textContent = await page.getTextContent();
+            
+            textContent.items.forEach(item => {
+                if (!item.str || item.str.trim() === "") return;
+                const [left, txY] = displayViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+                const fontHeight = Math.abs(item.transform[3]) * 1.25; 
+                const top = txY - fontHeight;
+
+                const textNode = document.createElement('div');
+                textNode.className = 'word-text-node';
+                textNode.setAttribute('contenteditable', 'false');
+                textNode.style.left = left + 'px'; textNode.style.top = top + 'px';
+                textNode.style.fontSize = fontHeight + 'px';
+                
+                const calculatedWidth = item.width * 1.25;
+                if (calculatedWidth > 0) textNode.style.width = calculatedWidth + 'px';
+                textNode.innerText = item.str;
+                textNode.addEventListener('input', () => textNode.classList.add('is-edited'));
+                textOverlayLayer.appendChild(textNode);
+            });
+            bindDrawingEngine(drawingCanvas);
+        }
+        switchFileMode(currentFileMode);
+    } catch (error) { alert("เกิดข้อผิดพลาดในการโหลดชีทสเปซ: " + error.message); }
 }
 
 function triggerPdfToWord() { closeAllPopups(); if (!pdfDoc) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; } switchFileMode('word'); }
@@ -583,69 +681,6 @@ function closeAllPopups() { document.querySelectorAll('.dropdown-popup').forEach
 function updateBrushPreview() {
     const preview = document.getElementById('brush-preview');
     if (preview) { preview.style.width = currentBrushSize + 'px'; preview.style.height = currentBrushSize + 'px'; preview.style.backgroundColor = currentActiveColor; }
-}
-
-async function handleFileOpen(e) {
-    try {
-        const file = e.target.files[0]; if (!file) return;
-        originalFileName = file.name.replace(/\.[^/.]+$/, ""); 
-        const arrayBuffer = await file.arrayBuffer();
-        pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        
-        container.innerHTML = ''; currentScale = 1.0; applyZoom();
-        geminiChatHistory = []; // 🟢 เคลียร์ประวัติ AI ทุกครั้งเมื่อเปิดเอกสารชุดใหม่
-
-        for (let i = 1; i <= pdfDoc.numPages; i++) {
-            const page = await pdfDoc.getPage(i);
-            const viewport = page.getViewport({ scale: 2.5 }); 
-
-            const pageWrapper = document.createElement('div');
-            pageWrapper.className = 'page-wrapper';
-            pageWrapper.style.width = (viewport.width / 2) + 'px';
-            pageWrapper.style.height = (viewport.height / 2) + 'px';
-
-            const pdfCanvas = document.createElement('canvas');
-            pdfCanvas.className = 'pdf-page-canvas';
-            pdfCanvas.width = viewport.width; pdfCanvas.height = viewport.height;
-            pageWrapper.appendChild(pdfCanvas);
-
-            const drawingCanvas = document.createElement('canvas');
-            drawingCanvas.className = 'drawing-page-canvas';
-            drawingCanvas.width = viewport.width; drawingCanvas.height = viewport.height;
-            pageWrapper.appendChild(drawingCanvas);
-
-            const textOverlayLayer = document.createElement('div');
-            textOverlayLayer.className = 'text-overlay-layer';
-            pageWrapper.appendChild(textOverlayLayer);
-            container.appendChild(pageWrapper);
-
-            await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
-
-            const displayViewport = page.getViewport({ scale: 1.25 });
-            const textContent = await page.getTextContent();
-            
-            textContent.items.forEach(item => {
-                if (!item.str || item.str.trim() === "") return;
-                const [left, txY] = displayViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
-                const fontHeight = Math.abs(item.transform[3]) * 1.25; 
-                const top = txY - fontHeight;
-
-                const textNode = document.createElement('div');
-                textNode.className = 'word-text-node';
-                textNode.setAttribute('contenteditable', 'false');
-                textNode.style.left = left + 'px'; textNode.style.top = top + 'px';
-                textNode.style.fontSize = fontHeight + 'px';
-                
-                const calculatedWidth = item.width * 1.25;
-                if (calculatedWidth > 0) textNode.style.width = calculatedWidth + 'px';
-                textNode.innerText = item.str;
-                textNode.addEventListener('input', () => textNode.classList.add('is-edited'));
-                textOverlayLayer.appendChild(textNode);
-            });
-            bindDrawingEngine(drawingCanvas);
-        }
-        switchFileMode(currentFileMode);
-    } catch (error) { alert("เกิดข้อผิดพลาดในการโหลดชีทสเปซ: " + error.message); }
 }
 
 function bindDrawingEngine(canvas) {
@@ -952,6 +987,7 @@ async function sendAiQuestion() {
     const userText = input.value.trim(); if (!userText) return;
 
     appendAiMessage("user", userText); input.value = '';
+    saveChatToLocalStorage(); // บันทึกสเตจฝั่ง User ทันทีกันหลุดหน้าจอ
     
     let pageText = "";
     const activePage = getActivePageWrapper();
@@ -986,14 +1022,19 @@ async function sendAiQuestion() {
                 aiMessageDiv.innerText += newChunk;
                 const chatBox = document.getElementById('ai-chat-box');
                 if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+                saveChatToLocalStorage(); // บันทึกสเตจความคืบหน้าการพิมพ์คำตอบของ AI ทีละตัวอักษร
             }
         },
         (fullResponseText) => {
             // บันทึกคำตอบเต็มของ AI ลงประวัติเมื่อการสตรีมจบลงสมบูรณ์
             geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
+            saveChatToLocalStorage(); // ทำการเขียนล็อกสมบูรณ์แบบลงเครื่องถาวร
         },
         (errorMsg) => {
-            if (aiMessageDiv) aiMessageDiv.innerText = errorMsg;
+            if (aiMessageDiv) {
+                aiMessageDiv.innerText = errorMsg;
+                saveChatToLocalStorage();
+            }
         }
     );
 }
@@ -1001,6 +1042,7 @@ async function sendAiQuestion() {
 // 📊 ฟังก์ชันวิเคราะห์สรุปรายงานอัจฉริยะ (Multimodal Report Analytics)
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
+    saveChatToLocalStorage();
     
     let pageText = "";
     const activePage = getActivePageWrapper();
@@ -1030,13 +1072,18 @@ async function askAiToSummary() {
                 aiMessageDiv.innerText += newChunk;
                 const chatBox = document.getElementById('ai-chat-box');
                 if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+                saveChatToLocalStorage(); // เซฟเรียลไทม์ระหว่างสตรีมสรุปผล
             }
         },
         (fullResponseText) => {
             geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
+            saveChatToLocalStorage(); // เซฟสรุปผลตัวสมบูรณ์ลงดิสก์
         },
         (errorMsg) => {
-            if (aiMessageDiv) aiMessageDiv.innerText = errorMsg;
+            if (aiMessageDiv) {
+                aiMessageDiv.innerText = errorMsg;
+                saveChatToLocalStorage();
+            }
         }
     );
 }
@@ -1065,4 +1112,59 @@ function appendAiMessage(sender, text) {
 
     const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
     msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+
+// ==========================================================
+// 🛡️ [NEW v2.5] ระบบตรวจจับและขอยืนยันการอัปเดตอย่างปลอดภัย (Safe PWA Update)
+// ==========================================================
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js')
+    .then(reg => {
+        
+        // ฟังก์ชันขึ้นกล่องแจ้งเตือนถามคุณนาวีก่อนเปลี่ยนเวอร์ชัน เพื่อสกัดกั้นงานหายกลางคัน
+        function promptUserToUpdate(waitingWorker) {
+            const userAccepted = confirm(
+                "✨ [Nawee Studio] พบการอัปเดตระบบเวอร์ชันใหม่ล่าสุด!\n\n" +
+                "คุณต้องการเปลี่ยนผ่านระบบและเริ่มหน้าแอปใหม่ตอนนี้เลยไหมคะ?\n" +
+                "--------------------------------------------------\n" +
+                "⚠️ หากคุณกำลังติดงานพิมพ์ วาดแบบ หรือทำงานค้างอยู่ ให้กด 'ยกเลิก (Cancel)' เพื่อเซฟงานก่อนได้ค่ะ ระบบจะไม่รีโหลดจนกว่าคุณจะพร้อม"
+            );
+
+            if (userAccepted) {
+                // อนุมัติรหัสผ่านลับให้ Service Worker ก้าวข้ามสเตจ Waiting ไปรีบูตระบบได้ทันที
+                waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+        }
+
+        // กรณีที่ 1: ตรวจพบไฟล์อัปเดตดาวน์โหลดมารอก่อนหน้าแล้วในเครื่อง
+        if (reg.waiting) {
+            promptUserToUpdate(reg.waiting);
+        }
+
+        // กรณีที่ 2: ระบบตรวจจับเจออัปเดตใหม่ระหว่างกำลังเปิดหน้างานทิ้งไว้
+        reg.onupdatefound = () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+                installingWorker.onstatechange = () => {
+                    // เมื่อไฟล์เวอร์ชันใหม่ทั้งหมดถูกดาวน์โหลดและจัดสรรสเปซเสร็จสิ้นค้างไว้ที่แท่นจ่อคิว
+                    if (installingWorker.state === 'installed') {
+                        if (navigator.serviceWorker.controller) {
+                            promptUserToUpdate(installingWorker);
+                        }
+                    }
+                };
+            }
+        };
+
+    }).catch(err => console.error("Service Worker Registration Failed:", err));
+
+    // ผูกกระบวนการรีเฟรชหน้าจอ: จะเริ่มโหลดแอปใหม่ก้าวไปเวอร์ชันถัดไปก็ต่อเมื่อกดยอมรับ 'ตกลง' เท่านั้นค่ะ
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            window.location.reload();
+            refreshing = true;
+        }
+    });
 }
