@@ -906,24 +906,24 @@ async function captureActivePageBase64() {
             useCORS: true,
             logging: false,
             backgroundColor: '#ffffff',
-            scale: 1.2 // ปรับความคมชัดภาพสแกนกำลังดี เหมาะสมกับขนาดข้อมูลโครงข่าย
+            scale: 1.0 // 🚀 ปรับเป็น 1.0 เพื่อลดขนาดพิกเซลไฟล์ภาพ ไม่ให้หนักข้ามเครือข่ายเกินความจำเป็น
         });
-        return tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+        // บีบอัดคุณภาพรูป JPEG เหลือ 0.75 เพื่อความประหยัด Bandwidth และความรวดเร็วในการประมวลผลของบอต
+        return tempCanvas.toDataURL('image/jpeg', 0.75).split(',')[1];
     } catch (error) {
         console.error("สแกนและถ่ายภาพหน้าจอผิดพลาด:", error);
         return null;
     }
 }
+
 // 🤖 ฟังก์ชันเปิด-ปิดแผงผู้ช่วย AI (ฉบับแก้ไขล็อกคลาสครอบจักรวาล)
 function toggleAiSidebar() {
     const sidebar = document.getElementById('ai-sidebar');
     if (sidebar) {
-        // สลับคลาสทุกตัวที่สไตล์ชีตอาจจะดักจับอยู่เพื่อบังคับแสดงผล
         sidebar.classList.toggle('active');
         sidebar.classList.toggle('open');
         sidebar.classList.toggle('show');
         
-        // โฟกัสช่องพิมพ์คำถามอัตโนมัติเมื่อเปิดใช้งาน
         if (sidebar.classList.contains('active') || sidebar.classList.contains('open')) {
             const aiInput = document.getElementById('ai-input');
             if (aiInput) {
@@ -935,6 +935,7 @@ function toggleAiSidebar() {
     }
 }
 
+// 🚀 ฟังก์ชันหลักในการส่งและรับคำตอบแบบ Realtime Streaming (เวอร์ชันเสถียรสูงสุดปี 2026)
 async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
@@ -943,17 +944,41 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
         return;
     }
 
-    // 🚀 อัปเกรดขุมพลังเป็นรุ่นโมเดลหลัก gemini-1.5-flash เพื่อให้ทำงานได้ครบครันทั้งสตรีมและประมวลผลรูปภาพประกอบ
+    // 🛑 [กลไกตัดตัวปัญหา] กรองล้างรูปภาพ Base64 ออกจากเทิร์นในประวัติอดีต เพื่อล็อกขนาดข้อมูลไม่ให้ระเบิดตัว
+    const sanitizedContents = contents.map((turn, index) => {
+        let roleName = turn.role;
+        if (roleName === 'assistant') roleName = 'model'; // บังคับบทบาทให้ตรงมาตรฐานของกูเกิล
+
+        // ถ้าไม่ใช่รอบแชตล่าสุดตัวปัจจุบัน ให้ถอดถอน inline_data รูปภาพออกไป คงเหลือเฉพาะเนื้อหาข้อความ
+        if (index < contents.length - 1) {
+            const textOnlyParts = turn.parts.filter(p => p.text).map(p => ({ text: p.text }));
+            return {
+                role: roleName,
+                parts: textOnlyParts.length > 0 ? textOnlyParts : [{ text: "" }]
+            };
+        }
+        // ถ้าเป็นรอบปัจจุบันที่ผู้ใช้เพิ่งกดส่งคำสั่ง ให้คงสภาพส่งไปทั้งรูปภาพและ prompt
+        return {
+            role: roleName,
+            parts: turn.parts
+        };
+    });
+
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${API_KEY}`;
 
     try {
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: contents })
+            body: JSON.stringify({ contents: sanitizedContents })
         });
 
-        if (!response.ok) throw new Error(`HTTP status ${response.status}`);
+        if (!response.ok) {
+            // แกะรายละเอียดข้อมูลจากเซิร์ฟเวอร์ย้อนหลัง เผื่อกรณีคีย์ตาย หรือเครือข่ายไม่อนุมัติ
+            const errJson = await response.json().catch(() => ({}));
+            const serverMsg = (errJson.error && errJson.error.message) ? errJson.error.message : `HTTP status ${response.status}`;
+            throw new Error(serverMsg);
+        }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
@@ -966,7 +991,6 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
 
             buffer += decoder.decode(value, { stream: true });
 
-            // ใช้ระบบวิเคราะห์ Regular Expression ค้นหาฟิลด์คำตอบ "text" ที่ตัดแยกเป็นส่วนๆ ใน JSON Stream อย่างเสถียร
             const regex = /"text"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
             let currentTextSnapshot = "";
             let match;
@@ -980,7 +1004,6 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
                 currentTextSnapshot += cleanedText;
             }
 
-            // คำนวณส่งเฉพาะตัวหนังสือส่วนต่างที่เพิ่งไหลมาใหม่ (Realtime Diff Text)
             if (currentTextSnapshot.length > accumulatedText.length) {
                 let newPiece = currentTextSnapshot.substring(accumulatedText.length);
                 accumulatedText = currentTextSnapshot;
@@ -990,8 +1013,8 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
         onDone(accumulatedText);
 
     } catch (e) {
-        console.error(e);
-        onError("❌ การเชื่อมต่อล้มเหลว คีย์อาจไม่ถูกต้อง หรือเน็ตเวิร์กขัดข้องชั่วคราวค่ะ");
+        console.error("Gemini API Engine Crash:", e);
+        onError(`⚠️ การเชื่อมต่อขัดข้อง: ${e.message}`);
     }
 }
 
@@ -1001,7 +1024,7 @@ async function sendAiQuestion() {
     const userText = input.value.trim(); if (!userText) return;
 
     appendAiMessage("user", userText); input.value = '';
-    saveChatToLocalStorage(); // บันทึกสเตจฝั่ง User ทันทีกันหลุดหน้าจอ
+    saveChatToLocalStorage(); 
     
     let pageText = "";
     const activePage = getActivePageWrapper();
@@ -1009,7 +1032,6 @@ async function sendAiQuestion() {
 
     appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์ข้อมูลและรูปภาพหน้าจอให้คุณนาวีค่ะ...");
 
-    // 📸 ดึงข้อมูลภาพหน้าจอ (หากมีไลบรารีรองรับจะจับภาพรอยปากกาและไฮไลต์ส่งไปด้วย)
     const base64Screen = await captureActivePageBase64();
 
     let currentTurnParts = [];
@@ -1024,10 +1046,8 @@ async function sendAiQuestion() {
 
     currentTurnParts.push({ text: finalPrompt });
 
-    // บันทึกลงคลังประวัติคุยต่อเนื่อง
     geminiChatHistory.push({ role: "user", parts: currentTurnParts });
 
-    // สร้างกล่องแชต AI เปล่ารอรับการพิมพ์ตอบไล่ระดับ (Streaming)
     const aiMessageDiv = createStreamingAiMessageElement();
 
     await streamGeminiPayload(geminiChatHistory, 
@@ -1036,16 +1056,16 @@ async function sendAiQuestion() {
                 aiMessageDiv.innerText += newChunk;
                 const chatBox = document.getElementById('ai-chat-box');
                 if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-                saveChatToLocalStorage(); // บันทึกสเตจความคืบหน้าการพิมพ์คำตอบของ AI ทีละตัวอักษร
+                saveChatToLocalStorage(); 
             }
         },
         (fullResponseText) => {
-            // บันทึกคำตอบเต็มของ AI ลงประวัติเมื่อการสตรีมจบลงสมบูรณ์
             geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
-            saveChatToLocalStorage(); // ทำการเขียนล็อกสมบูรณ์แบบลงเครื่องถาวร
+            saveChatToLocalStorage(); 
         },
         (errorMsg) => {
             if (aiMessageDiv) {
+                aiMessageDiv.style.color = "#ef4444"; // เปลี่ยนสีตัวอักษรกล่องแชตเป็นสีแดงเมื่อเอเรอร์
                 aiMessageDiv.innerText = errorMsg;
                 saveChatToLocalStorage();
             }
@@ -1086,15 +1106,16 @@ async function askAiToSummary() {
                 aiMessageDiv.innerText += newChunk;
                 const chatBox = document.getElementById('ai-chat-box');
                 if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-                saveChatToLocalStorage(); // เซฟเรียลไทม์ระหว่างสตรีมสรุปผล
+                saveChatToLocalStorage(); 
             }
         },
         (fullResponseText) => {
             geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
-            saveChatToLocalStorage(); // เซฟสรุปผลตัวสมบูรณ์ลงดิสก์
+            saveChatToLocalStorage(); 
         },
         (errorMsg) => {
             if (aiMessageDiv) {
+                aiMessageDiv.style.color = "#ef4444";
                 aiMessageDiv.innerText = errorMsg;
                 saveChatToLocalStorage();
             }
