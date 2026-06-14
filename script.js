@@ -895,17 +895,35 @@ async function callGeminiAPI(promptText) {
     const API_KEY = keyInput ? keyInput.value.trim() : "";
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
-    // 🚀 [UPGRADED] อัปเกรดไปใช้ Endpoint ของ gemini-1.5-flash เพื่อความรวดเร็วและประสิทธิภาพที่ดีกว่าตามมาตรฐานสากลปัจจุบัน
+    // อัปเดตโมเดลเป็นรุ่นใหม่ล่าสุด (gemini-1.5-flash) ที่เร็วกว่าและเสถียรกว่า
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    
     try {
         const response = await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         });
+        
         const data = await response.json();
-        return data.candidates[0].content.parts[0].text;
+
+        // ดักจับกรณี API ของ Google ส่ง Error กลับมา (เช่น คีย์ผิด, ไม่ได้เปิด API, ฯลฯ)
+        if (!response.ok) {
+            console.error("Gemini API Error details:", data);
+            return `❌ ข้อผิดพลาดจากระบบ: ${data.error?.message || "ไม่ทราบสาเหตุ (กรุณาเช็ก Console)"}`;
+        }
+
+        // ตรวจสอบว่ามีคำตอบกลับมาจริงๆ ป้องกันการอ่านค่า undefined
+        if (data.candidates && data.candidates.length > 0) {
+            return data.candidates[0].content.parts[0].text;
+        } else {
+            console.warn("Unexpected API Response:", data);
+            return "❌ AI ไม่ได้ส่งคำตอบกลับมาค่ะ (อาจถูกบล็อกโดยระบบความปลอดภัยของ Google)";
+        }
+
     } catch (e) {
-        return "❌ คีย์เชื่อมต่อไม่ถูกต้อง หรือเน็ตเวิร์กขัดข้องชั่วคราวค่ะ";
+        console.error("Fetch Error:", e);
+        return "❌ เน็ตเวิร์กขัดข้อง ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ของ AI ได้ค่ะ";
     }
 }
 
