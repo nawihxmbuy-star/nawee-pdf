@@ -902,6 +902,7 @@ function toggleAiSidebar() {
     }
 }
 
+// 🚀 ฟังก์ชันส่งข้อมูลหา AI (ปรับกลับมาใช้เวอร์ชัน v1 และโครงสร้างเดิมที่คุณนาวีใช้งานได้สำเร็จ)
 async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
@@ -910,27 +911,15 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
         return;
     }
 
-    // 🌐 เลือกใช้ v1beta เพื่อรองรับโครงสร้างข้อมูล Multimodal และ REST API คีย์แยกอย่างมีเสถียรภาพสูงสุด
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${API_KEY}`;
+    // 🌐 ย้อนกลับมาใช้เวอร์ชัน v1 ตามโครงสร้างเดิมที่คุณนาวีเคยใช้งานได้สำเร็จครับ
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key=${API_KEY}`;
 
     try {
-        // ทำความสะอาดคัดแยกข้อมูลประวัติ: ล้างรูปภาพเก่าในประวัติทิ้งเพื่อลดภาระ Bandwidth ป้องกันรหัสเอเรอร์สะสม
-        const sanitizedContents = contents.map((turn, index) => {
-            let roleName = turn.role === 'user' ? 'user' : 'model';
-            if (index < contents.length - 1) {
-                const textOnlyParts = turn.parts.filter(p => p.text).map(p => ({ text: p.text }));
-                return {
-                    role: roleName,
-                    parts: textOnlyParts.length > 0 ? textOnlyParts : [{ text: "" }]
-                };
-            }
-            return { role: roleName, parts: turn.parts };
-        });
-
+        // ส่งโครงสร้าง contents ตรง ๆ แบบเดิม เพื่อความชัวร์สูงสุดกับตัวคีย์ครับ
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: sanitizedContents })
+            body: JSON.stringify({ contents: contents })
         });
 
         if (!response.ok) {
@@ -977,7 +966,7 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
         onDone(accumulatedText);
 
     } catch (e) {
-        console.error("Gemini API Engine Crash:", e);
+        console.error("Gemini Engine Error:", e);
         onError(`⚠️ ข้อขัดข้อง: ${e.message}`);
     }
 }
