@@ -26,7 +26,7 @@ let appTitle = null;
 let activeDraggableNode = null; // ตัวแปรหลักสำหรับเก็บกล่องข้อความลอยที่กำลังถูกเลือกใช้งานอยู่ปัจจุบัน
 let eraserShape = 'circle';
 
-// ✨ ✨ [NEW v2.0] ตัวแปรความจำสำหรับเก็บประวัติการคุยกับ AI ต่อเนื่อง (Chat History)
+// ✨ ✨ ตัวแปรความจำสำหรับเก็บประวัติการคุยกับ AI ต่อเนื่อง (Chat History)
 let geminiChatHistory = [];
 
 // ฟังก์ชันเสริมสำหรับบันทึกสถานะแชทลงเครื่องแบบเรียลไทม์ (Chat Persistence)
@@ -162,6 +162,36 @@ function deselectTextNode() {
     closeTextSheet();
 }
 
+// 🔄 ฟังก์ชันล้างงานเก่าและสร้างงานใหม่ (Reset App State)
+function resetApp() {
+    if (!confirm("คุณต้องการล้างงานปัจจุบันและเริ่มเอกสารใหม่ใช่ไหมคะ? (ข้อมูลที่ไม่ได้เซฟจะหายไป)")) {
+        return;
+    }
+
+    pdfDoc = null;
+    originalFileName = "Nawee_Document";
+    container.innerHTML = `
+        <div class="initial-notice">
+            <p><i class="fa-solid fa-cloud-arrow-up" style="font-size: 48px; color: var(--accent-color); margin-bottom: 15px;"></i></p>
+            <p>ยินดีต้อนรับสู่ระบบกรุณากดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มต้นทำงานค่ะ</p>
+        </div>
+    `;
+
+    geminiChatHistory = [];
+    localStorage.removeItem('nawee_studio_chat_html');
+    localStorage.removeItem('nawee_studio_chat_history');
+    
+    const chatBox = document.getElementById('ai-chat-box');
+    if (chatBox) {
+        chatBox.innerHTML = '<div class="ai-message system-msg">สวัสดีค่ะคุณนาวี! ให้หนูช่วยสรุปรายงาน วิเคราะห์ตาราง หรือแปลความหมายข้อมูลในหน้าเอกสารปัจจุบัน พิมพ์บอกได้เลยนะคะ 📝</div>';
+    }
+
+    currentScale = 1.0;
+    applyZoom();
+    setTool('pan');
+    showNotification("✨ เริ่มงานใหม่เรียบร้อยแล้วค่ะ พร้อมลุยงานต่อได้เลย!");
+}
+
 // 🌐 ยุบรวมการตั้งค่าและดักจับ Event ต่างๆ ไว้ที่สัญญานโหลดหน้าจอหลักจุดเดียว
 document.addEventListener('DOMContentLoaded', () => {
     container = document.getElementById('pdf-container');
@@ -169,7 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
     appTitle = document.getElementById('app-title');
     const chatBox = document.getElementById('ai-chat-box');
     
-    // 💾 [NEW v2.0 - Chat Persistence] โหลดข้อความแชทเก่าและประวัติจากหน่วยความจำเครื่องกลับมาแสดงผลอัตโนมัติ
     if (chatBox) {
         const savedChatHtml = localStorage.getItem('nawee_studio_chat_html');
         const savedHistory = localStorage.getItem('nawee_studio_chat_history');
@@ -190,7 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadInput = document.getElementById('upload');
     if (uploadInput) uploadInput.addEventListener('change', handleFileOpen);
     
-    // 💾 [NEW v2.0] ระบบจำจำ API Key อัตโนมัติด้วย LocalStorage
     const keyInput = document.getElementById('ai-api-key');
     if (keyInput) {
         keyInput.value = localStorage.getItem('gemini_api_key') || '';
@@ -217,7 +245,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // 🟢 เลือกสีจากแผงหลักแล้วให้ข้อความเปลี่ยนสีตามทันทีแบบ Real-time (ใช้ได้ทุกกล่องที่เลือก)
     const textColorPicker = document.getElementById('text-color-picker');
     if (textColorPicker) {
         textColorPicker.addEventListener('input', (e) => {
@@ -231,7 +258,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 🟢 เลื่อนสไลเดอร์ปรับขนาดแล้วให้ข้อความขยายใหญ่ตามทันทีแบบ Real-time (ใช้ได้ทุกกล่องที่เลือก)
     const textSizeSlider = document.getElementById('text-size-slider');
     const textSizeLabel = document.getElementById('text-size-val');
     if (textSizeSlider && textSizeLabel) {
@@ -244,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 🟢 ปรับเปลี่ยนสีจากแผงควบคุมลอยด้านล่าง (Bottom Bar) แบบย้อนหลังและเรียลไทม์
     const floatingTextColor = document.getElementById('floating-text-color');
     if (floatingTextColor) {
         floatingTextColor.addEventListener('input', (e) => {
@@ -261,7 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateBrushPreview();
     setTool('pan');
     
-    // 🟢 [RE-ORGANIZED] ย้ายระบบคลิกพื้นที่ทำงานว่างเพื่อสร้างกล่องข้อความลอยมารวมไว้ที่นี่
     if (workspace) {
         workspace.addEventListener('click', (e) => {
             if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('#text-node-bottom-bar')) {
@@ -365,7 +389,6 @@ function switchFileMode(mode) {
     applyZoom();
 }
 
-// 🟢 [DEPRECATION WARNING INFO] การใช้ execCommand เหมาะกับระบบ Rich Text ดั้งเดิม ในอนาคตสามารถย้ายไปคุมโครงสร้าง DOM ตรงๆ ได้ค่ะ
 function formatWord(command, value = null) {
     if (activeDraggableNode) {
         const span = activeDraggableNode.querySelector('span');
@@ -384,7 +407,6 @@ function formatWord(command, value = null) {
     }
 }
 
-// 🟢 เคลียร์ประวัติ AI และความจำแชทในเครื่องทุกครั้งเมื่อเปิดเอกสารชุดใหม่ เพื่อไม่ให้ข้อมูลผสมปนเปกันค่ะ
 async function handleFileOpen(e) {
     try {
         const file = e.target.files[0]; if (!file) return;
@@ -394,7 +416,6 @@ async function handleFileOpen(e) {
         
         container.innerHTML = ''; currentScale = 1.0; applyZoom();
         
-        // ล้างความจำแชททั้งในแรมและใน Storage เครื่อง
         geminiChatHistory = []; 
         localStorage.removeItem('nawee_studio_chat_html');
         localStorage.removeItem('nawee_studio_chat_history');
@@ -490,7 +511,6 @@ async function exportToPDFFile() {
     
     const originalScale = currentScale;
     const element = document.getElementById('pdf-container');
-    
     const originalScrollTop = workspace ? workspace.scrollTop : 0;
     const originalScrollLeft = workspace ? workspace.scrollLeft : 0;
     
@@ -518,30 +538,8 @@ async function exportToPDFFile() {
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        #pdf-container { 
-            padding: 0 !important; 
-            margin: 0 !important; 
-            gap: 0 !important; 
-            display: block !important; 
-            width: ${pdfWidth}px !important; 
-            min-width: ${pdfWidth}px !important; 
-            max-width: ${pdfWidth}px !important;
-            transform: none !important; 
-        }
-        .page-wrapper { 
-            margin: 0 !important; 
-            padding: 0 !important; 
-            border: none !important; 
-            box-shadow: none !important; 
-            display: block !important; 
-            page-break-inside: avoid !important; 
-            break-inside: avoid !important; 
-            width: ${pdfWidth}px !important; 
-            min-width: ${pdfWidth}px !important; 
-            max-width: ${pdfWidth}px !important;
-            height: ${pdfHeight}px !important; 
-            position: relative !important; 
-        }
+        #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; width: ${pdfWidth}px !important; min-width: ${pdfWidth}px !important; max-width: ${pdfWidth}px !important; transform: none !important; }
+        .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; width: ${pdfWidth}px !important; min-width: ${pdfWidth}px !important; max-width: ${pdfWidth}px !important; height: ${pdfHeight}px !important; position: relative !important; }
         .pdf-page-canvas, .drawing-page-canvas { width: 100% !important; height: 100% !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls, .text-node-floating-bar { display: none !important; }
@@ -571,7 +569,6 @@ async function shareToLine() {
     closeAllPopups(); if (!pdfDoc) { alert("ไม่พบเอกสารในการแชร์ค่ะ!"); return; }
     const originalScale = currentScale; 
     const element = document.getElementById('pdf-container');
-    
     const originalScrollTop = workspace ? workspace.scrollTop : 0;
     const originalScrollLeft = workspace ? workspace.scrollLeft : 0;
     
@@ -599,30 +596,8 @@ async function shareToLine() {
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        #pdf-container { 
-            padding: 0 !important; 
-            margin: 0 !important; 
-            gap: 0 !important; 
-            display: block !important; 
-            width: ${pdfWidth}px !important; 
-            min-width: ${pdfWidth}px !important; 
-            max-width: ${pdfWidth}px !important;
-            transform: none !important; 
-        }
-        .page-wrapper { 
-            margin: 0 !important; 
-            padding: 0 !important; 
-            border: none !important; 
-            box-shadow: none !important; 
-            display: block !important; 
-            page-break-inside: avoid !important; 
-            break-inside: avoid !important; 
-            width: ${pdfWidth}px !important; 
-            min-width: ${pdfWidth}px !important; 
-            max-width: ${pdfWidth}px !important;
-            height: ${pdfHeight}px !important; 
-            position: relative !important; 
-        }
+        #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; width: ${pdfWidth}px !important; min-width: ${pdfWidth}px !important; max-width: ${pdfWidth}px !important; transform: none !important; }
+        .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; width: ${pdfWidth}px !important; min-width: ${pdfWidth}px !important; max-width: ${pdfWidth}px !important; height: ${pdfHeight}px !important; position: relative !important; }
         .pdf-page-canvas, .drawing-page-canvas { width: 100% !important; height: 100% !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
         .text-node-controls, .text-node-floating-bar { display: none !important; }
@@ -789,7 +764,6 @@ function setTool(tool) {
     if (toggleShapeBtn) toggleShapeBtn.style.display = (tool === 'eraser') ? 'inline-block' : 'none';
     if (textPanel) textPanel.style.display = (tool === 'text') ? 'flex' : 'none';
 
-    // 🎯 [FIXED v1.0] แก้บั๊กนวัตกรรมยางลบสายรุ้ง: ซ่อนแผงเลือกสีปากกาทันทีเมื่อใช้ยางลบ
     const penColorGroup = document.getElementById('pen-color-group') || (penPanel ? penPanel.querySelector('.panel-item') : null);
     if (penColorGroup) {
         penColorGroup.style.display = (tool === 'eraser') ? 'none' : 'flex';
@@ -803,7 +777,6 @@ function setTool(tool) {
     clearActiveDraggableNode();
 }
 
-// 🟢 [DYNAMIC DRAG & EDIT - UPDATED] จัดการข้อความลอยแบบสมบูรณ์ ตัดปัญหา Memory Leak อย่างเด็ดขาด
 function createDraggableTextNode(e) {
     if (currentTool !== 'text') return;
     const activePage = getActivePageWrapper(); if (!activePage) return;
@@ -851,7 +824,6 @@ function createDraggableTextNode(e) {
         startY = pageY - parseFloat(node.style.top);
         selectTextNode(node);
 
-        // 🎯 [FIXED] ลงทะเบียนสัญญานเฉพาะเมื่อเริ่มลากจับวัตถุเท่านั้น
         document.addEventListener('mousemove', dragMove); 
         document.addEventListener('mouseup', dragEnd);
         document.addEventListener('touchmove', dragMove, { passive: false }); 
@@ -860,7 +832,7 @@ function createDraggableTextNode(e) {
 
     function dragMove(ev) {
         if (!isDraggingNode) return;
-        if (ev.cancelable) ev.preventDefault(); // ป้องกันหน้าจอหลักเลื่อนขณะลากบนมือถือ
+        if (ev.cancelable) ev.preventDefault(); 
         const pageX = ev.touches ? ev.touches[0].pageX : ev.pageX;
         const pageY = ev.touches ? ev.touches[0].pageY : ev.pageY;
         node.style.left = (pageX - startX) + 'px'; 
@@ -870,7 +842,6 @@ function createDraggableTextNode(e) {
     function dragEnd() { 
         if (isDraggingNode) {
             isDraggingNode = false; 
-            // 🎯 [FIXED] ถอดถอนสัญญานออกทันทีเมื่อผู้ใช้ปล่อยเมาส์/ปล่อยมือ เพื่อไม่ให้เกิดปัญหาสะสมค้างในระบบ
             document.removeEventListener('mousemove', dragMove);
             document.removeEventListener('mouseup', dragEnd);
             document.removeEventListener('touchmove', dragMove);
@@ -882,23 +853,21 @@ function createDraggableTextNode(e) {
     node.addEventListener('touchstart', dragStart, {passive: true}); 
 
     overlay.appendChild(node);
-    
     selectTextNode(node);
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
 
 
-// ==========================================
-// 🔥🔥🔥 [UPGRADED v2.0] AI GEMINI PRO STUDIO ENGINE
-// ==========================================
+// ==========================================================
+// 🔥🔥🔥 [ULTRA-ROBUST v3.0] AI GEMINI PRO STUDIO ENGINE
+// ==========================================================
 
-// 📸 ฟังก์ชันแคปเจอร์หน้าจอเฉพาะแผ่นที่เปิดดูอยู่ (Multimodal)
 async function captureActivePageBase64() {
     const activePage = getActivePageWrapper();
     if (!activePage) return null;
     if (typeof html2canvas === 'undefined') {
-        console.warn("ไม่พบไลบรารี html2canvas กรุณาใส่ Script แท็กเชื่อมต่อในหน้า HTML นะคะ");
+        console.warn("ไม่พบไลบรารี html2canvas");
         return null;
     }
     try {
@@ -906,17 +875,15 @@ async function captureActivePageBase64() {
             useCORS: true,
             logging: false,
             backgroundColor: '#ffffff',
-            scale: 1.0 // 🚀 ปรับเป็น 1.0 เพื่อลดขนาดพิกเซลไฟล์ภาพ ไม่ให้หนักข้ามเครือข่ายเกินความจำเป็น
+            scale: 1.0 
         });
-        // บีบอัดคุณภาพรูป JPEG เหลือ 0.75 เพื่อความประหยัด Bandwidth และความรวดเร็วในการประมวลผลของบอต
         return tempCanvas.toDataURL('image/jpeg', 0.75).split(',')[1];
     } catch (error) {
-        console.error("สแกนและถ่ายภาพหน้าจอผิดพลาด:", error);
+        console.error("สแกนหน้าจอผิดพลาด:", error);
         return null;
     }
 }
 
-// 🤖 ฟังก์ชันเปิด-ปิดแผงผู้ช่วย AI (ฉบับแก้ไขล็อกคลาสครอบจักรวาล)
 function toggleAiSidebar() {
     const sidebar = document.getElementById('ai-sidebar');
     if (sidebar) {
@@ -931,11 +898,10 @@ function toggleAiSidebar() {
             }
         }
     } else {
-        console.error("ไม่พบ ID #ai-sidebar ในหน้า HTML");
+        console.error("ไม่พบ ID #ai-sidebar");
     }
 }
 
-// 🚀 ฟังก์ชันหลักในการส่งและรับคำตอบแบบ Realtime Streaming (เวอร์ชันเสถียรสูงสุดปี 2026)
 async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
@@ -944,17 +910,39 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
         return;
     }
 
-    // 🚀 [FIXED] อัปเกรดเปลี่ยนจาก v1beta เป็น v1 เพื่อเข้าสู่ Endpoint ตัวเต็มที่มีความเสถียรสูงสุด
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key=${API_KEY}`;
+    // 🌐 เลือกใช้ v1beta เพื่อรองรับโครงสร้างข้อมูล Multimodal และ REST API คีย์แยกอย่างมีเสถียรภาพสูงสุด
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${API_KEY}`;
 
     try {
+        // ทำความสะอาดคัดแยกข้อมูลประวัติ: ล้างรูปภาพเก่าในประวัติทิ้งเพื่อลดภาระ Bandwidth ป้องกันรหัสเอเรอร์สะสม
+        const sanitizedContents = contents.map((turn, index) => {
+            let roleName = turn.role === 'user' ? 'user' : 'model';
+            if (index < contents.length - 1) {
+                const textOnlyParts = turn.parts.filter(p => p.text).map(p => ({ text: p.text }));
+                return {
+                    role: roleName,
+                    parts: textOnlyParts.length > 0 ? textOnlyParts : [{ text: "" }]
+                };
+            }
+            return { role: roleName, parts: turn.parts };
+        });
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: contents })
+            body: JSON.stringify({ contents: sanitizedContents })
         });
 
-        if (!response.ok) throw new Error(`HTTP status ${response.status}`);
+        if (!response.ok) {
+            let detailErrorMessage = `HTTP status ${response.status}`;
+            try {
+                const errorJson = await response.json();
+                if (errorJson.error && errorJson.error.message) {
+                    detailErrorMessage = errorJson.error.message;
+                }
+            } catch (_) {}
+            throw new Error(detailErrorMessage);
+        }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
@@ -989,13 +977,11 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
         onDone(accumulatedText);
 
     } catch (e) {
-        console.error(e);
-        // [UPDATE UI] แสดงข้อความ Error จริงจากระบบเพื่อให้ง่ายต่อการวิเคราะห์บั๊ก
-        onError(`❌ การเชื่อมต่อขัดข้อง: ${e.message} (กรุณาเช็กความถูกต้องของ API Key และเครือข่ายเน็ตด้วยนะคะ)`);
+        console.error("Gemini API Engine Crash:", e);
+        onError(`⚠️ ข้อขัดข้อง: ${e.message}`);
     }
 }
 
-// 💬 ระบบแชตพิมพ์ถามเจาะลึก (Multi-turn + Multimodal Screen)
 async function sendAiQuestion() {
     const input = document.getElementById('ai-input'); if (!input) return;
     const userText = input.value.trim(); if (!userText) return;
@@ -1013,9 +999,8 @@ async function sendAiQuestion() {
 
     let currentTurnParts = [];
     if (base64Screen) {
-        // 🎯 [FIXED] เปลี่ยนเป็น inlineData และ mimeType (CamelCase) ตามกฎของ JavaScript REST API
         currentTurnParts.push({
-            inlineData: { mimeType: "image/jpeg", data: base64Screen }
+            inline_data: { mime_type: "image/jpeg", data: base64Screen }
         });
     }
 
@@ -1023,7 +1008,6 @@ async function sendAiQuestion() {
         `ข้อมูลตัวหนังสือที่อ่านได้จากเอกสารหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถามเพิ่มเติมจากผู้ใช้: ${userText}\n(คำแนะนำสำหรับ AI: จงดูภาพถ่ายหน้าจอประกอบควบคู่กับตัวหนังสือ เพื่อตรวจสอบตาราง รูปวาดเขียน ไฮไลต์ หรือจุดที่ผู้ใช้วงไว้ แล้วอธิบายเป็นภาษาไทยอย่างกระชับและเป็นมิตร)` : userText;
 
     currentTurnParts.push({ text: finalPrompt });
-
     geminiChatHistory.push({ role: "user", parts: currentTurnParts });
 
     const aiMessageDiv = createStreamingAiMessageElement();
@@ -1043,6 +1027,7 @@ async function sendAiQuestion() {
         },
         (errorMsg) => {
             if (aiMessageDiv) {
+                aiMessageDiv.style.color = "#ef4444";
                 aiMessageDiv.innerText = errorMsg;
                 saveChatToLocalStorage();
             }
@@ -1050,57 +1035,6 @@ async function sendAiQuestion() {
     );
 }
 
-// 📊 ฟังก์ชันวิเคราะห์สรุปรายงานอัจฉริยะ (Multimodal Report Analytics)
-async function askAiToSummary() {
-    appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
-    saveChatToLocalStorage();
-    
-    let pageText = "";
-    const activePage = getActivePageWrapper();
-    if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
-    
-    appendAiMessage("system", "⚡ กำลังสแกนโครงสร้างหน้าจอรวมถึงรอยปากกาไฮไลต์เพื่อสรุปผลค่ะ...");
-
-    const base64Screen = await captureActivePageBase64();
-
-    let currentTurnParts = [];
-    if (base64Screen) {
-        // 🎯 [FIXED] เปลี่ยนเป็น inlineData และ mimeType (CamelCase) เช่นกันครับ
-        currentTurnParts.push({
-            inlineData: { mimeType: "image/jpeg", data: base64Screen }
-        });
-    }
-
-    const prompt = `จงสรุปสาระสำคัญ ตัวเลข ผลลัพธ์ หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้องสูงสุด หากบนหน้าจอมีโครงสร้างภาพ แผนภูมิ หรือรอยเขียนปากกา/ยางลบลบข้อความใดๆ ให้รวมองค์ประกอบภาพเหล่านั้นมาวิเคราะห์ร่วมด้วยอย่างมีหลักการ:\n"""\n${pageText}\n"""`;
-    currentTurnParts.push({ text: prompt });
-
-    geminiChatHistory.push({ role: "user", parts: currentTurnParts });
-
-    const aiMessageDiv = createStreamingAiMessageElement();
-
-    await streamGeminiPayload(geminiChatHistory, 
-        (newChunk) => {
-            if (aiMessageDiv) {
-                aiMessageDiv.innerText += newChunk;
-                const chatBox = document.getElementById('ai-chat-box');
-                if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-                saveChatToLocalStorage(); 
-            }
-        },
-        (fullResponseText) => {
-            geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
-            saveChatToLocalStorage(); 
-        },
-        (errorMsg) => {
-            if (aiMessageDiv) {
-                aiMessageDiv.innerText = errorMsg;
-                saveChatToLocalStorage();
-            }
-        }
-    );
-}
-
-// 📊 ฟังก์ชันวิเคราะห์สรุปรายงานอัจฉริยะ (Multimodal Report Analytics)
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
     saveChatToLocalStorage();
@@ -1150,7 +1084,6 @@ async function askAiToSummary() {
     );
 }
 
-// สร้างกล่องข้อความ AI เปล่าสำหรับฉีดข้อมูล Streaming
 function createStreamingAiMessageElement() {
     const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return null;
     const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
@@ -1183,8 +1116,6 @@ function appendAiMessage(sender, text) {
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js')
     .then(reg => {
-        
-        // ฟังก์ชันขึ้นกล่องแจ้งเตือนถามคุณนาวีก่อนเปลี่ยนเวอร์ชัน เพื่อสกัดกั้นงานหายกลางคัน
         function promptUserToUpdate(waitingWorker) {
             const userAccepted = confirm(
                 "✨ [Nawee Studio] พบการอัปเดตระบบเวอร์ชันใหม่ล่าสุด!\n\n" +
@@ -1192,42 +1123,26 @@ if ('serviceWorker' in navigator) {
                 "--------------------------------------------------\n" +
                 "⚠️ หากคุณกำลังติดงานพิมพ์ วาดแบบ หรือทำงานค้างอยู่ ให้กด 'ยกเลิก (Cancel)' เพื่อเซฟงานก่อนได้ค่ะ ระบบจะไม่รีโหลดจนกว่าคุณจะพร้อม"
             );
-
             if (userAccepted) {
-                // อนุมัติรหัสผ่านลับให้ Service Worker ก้าวข้ามสเตจ Waiting ไปรีบูตระบบได้ทันที
                 waitingWorker.postMessage({ type: 'SKIP_WAITING' });
             }
         }
-
-        // กรณีที่ 1: ตรวจพบไฟล์อัปเดตดาวน์โหลดมารอก่อนหน้าแล้วในเครื่อง
-        if (reg.waiting) {
-            promptUserToUpdate(reg.waiting);
-        }
-
-        // กรณีที่ 2: ระบบตรวจจับเจออัปเดตใหม่ระหว่างกำลังเปิดหน้างานทิ้งไว้
+        if (reg.waiting) { promptUserToUpdate(reg.waiting); }
         reg.onupdatefound = () => {
             const installingWorker = reg.installing;
             if (installingWorker) {
                 installingWorker.onstatechange = () => {
-                    // เมื่อไฟล์เวอร์ชันใหม่ทั้งหมดถูกดาวน์โหลดและจัดสรรสเปซเสร็จสิ้นค้างไว้ที่แท่นจ่อคิว
                     if (installingWorker.state === 'installed') {
-                        if (navigator.serviceWorker.controller) {
-                            promptUserToUpdate(installingWorker);
-                        }
+                        if (navigator.serviceWorker.controller) { promptUserToUpdate(installingWorker); }
                     }
                 };
             }
         };
-
     }).catch(err => console.error("Service Worker Registration Failed:", err));
 
-    // ผูกกระบวนการรีเฟรชหน้าจอ: จะเริ่มโหลดแอปใหม่ก้าวไปเวอร์ชันถัดไปก็ต่อเมื่อกดยอมรับ 'ตกลง' เท่านั้นค่ะ
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-            window.location.reload();
-            refreshing = true;
-        }
+        if (!refreshing) { window.location.reload(); refreshing = true; }
     });
 }
 
@@ -1235,7 +1150,6 @@ if ('serviceWorker' in navigator) {
 // 🎨 โมดูลจัดการปุ่มสีด่วน + ซ่อมแซมระบบ AI + ซ่อนแป้นพิมพ์มือถือ (บูรณาการสมบูรณ์)
 // ==========================================================================
 (function() {
-    // 🛠️ ฟังก์ชันภายในสำหรับแปลงสี RGB เป็น HEX ป้องกันระบบสคริปต์หลักเอเรอร์
     function safeRgbToHex(rgb) {
         if (!rgb) return '#22d3ee';
         if (rgb.startsWith('#')) return rgb;
@@ -1248,7 +1162,6 @@ if ('serviceWorker' in navigator) {
     }
 
     function initQuickColorPalette() {
-        // 1. ระบบสีด่วนสำหรับ ปากกาวาดเขียน
         const penDots = document.querySelectorAll('.pen-palette-dot');
         const penColorPicker = document.getElementById('color-picker');
         
@@ -1256,77 +1169,51 @@ if ('serviceWorker' in navigator) {
             dot.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                
                 const selectedColor = this.getAttribute('data-color') || this.style.backgroundColor;
                 if (!selectedColor) return;
-
-                if (typeof currentActiveColor !== 'undefined') {
-                    currentActiveColor = selectedColor;
-                }
-                
+                if (typeof currentActiveColor !== 'undefined') { currentActiveColor = selectedColor; }
                 if (penColorPicker) {
                     penColorPicker.value = safeRgbToHex(selectedColor);
                     penColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
                     penColorPicker.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-                
-                if (typeof updateBrushPreview === 'function') {
-                    updateBrushPreview();
-                }
+                if (typeof updateBrushPreview === 'function') { updateBrushPreview(); }
             });
         });
 
-        // 2. ระบบสีด่วนสำหรับ ข้อความลอย (แก้ไขปัญหาแป้นพิมพ์เด้งกวนใจ)
         const textDots = document.querySelectorAll('.text-palette-dot');
         const mainTextColorPicker = document.getElementById('text-color-picker');
         const floatingTextColorPicker = document.getElementById('floating-text-color');
         
         textDots.forEach(dot => {
             dot.addEventListener('click', function(e) {
-                e.preventDefault();  /* 🛑 เบรกคำสั่งดั้งเดิม ไม่ให้เกิดการโฟกัสซ้ำ */
+                e.preventDefault(); 
                 e.stopPropagation();
-                
-                // 📱 สั่งซ่อนแป้นพิมพ์มือถือทันที โดยล้างโฟกัสออกจากทุกอิลิเมนต์
                 if (document.activeElement && typeof document.activeElement.blur === 'function') {
                     document.activeElement.blur();
                 }
-
                 const selectedColor = this.getAttribute('data-color') || this.style.backgroundColor;
                 if (!selectedColor) return;
-
                 const hexColor = safeRgbToHex(selectedColor);
-
-                if (typeof currentTextActiveColor !== 'undefined') {
-                    currentTextActiveColor = hexColor;
-                }
-                
+                if (typeof currentTextActiveColor !== 'undefined') { currentTextActiveColor = hexColor; }
                 if (mainTextColorPicker) {
                     mainTextColorPicker.value = hexColor;
                     mainTextColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
                 }
-                
                 if (floatingTextColorPicker) {
                     floatingTextColorPicker.value = hexColor;
                     floatingTextColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
                 }
-
-                // เปลี่ยนสีข้อความ Active Node ทันที และสั่งตัดโฟกัสป้องกันคีย์บอร์ดเด้ง
                 if (typeof activeDraggableNode !== 'undefined' && activeDraggableNode) {
                     activeDraggableNode.style.color = hexColor;
                     activeDraggableNode.style.borderColor = hexColor;
-                    activeDraggableNode.blur(); /* 📱 ล็อกย้ำอีกครั้งเพื่อความชัวร์ */
-                    
-                    if (typeof saveDrawingState === 'function') {
-                        saveDrawingState();
-                    }
+                    activeDraggableNode.blur();
+                    if (typeof saveDrawingState === 'function') { saveDrawingState(); }
                 }
             });
         });
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initQuickColorPalette);
-    } else {
-        initQuickColorPalette();
-    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initQuickColorPalette); } 
+    else { initQuickColorPalette(); }
 })();
