@@ -12,7 +12,6 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -24,6 +23,9 @@
             <span id="app-title">PDF Pro <small class="badge">PDF MODE</small></span>
         </div>
         <div class="action-group">
+            <button onclick="resetApp()" title="ล้างหน้าจอเพื่อเริ่มงานใหม่" style="background: rgba(239, 68, 68, 0.08); color: #f87171;">
+                <i class="fa-solid fa-square-plus"></i> <span class="lbl">งานใหม่</span>
+            </button>
             <button onclick="document.getElementById('upload').click()" title="เปิดไฟล์ PDF"><i class="fa-solid fa-folder-open"></i> <span class="lbl">เปิดไฟล์</span></button>
             <button onclick="saveToDatabase()" title="บันทึกลงฐานข้อมูลตรงๆ ไม่ดาวน์โหลด"><i class="fa-solid fa-floppy-disk"></i> <span class="lbl">เซฟไฟล์</span></button>
             <button onclick="shareToLine()" title="แชร์ผ่าน LINE" class="btn-line"><i class="fa-brands fa-line"></i> <span class="lbl">แชร์ LINE</span></button>
@@ -127,10 +129,9 @@
         
         <button onclick="setTool('pan')" id="tool-pan" class="tool-btn active" title="โหมดเลื่อนดูงาน"><i class="fa-solid fa-hand"></i></button>
         <button onclick="setTool('pen')" id="tool-pen" class="tool-btn" title="ปากกาวาดเขียน"><i class="fa-solid fa-pen-fancy"></i></button>
-        
         <button onclick="setTool('text')" id="tool-text" class="tool-btn" title="พิมพ์ข้อความลอย"><i class="fa-solid fa-font"></i></button>
-        
         <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn" title="ยางลบ"><i class="fa-solid fa-eraser"></i></button>
+        
         <div class="divider"></div>
         <button onclick="zoomIn()" title="ขยาย"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
         <button onclick="zoomOut()" title="ย่อ"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
@@ -195,15 +196,5 @@
     </div>
 
     <script src="script.js"></script>
-    
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
-                    .then(reg => console.log('Service Worker ลงทะเบียนสำเร็จแล้วค่ะ! ✅'))
-                    .catch(err => console.error('การลงทะเบียน Service Worker ล้มเหลว: ', err));
-            });
-        }
-    </script>
 </body>
 </html>
