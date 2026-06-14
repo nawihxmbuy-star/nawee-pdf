@@ -944,41 +944,17 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
         return;
     }
 
-    // 🛑 [กลไกตัดตัวปัญหา] กรองล้างรูปภาพ Base64 ออกจากเทิร์นในประวัติอดีต เพื่อล็อกขนาดข้อมูลไม่ให้ระเบิดตัว
-    const sanitizedContents = contents.map((turn, index) => {
-        let roleName = turn.role;
-        if (roleName === 'assistant') roleName = 'model'; // บังคับบทบาทให้ตรงมาตรฐานของกูเกิล
-
-        // ถ้าไม่ใช่รอบแชตล่าสุดตัวปัจจุบัน ให้ถอดถอน inline_data รูปภาพออกไป คงเหลือเฉพาะเนื้อหาข้อความ
-        if (index < contents.length - 1) {
-            const textOnlyParts = turn.parts.filter(p => p.text).map(p => ({ text: p.text }));
-            return {
-                role: roleName,
-                parts: textOnlyParts.length > 0 ? textOnlyParts : [{ text: "" }]
-            };
-        }
-        // ถ้าเป็นรอบปัจจุบันที่ผู้ใช้เพิ่งกดส่งคำสั่ง ให้คงสภาพส่งไปทั้งรูปภาพและ prompt
-        return {
-            role: roleName,
-            parts: turn.parts
-        };
-    });
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${API_KEY}`;
+    // 🚀 [FIXED] อัปเกรดเปลี่ยนจาก v1beta เป็น v1 เพื่อเข้าสู่ Endpoint ตัวเต็มที่มีความเสถียรสูงสุด
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key=${API_KEY}`;
 
     try {
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: sanitizedContents })
+            body: JSON.stringify({ contents: contents })
         });
 
-        if (!response.ok) {
-            // แกะรายละเอียดข้อมูลจากเซิร์ฟเวอร์ย้อนหลัง เผื่อกรณีคีย์ตาย หรือเครือข่ายไม่อนุมัติ
-            const errJson = await response.json().catch(() => ({}));
-            const serverMsg = (errJson.error && errJson.error.message) ? errJson.error.message : `HTTP status ${response.status}`;
-            throw new Error(serverMsg);
-        }
+        if (!response.ok) throw new Error(`HTTP status ${response.status}`);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
@@ -1013,8 +989,9 @@ async function streamGeminiPayload(contents, onChunkReceived, onDone, onError) {
         onDone(accumulatedText);
 
     } catch (e) {
-        console.error("Gemini API Engine Crash:", e);
-        onError(`⚠️ การเชื่อมต่อขัดข้อง: ${e.message}`);
+        console.error(e);
+        // [UPDATE UI] แสดงข้อความ Error จริงจากระบบเพื่อให้ง่ายต่อการวิเคราะห์บั๊ก
+        onError(`❌ การเชื่อมต่อขัดข้อง: ${e.message} (กรุณาเช็กความถูกต้องของ API Key และเครือข่ายเน็ตด้วยนะคะ)`);
     }
 }
 
@@ -1036,8 +1013,9 @@ async function sendAiQuestion() {
 
     let currentTurnParts = [];
     if (base64Screen) {
+        // 🎯 [FIXED] เปลี่ยนเป็น inlineData และ mimeType (CamelCase) ตามกฎของ JavaScript REST API
         currentTurnParts.push({
-            inline_data: { mime_type: "image/jpeg", data: base64Screen }
+            inlineData: { mimeType: "image/jpeg", data: base64Screen }
         });
     }
 
@@ -1065,7 +1043,56 @@ async function sendAiQuestion() {
         },
         (errorMsg) => {
             if (aiMessageDiv) {
-                aiMessageDiv.style.color = "#ef4444"; // เปลี่ยนสีตัวอักษรกล่องแชตเป็นสีแดงเมื่อเอเรอร์
+                aiMessageDiv.innerText = errorMsg;
+                saveChatToLocalStorage();
+            }
+        }
+    );
+}
+
+// 📊 ฟังก์ชันวิเคราะห์สรุปรายงานอัจฉริยะ (Multimodal Report Analytics)
+async function askAiToSummary() {
+    appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
+    saveChatToLocalStorage();
+    
+    let pageText = "";
+    const activePage = getActivePageWrapper();
+    if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
+    
+    appendAiMessage("system", "⚡ กำลังสแกนโครงสร้างหน้าจอรวมถึงรอยปากกาไฮไลต์เพื่อสรุปผลค่ะ...");
+
+    const base64Screen = await captureActivePageBase64();
+
+    let currentTurnParts = [];
+    if (base64Screen) {
+        // 🎯 [FIXED] เปลี่ยนเป็น inlineData และ mimeType (CamelCase) เช่นกันครับ
+        currentTurnParts.push({
+            inlineData: { mimeType: "image/jpeg", data: base64Screen }
+        });
+    }
+
+    const prompt = `จงสรุปสาระสำคัญ ตัวเลข ผลลัพธ์ หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้องสูงสุด หากบนหน้าจอมีโครงสร้างภาพ แผนภูมิ หรือรอยเขียนปากกา/ยางลบลบข้อความใดๆ ให้รวมองค์ประกอบภาพเหล่านั้นมาวิเคราะห์ร่วมด้วยอย่างมีหลักการ:\n"""\n${pageText}\n"""`;
+    currentTurnParts.push({ text: prompt });
+
+    geminiChatHistory.push({ role: "user", parts: currentTurnParts });
+
+    const aiMessageDiv = createStreamingAiMessageElement();
+
+    await streamGeminiPayload(geminiChatHistory, 
+        (newChunk) => {
+            if (aiMessageDiv) {
+                aiMessageDiv.innerText += newChunk;
+                const chatBox = document.getElementById('ai-chat-box');
+                if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+                saveChatToLocalStorage(); 
+            }
+        },
+        (fullResponseText) => {
+            geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
+            saveChatToLocalStorage(); 
+        },
+        (errorMsg) => {
+            if (aiMessageDiv) {
                 aiMessageDiv.innerText = errorMsg;
                 saveChatToLocalStorage();
             }
