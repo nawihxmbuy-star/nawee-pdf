@@ -239,48 +239,35 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 .ai-sidebar-footer input { flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
 .ai-sidebar-footer button { background: var(--accent-color); border: none; width: 40px; height: 40px; border-radius: 8px; color: #0f172a; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 /* ==========================================================================
-   📱 [ฉบับเต็ม] บล็อกควบคุมหน้าจอมือถือและการแสดงผลแชท AI ครึ่งจอ (Bottom Sheet)
-   นำชุดนี้ไปวางไว้ที่ "ท้ายสุดของไฟล์ style.css" ได้เลยครับ (ระบบจะเขียนทับตัวเก่าให้เอง)
+   📱 [แก้ไขสมบูรณ์] ปรับความกว้าง Breakpoint เป็น 1024px ให้แชท AI ยอมหดครึ่งจอ
+   วางแทนที่โค้ดโมดูลมือถือตัวเดิมที่ท้ายสุดของไฟล์ style.css ได้เลยครับ
    ========================================================================== */
-@media (max-width: 768px) {
-    /* ปรับแต่งแผงแชท AI ให้แสดงผลครึ่งจอทรงการ์ดโมเดิร์นยึดขอบล่าง */
+@media (max-width: 1024px) {
     .ai-sidebar {
         position: fixed !important;
-        top: auto !important;         /* ปลดล็อกขอบบนเดิม */
-        bottom: 0 !important;        /* ยึดแผงแชทเข้ากับขอบล่างสุด */
+        top: auto !important;         
+        bottom: 0 !important;        /* บังคับยึดติดขอบล่าง */
         right: 0 !important;
         left: 0 !important;
-        width: 100% !important;      /* แผงกว้างเต็มจอซ้ายขวา */
-        height: 50vh !important;     /* บังคับความสูงไว้ที่ 50% ของหน้าจอพอดี */
-        z-index: 1005 !important;
+        width: 100% !important;      
+        height: 50vh !important;     /* บังคับสูงแค่ครึ่งจอแน่นอน */
+        z-index: 2000 !important;    /* ดันขึ้นมาให้อยู่เหนือเลเยอร์อื่น */
         display: flex !important;
         flex-direction: column !important;
         background: #1e293b !important;
         
-        /* สไตล์ทรงการ์ดโค้งมนแบบแอป Bottom Sheet ยุคใหม่ */
         border-radius: 20px 20px 0 0 !important; 
         border-left: none !important;
-        border-top: 2px solid var(--accent-color) !important; /* ขอบเรืองแสงสีฟ้าด้านบน */
-        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5) !important; /* เงาดันขึ้นด้านบน */
-        transition: transform 0.3s ease-in-out !important;
+        border-top: 2px solid var(--accent-color) !important; 
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5) !important; 
+        transform: none !important;  /* ล้างค่าพิกัดการขยับเดิมทิ้ง */
     }
 
-    /* จัดการกล่องแสดงข้อความแชทภายในให้อยู่ในขอบเขต 50vh ไม่หลุดเฟรมขอบจอ */
     .ai-chat-box {
         flex: 1 !important;
-        min-height: 0 !important; /* แก้ปัญหาช่องพิมพ์ตกหน้าจอ */
+        min-height: 0 !important; 
         overflow-y: auto !important;
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 10px !important;
         background: #0f172a !important;
         padding: 12px !important;
-    }
-
-    /* ซ่อมแซมส่วนล่างสุด (Container ช่องพิมพ์) ให้กระชับพับตามบอร์ดขอบล่าง */
-    .ai-input-container {
-        padding: 10px !important;
-        background: #1e293b !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
 }

@@ -1169,99 +1169,99 @@ if ('serviceWorker' in navigator) {
     });
 }
 // ==========================================================================
-// 🎨 [ฉบับเต็ม] โมดูลจัดการปุ่มจิ้มสีด่วน (Quick Color Palette) ซิงค์สีระบบ Real-time
-// แปะโค้ดชุดนี้ไว้ที่ "บรรทัดท้ายสุดของไฟล์ script.js" ได้เลยครับ ทำงานแยกอิสระปลอดภัย 100%
+// 🎨 [แก้ไขสมบูรณ์] โมดูลจัดการปุ่มสีด่วน + ซ่อมแซมระบบ AI + ซ่อนแป้นพิมพ์มือถือ
+// วางแทนที่โค้ดจานสีด่วนอันเดิมที่ท้ายสุดของไฟล์ script.js ได้เลยครับ
 // ==========================================================================
 (function() {
+    // 🛠️ ฟังก์ชันภายในสำหรับแปลงสี RGB เป็น HEX ป้องกันระบบสคริปต์หลักเอเรอร์
+    function safeRgbToHex(rgb) {
+        if (!rgb) return '#22d3ee';
+        if (rgb.startsWith('#')) return rgb;
+        const matches = rgb.match(/\d+/g);
+        if (!matches || matches.length < 3) return '#22d3ee';
+        const r = parseInt(matches[0]).toString(16).padStart(2, '0');
+        const g = parseInt(matches[1]).toString(16).padStart(2, '0');
+        const b = parseInt(matches[2]).toString(16).padStart(2, '0');
+        return `#${r}${g}${b}`;
+    }
+
     function initQuickColorPalette() {
-        // 1. จัดการจุดสีด่วนสำหรับ ปากกาวาดเขียน (.pen-palette-dot)
+        // 1. ระบบสีด่วนสำหรับ ปากกาวาดเขียน
         const penDots = document.querySelectorAll('.pen-palette-dot');
         const penColorPicker = document.getElementById('color-picker');
         
         penDots.forEach(dot => {
             dot.addEventListener('click', function(e) {
+                e.preventDefault();
                 e.stopPropagation();
-                // ดึงค่าสีจาก attribute data-color หรือสไตล์พื้นหลังที่ตั้งไว้
+                
                 const selectedColor = this.getAttribute('data-color') || this.style.backgroundColor;
                 if (!selectedColor) return;
 
-                // อัปเดตตัวแปรสถานะสีปากกาหลักของระบบโกลบอล
                 if (typeof currentActiveColor !== 'undefined') {
                     currentActiveColor = selectedColor;
                 }
                 
-                // ซิงค์ค่าสีไปยังกล่องเลือกสีหลัก (Color Picker) เพื่ออัปเดตสถานะหน้าต่าง UI
                 if (penColorPicker) {
-                    // หากเบราว์เซอร์คืนค่ามาเป็นฟอร์แมต rgb() ให้แปลงเป็น Hex เพื่อซิงค์กับช่องเลือกสีมาตรฐาน
-                    const hexColor = selectedColor.startsWith('rgb') ? rgbToHex(selectedColor) : selectedColor;
-                    penColorPicker.value = hexColor;
-                    
-                    // สั่งกระตุ้น Event เพื่อแจ้งให้ Engine ปากกาหลักของคุณนาวีรับรู้การเปลี่ยนแปลง
+                    penColorPicker.value = safeRgbToHex(selectedColor);
                     penColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
                     penColorPicker.dispatchEvent(new Event('change', { bubbles: true }));
                 }
                 
-                // เรียกฟังก์ชันอัปเดตวงกลมตัวอย่างขนาดปากกาที่ผูกไว้ในระบบหลัก
                 if (typeof updateBrushPreview === 'function') {
                     updateBrushPreview();
-                }
-                
-                if (typeof showNotification === 'function') {
-                    showNotification("🎨 สลับสีปากกาเป็น: " + selectedColor);
                 }
             });
         });
 
-        // 2. จัดการจุดสีด่วนสำหรับ ข้อความลอย (.text-palette-dot)
+        // 2. ระบบสีด่วนสำหรับ ข้อความลอย (แก้ไขปัญหาแป้นพิมพ์เด้งกวนใจ)
         const textDots = document.querySelectorAll('.text-palette-dot');
         const mainTextColorPicker = document.getElementById('text-color-picker');
         const floatingTextColorPicker = document.getElementById('floating-text-color');
         
         textDots.forEach(dot => {
             dot.addEventListener('click', function(e) {
+                e.preventDefault();  /* 🛑 เบรกคำสั่งดั้งเดิม ไม่ให้เกิดการโฟกัสซ้ำ */
                 e.stopPropagation();
+                
+                // 📱 สั่งซ่อนแป้นพิมพ์มือถือทันที โดยล้างโฟกัสออกจากทุกอิลิเมนต์
+                if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                    document.activeElement.blur();
+                }
+
                 const selectedColor = this.getAttribute('data-color') || this.style.backgroundColor;
                 if (!selectedColor) return;
 
-                // แปลงค่าสีให้อยู่ในฟอร์แมต Hex (#ffffff) เพื่อป้องกันการเอเรอร์บนช่อง Input ตัวเลือกสี
-                const hexColor = selectedColor.startsWith('rgb') ? rgbToHex(selectedColor) : selectedColor;
+                const hexColor = safeRgbToHex(selectedColor);
 
-                // อัปเดตตัวแปรสถานะสีข้อความหลักในระบบสากล
                 if (typeof currentTextActiveColor !== 'undefined') {
                     currentTextActiveColor = hexColor;
                 }
                 
-                // ซิงค์สีไปยังกล่องเลือกสีบนแผงเมนูด้านข้าง (Sidebar)
                 if (mainTextColorPicker) {
                     mainTextColorPicker.value = hexColor;
                     mainTextColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
                 }
                 
-                // ซิงค์สีไปยังกล่องเลือกสีบนแถบเครื่องมือลอยด้านล่าง (Bottom Bar / Floating Tool)
                 if (floatingTextColorPicker) {
                     floatingTextColorPicker.value = hexColor;
                     floatingTextColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
                 }
 
-                // 🔥 [สำคัญมาก] สั่งเปลี่ยนสีตัวอักษรและกรอบให้กับกล่องข้อความลอยที่เลือกอยู่ (Active Node) ในปัจจุบันทันทีแบบ Real-time
+                // เปลี่ยนสีข้อความ Active Node ทันที และสั่งตัดโฟกัสป้องกันคีย์บอร์ดเด้ง
                 if (typeof activeDraggableNode !== 'undefined' && activeDraggableNode) {
                     activeDraggableNode.style.color = hexColor;
                     activeDraggableNode.style.borderColor = hexColor;
+                    activeDraggableNode.blur(); /* 📱 ล็อกย้ำอีกครั้งเพื่อความชัวร์ */
                     
-                    // เรียกกลไกบันทึกประวัติความจำ (Undo/Redo State) ของระบบหลักคุณนาวี (หากมี)
                     if (typeof saveDrawingState === 'function') {
                         saveDrawingState();
                     }
-                }
-                
-                if (typeof showNotification === 'function') {
-                    showNotification("🔤 สลับสีข้อความเป็น: " + hexColor);
                 }
             });
         });
     }
 
-    // ทำการลงทะเบียนระบบตามสถานะวงจรการโหลด Lifecycle ของเอกสารเว็บอย่างปลอดภัย
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initQuickColorPalette);
     } else {
