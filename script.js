@@ -914,24 +914,24 @@ async function captureActivePageBase64() {
         return null;
     }
 }
-
-// ⚡ ฟังก์ชันจัดการส่งและเชื่อมต่อ Streaming Data Reader กับ Gemini API (จำลอง Multi-turn + Streaming)
-// 🤖 ฟังก์ชันสำหรับ เปิด-ปิด แถบผู้ช่วย AI ด้านข้าง (Sidebar Toggle)
+// 🤖 ฟังก์ชันเปิด-ปิดแผงผู้ช่วย AI (ฉบับแก้ไขล็อกคลาสครอบจักรวาล)
 function toggleAiSidebar() {
     const sidebar = document.getElementById('ai-sidebar');
     if (sidebar) {
-        // ทำการสลับคลาส active เพื่อแสดงหรือซ่อนแผงควบคุมตามเงื่อนไข CSS
+        // สลับคลาสทุกตัวที่สไตล์ชีตอาจจะดักจับอยู่เพื่อบังคับแสดงผล
         sidebar.classList.toggle('active');
+        sidebar.classList.toggle('open');
+        sidebar.classList.toggle('show');
         
-        // 📱 Option เสริม: ถ้าเปิดแถบขึ้นมาแล้ว ให้กล่องพิมพ์คำถามโฟกัสอัตโนมัติพร้อมใช้งานทันที
-        if (sidebar.classList.contains('active')) {
+        // โฟกัสช่องพิมพ์คำถามอัตโนมัติเมื่อเปิดใช้งาน
+        if (sidebar.classList.contains('active') || sidebar.classList.contains('open')) {
             const aiInput = document.getElementById('ai-input');
             if (aiInput) {
-                setTimeout(() => aiInput.focus(), 300); // รอเอฟเฟกต์สไลด์ทำงานแป๊บหนึ่งแล้วเปิดโฟกัส
+                setTimeout(() => aiInput.focus(), 300);
             }
         }
     } else {
-        showNotification("❌ ไม่พบแผงควบคุม #ai-sidebar ในระบบกรุณาตรวจสอบหน้า HTML นะคะ");
+        console.error("ไม่พบ ID #ai-sidebar ในหน้า HTML");
     }
 }
 

@@ -287,3 +287,59 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
         padding: 12px !important;
     }
 }
+/* ========================================================
+   📱 [FIX] จัดระเบียบแผง AI ใน "โหมดแนวนอน" (Landscape) ไม่ให้หลุดจอ
+   ======================================================== */
+
+/* บังคับดันขึ้นมาสไลด์แสดงผลแน่นอนเมื่อคลาสทำงาน */
+.ai-sidebar.active, .ai-sidebar.open, .ai-sidebar.show {
+    transform: translateY(0) !important;
+    display: flex !important;
+}
+
+/* เจาะจงเมื่อผู้ใช้หมุนจอเป็น "แนวนอน" บนมือถือ/แท็บเล็ต (ความสูงจอน้อยกว่า 600px) */
+@media (orientation: landscape) and (max-height: 600px) {
+    .ai-sidebar {
+        top: 65px !important;                 /* หลบแถบ Top-bar ด้านบนไม่ให้บัง */
+        bottom: 0 !important;
+        height: calc(100vh - 65px) !important; /* ให้สูงเต็มพื้นที่ที่เหลือ (ไม่ใช่ 50vh ที่จะเตี้ยเกินไป) */
+        width: 380px !important;               /* บีบความกว้างให้พอดีสายตา */
+        max-width: 85% !important;
+        
+        /* สลับจากรูดขึ้นจากข้างล่าง เป็นสไลด์ออกมาจากฝั่งขวาแทน เพื่อเข้ากับทรงหน้าจอแนวนอน */
+        transform: translateX(100%) !important; 
+        transition: transform 0.3s ease-in-out !important;
+        border-radius: 16px 0 0 0 !important;
+        border-left: 2px solid var(--accent-color) !important;
+        border-top: none !important;
+    }
+
+    /* สถานะสไลด์ออกมาฝั่งขวาเมื่อสั่งเปิด */
+    .ai-sidebar.active, .ai-sidebar.open, .ai-sidebar.show {
+        transform: translateX(0) !important;
+    }
+
+    /* จัดการไส้ในกล่องแชทแนวนอนให้กระชับ ไม่เบียดกันจนทะลัก */
+    .ai-sidebar-body {
+        padding: 10px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        overflow-y: auto !important;
+    }
+
+    .api-key-container {
+        margin-bottom: 0 !important;
+    }
+
+    .ai-quick-actions {
+        margin-bottom: 2px !important;
+    }
+
+    /* กล่องแชทขยายเต็มที่ ยืดหยุ่นตามพื้นที่จริง */
+    .ai-chat-box {
+        flex: 1 !important;
+        min-height: 100px !important; 
+        max-height: none !important;
+    }
+}
