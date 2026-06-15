@@ -897,8 +897,17 @@ async function callGeminiAPI(promptText, onChunk, onError) {
         onError("❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ");
         return;
     }
+// =================================================================
+// 🚀 1. ระบบเรียกใช้งาน Gemini API แบบไหลพ่นทีละคำ (Streaming)
+// =================================================================
+async function callGeminiAPI(promptText, onChunk, onError) {
+    const keyInput = document.getElementById('ai-api-key');
+    const API_KEY = keyInput ? keyInput.value.trim() : "";
+    if(!API_KEY) {
+        onError("❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ");
+        return;
+    }
 
-    // 🎯 1. เปลี่ยนชื่อท่อท้าย URL เป็น streamGenerateContent เพื่อสั่งให้ Google ทยอยพ่นคำออกมา
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?key=${API_KEY}`;
     
     try {
@@ -914,18 +923,16 @@ async function callGeminiAPI(promptText, onChunk, onError) {
             return;
         }
 
-        // 🎯 2. เปิดระบบ Reader เพื่อดักรับเศษข้อความที่กำลังไหลมาจากเซิร์ฟเวอร์
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
 
         while (true) {
             const { value, done } = await reader.read();
-            if (done) break; // ถ้าส่งมาครบ 100% แล้วให้หลุดออกจากลูป
+            if (done) break;
             
             buffer += decoder.decode(value, { stream: true });
             
-            // 🎯 3. สมองกลดักจับปีกกา {} เพื่อแกะเอาเฉพาะข้อความภาษาไทย/อังกฤษที่ไหลมา
             let startIdx = 0;
             while (true) {
                 const openBrace = buffer.indexOf('{', startIdx);
@@ -953,11 +960,10 @@ async function callGeminiAPI(promptText, onChunk, onError) {
                         const jsonObj = JSON.parse(jsonStr);
                         const textChunk = jsonObj.candidates?.[0]?.content?.parts?.[0]?.text;
                         if (textChunk) {
-                            // 🎁 ส่งเศษคำที่ได้ออกไปอัปเดตบนหน้าจอแอปของคุณนาวีทันที!
-                            onChunk(textChunk); 
+                            onChunk(textChunk);
                         }
                     } catch (err) {
-                        // ข้ามก้อนข้อมูลที่ยังมาไม่สมบูรณ์
+                        // ข้ามก้อนที่ยังมาไม่สมบูรณ์
                     }
                     startIdx = endIdx;
                 } else {
@@ -989,10 +995,47 @@ async function sendAiQuestion() {
     let finalPrompt = pageText.trim() !== "" ? 
         `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถาม: ${userText}\n(วิเคราะห์และสรุปภาษาไทยแบบกระชับและเป็นมิตร)` : userText;
 
-    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้ค่ะ...");
-    const result = await callGeminiAPI(finalPrompt);
-    appendAiMessage("ai", result);
-}
+    // สร้างกล่องข้อความ AI ขึ้นมารอ โดยใช้หมุดรหัสลับตั้งชื่อไว้ชั่วคราว
+    const targetMarker = "⚡_LOADING_NAWEE_" + Date.now();
+    appendAiMessage("ai", targetMarker);
+
+    // วิ่งตามหา Element กล่องแชทล่าสุดเพื่อล็อกเป้าหมายในการพ่นคำ
+    let aiTargetElement = null;
+    const allElements = document.getElementsByTagName('*');
+    for (let i = allElements.length - 1; i >= 0; i--) {
+        if (allElements[i].innerText === targetMarker || allElements[i].textContent === targetMarker) {
+            aiTargetElement = allElements[i];
+            break;
+        }
+    }
+
+    if (aiTargetElement) {
+        aiTargetElement.innerText = "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...";
+    }
+
+    let fullReply = "";
+
+    // 🎯 1. แยกฟังก์ชันย่อยออกมารับเศษคำ (ลดความซับซ้อนท้ายบรรทัด)
+    function handleChunk(textChunk) {
+        if (fullReply === "" && aiTargetElement) {
+            aiTargetElement.innerText = "";
+        }
+        fullReply += textChunk;
+        if (aiTargetElement) {
+            aiTargetElement.innerText = fullReply; // ค่อยๆ ไหลคำตอบออกหน้าจอ
+        }
+    }
+
+    // 🎯 2. แยกฟังก์ชันย่อยจัดการข้อผิดพลาด
+    function handleError(errorMessage) {
+        if (aiTargetElement) {
+            aiTargetElement.innerText = errorMessage;
+        }
+    }
+
+    // 🚀 3. เรียกใช้งานแบบส่งชื่อฟังก์ชันเข้าไปสั้นๆ คลีนๆ
+    await callGeminiAPI(finalPrompt, handleChunk, handleError);
+} 
 
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
