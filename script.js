@@ -889,27 +889,14 @@ function createDraggableTextNode(e) {
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
-// 🚀 เวอร์ชันใหม่ล่าสุด: ระบบเรียกใช้งาน Gemini API แบบไหลพ่นทีละคำ (Streaming)
-async function callGeminiAPI(promptText, onChunk, onError) {
+// 🚀 ซ่อมแซมระบบเรียกใช้งาน Gemini API (อัปเดตเป็นโมเดล gemini-3.5-flash ฟรีล่าสุด)
+async function callGeminiAPI(promptText) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
-    if(!API_KEY) {
-        onError("❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ");
-        return;
-    }
-// =================================================================
-// 🚀 1. ระบบเรียกใช้งาน Gemini API แบบไหลพ่นทีละคำ (Streaming)
-// =================================================================
-async function callGeminiAPI(promptText, onChunk, onError) {
-    const keyInput = document.getElementById('ai-api-key');
-    const API_KEY = keyInput ? keyInput.value.trim() : "";
-    if(!API_KEY) {
-        onError("❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ");
-        return;
-    }
+    if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
-    // 🎯 ใช้โมเดล gemini-3.5-flash ระบบไหลพ่นตามที่คุณนาวีตั้งค่าไว้เลยครับ
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?key=${API_KEY}`;
+    // 🎯 ปรับเส้นทาง URL ให้เรียกใช้โมเดลรุ่น 3.5 Flash ตามที่คุณนาวีต้องการเรียบร้อยครับ
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${API_KEY}`;
     
     try {
         const response = await fetch(url, {
@@ -918,78 +905,31 @@ async function callGeminiAPI(promptText, onChunk, onError) {
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         });
 
+        // ดักเช็กกรณีเกิด Error จากฝั่ง Google Server เช่น คีย์ผิด หรือโมเดลผิด
         if (!response.ok) {
             const errorData = await response.json();
-            onError(`❌ API ตอบกลับผิดพลาด: ${errorData.error?.message || response.statusText}`);
-            return;
+            return `❌ API ตอบกลับผิดพลาด: ${errorData.error?.message || response.statusText}`;
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
-
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            
-            buffer += decoder.decode(value, { stream: true });
-            
-            let startIdx = 0;
-            while (true) {
-                const openBrace = buffer.indexOf('{', startIdx);
-                if (openBrace === -1) break;
-                
-                let endIdx = openBrace + 1;
-                let braceCount = 1;
-                let inString = false;
-                
-                while (endIdx < buffer.length && braceCount > 0) {
-                    const char = buffer[endIdx];
-                    if (char === '"' && buffer[endIdx - 1] !== '\\') {
-                        inString = !inString;
-                    }
-                    if (!inString) {
-                        if (char === '{') braceCount++;
-                        else if (char === '}') braceCount--;
-                    }
-                    endIdx++;
-                }
-                
-                if (braceCount === 0) {
-                    const jsonStr = buffer.slice(openBrace, endIdx);
-                    try {
-                        const jsonObj = JSON.parse(jsonStr);
-                        const textChunk = jsonObj.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (textChunk) {
-                            onChunk(textChunk);
-                        }
-                    } catch (err) {
-                        // ข้ามก้อนข้อมูลที่ยังมาไม่ครบ
-                    }
-                    startIdx = endIdx;
-                } else {
-                    break;
-                }
-            }
-            buffer = buffer.slice(startIdx);
+        const data = await response.json();
+        
+        // ตรวจสอบโครงสร้างก่อนแกะเอาข้อความไปใช้งาน
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+            return data.candidates[0].content.parts[0].text;
+        } else {
+            return "❌ รูปแบบข้อมูลที่ตอบกลับมาไม่ถูกต้อง";
         }
     } catch (e) {
-        console.error("Gemini Streaming Error:", e);
-        onError("❌ ไม่สามารถเชื่อมต่อกับ API ได้ กรุณาตรวจสอบอินเทอร์เน็ตของคุณนาวีอีกครั้งค่ะ");
+        console.error("Gemini API Connection Error:", e);
+        return "❌ ไม่สามารถเชื่อมต่อกับ API ได้ กรุณาตรวจสอบอินเทอร์เน็ตของคุณนาวีอีกครั้งค่ะ";
     }
 }
 
-// =================================================================
-// ↔️ 2. ฟังก์ชัน เปิด-ปิด แถบข้าง AI Sidebar
-// =================================================================
 function toggleAiSidebar() {
     const sidebar = document.getElementById('ai-sidebar');
     if (sidebar) sidebar.classList.toggle('open');
 }
 
-// =================================================================
-// 🎯 3. ฟังก์ชันกดปุ่มส่งข้อความแชท (เวอร์ชันไหลพ่นปรับปรุงเสถียรภาพ)
-// =================================================================
 async function sendAiQuestion() {
     const input = document.getElementById('ai-input'); if (!input) return;
     const userText = input.value.trim(); if (!userText) return;
@@ -1002,92 +942,34 @@ async function sendAiQuestion() {
     let finalPrompt = pageText.trim() !== "" ? 
         `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถาม: ${userText}\n(วิเคราะห์และสรุปภาษาไทยแบบกระชับและเป็นมิตร)` : userText;
 
-    // ดึง Element กล่องข้อความ AI มาล็อกเป้าหมายโดยตรง แม่นยำ 100%
-    const aiTargetElement = appendAiMessage("ai", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
-    if (!aiTargetElement) return;
+    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
+    const result = await callGeminiAPI(finalPrompt);
+    appendAiMessage("ai", result);
+}
 
-    let fullReply = "";
-
-    function handleChunk(textChunk) {
-        if (fullReply === "") {
-            aiTargetElement.innerText = ""; 
-        }
-        fullReply += textChunk;
-        aiTargetElement.innerText = fullReply; 
-    }
-
-    function handleError(errorMessage) {
-        aiTargetElement.innerText = errorMessage;
-    }
-
-    await callGeminiAPI(finalPrompt, handleChunk, handleError);
-} 
-
-// =================================================================
-// 📊 4. ฟังก์ชันกดปุ่มสรุปรายงาน (แก้ไขให้รองรับระบบไหลพ่นเรียบร้อย ไม่ทำโค้ดเอ๋อแล้ว)
-// =================================================================
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
     
-    if(!pageText.trim()) { 
-        appendAiMessage("ai", "❌ หน้านี้ไม่มีข้อความธรรมดาให้ดึงไปวิเคราะห์ค่ะ"); 
-        return; 
-    }
+    if(!pageText.trim()) { appendAiMessage("ai", "❌ หน้านี้ไม่มีข้อความธรรมดาให้ดึงไปวิเคราะห์ค่ะ"); return; }
     
-    // ล็อกเป้าหมายกล่องข้อความ AI สำหรับรอรับข้อมูลสรุป
-    const aiTargetElement = appendAiMessage("ai", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
-    if (!aiTargetElement) return;
-
-    let fullReply = "";
+    appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
     const prompt = `จงสรุปสาระสำคัญ ตัวเลข หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้อง:\n"""\n${pageText}\n"""`;
-    
-    function handleSummaryChunk(textChunk) {
-        if (fullReply === "") {
-            aiTargetElement.innerText = "";
-        }
-        fullReply += textChunk;
-        aiTargetElement.innerText = fullReply; // ข้อความสรุปค่อยๆ ไหลพ่นออกมา
-    }
-
-    function handleSummaryError(errorMessage) {
-        aiTargetElement.innerText = errorMessage;
-    }
-
-    await callGeminiAPI(prompt, handleSummaryChunk, handleSummaryError);
+    const result = await callGeminiAPI(prompt);
+    appendAiMessage("ai", result);
 }
 
-// =================================================================
-// 💬 5. ฟังก์ชันสร้างกล่องข้อความบนหน้าจอแชท (คืนค่า Element กลับไปใช้งาน)
-// =================================================================
 function appendAiMessage(sender, text) {
-    const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return null;
+    const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
     if (sender === 'system') {
         const tempMsg = document.createElement('div');
         tempMsg.className = 'ai-message system-msg temp-status'; tempMsg.innerText = text;
-        chatBox.appendChild(tempMsg); chatBox.scrollTop = chatBox.scrollHeight; return tempMsg;
+        chatBox.appendChild(tempMsg); chatBox.scrollTop = chatBox.scrollHeight; return;
     }
     const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
 
     const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
     msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
-    return msgDiv; // คืนค่า Element ล่าสุดกลับไปเพื่อฉีดเศษข้อความใส่ได้ตรงจุด
 }
-
-// =================================================================
-// 💾 6. ระบบบันทึกคีย์ API อัตโนมัติ (ป้องกันคีย์หายเวลารีเฟรชหน้าเว็บ)
-// =================================================================
-document.addEventListener('DOMContentLoaded', () => {
-    const keyInput = document.getElementById('ai-api-key');
-    if (keyInput) {
-        const savedKey = localStorage.getItem('nawee_gemini_api_key');
-        if (savedKey) {
-            keyInput.value = savedKey;
-        }
-        keyInput.addEventListener('input', () => {
-            localStorage.setItem('nawee_gemini_api_key', keyInput.value.trim());
-        });
-    }
-});
