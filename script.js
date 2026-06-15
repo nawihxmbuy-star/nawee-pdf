@@ -889,14 +889,17 @@ function createDraggableTextNode(e) {
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
-// 🚀 ซ่อมแซมระบบเรียกใช้งาน Gemini API (อัปเดตเป็นโมเดล gemini-3.5-flash ฟรีล่าสุด)
-async function callGeminiAPI(promptText) {
+// 🚀 เวอร์ชันใหม่ล่าสุด: ระบบเรียกใช้งาน Gemini API แบบไหลพ่นทีละคำ (Streaming)
+async function callGeminiAPI(promptText, onChunk, onError) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
-    if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
+    if(!API_KEY) {
+        onError("❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ");
+        return;
+    }
 
-    // 🎯 ปรับเส้นทาง URL ให้เรียกใช้โมเดลรุ่น 3.5 Flash ตามที่คุณนาวีต้องการเรียบร้อยครับ
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${API_KEY}`;
+    // 🎯 1. เปลี่ยนชื่อท่อท้าย URL เป็น streamGenerateContent เพื่อสั่งให้ Google ทยอยพ่นคำออกมา
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?key=${API_KEY}`;
     
     try {
         const response = await fetch(url, {
@@ -905,23 +908,67 @@ async function callGeminiAPI(promptText) {
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         });
 
-        // ดักเช็กกรณีเกิด Error จากฝั่ง Google Server เช่น คีย์ผิด หรือโมเดลผิด
         if (!response.ok) {
             const errorData = await response.json();
-            return `❌ API ตอบกลับผิดพลาด: ${errorData.error?.message || response.statusText}`;
+            onError(`❌ API ตอบกลับผิดพลาด: ${errorData.error?.message || response.statusText}`);
+            return;
         }
 
-        const data = await response.json();
-        
-        // ตรวจสอบโครงสร้างก่อนแกะเอาข้อความไปใช้งาน
-        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-            return data.candidates[0].content.parts[0].text;
-        } else {
-            return "❌ รูปแบบข้อมูลที่ตอบกลับมาไม่ถูกต้อง";
+        // 🎯 2. เปิดระบบ Reader เพื่อดักรับเศษข้อความที่กำลังไหลมาจากเซิร์ฟเวอร์
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break; // ถ้าส่งมาครบ 100% แล้วให้หลุดออกจากลูป
+            
+            buffer += decoder.decode(value, { stream: true });
+            
+            // 🎯 3. สมองกลดักจับปีกกา {} เพื่อแกะเอาเฉพาะข้อความภาษาไทย/อังกฤษที่ไหลมา
+            let startIdx = 0;
+            while (true) {
+                const openBrace = buffer.indexOf('{', startIdx);
+                if (openBrace === -1) break;
+                
+                let endIdx = openBrace + 1;
+                let braceCount = 1;
+                let inString = false;
+                
+                while (endIdx < buffer.length && braceCount > 0) {
+                    const char = buffer[endIdx];
+                    if (char === '"' && buffer[endIdx - 1] !== '\\') {
+                        inString = !inString;
+                    }
+                    if (!inString) {
+                        if (char === '{') braceCount++;
+                        else if (char === '}') braceCount--;
+                    }
+                    endIdx++;
+                }
+                
+                if (braceCount === 0) {
+                    const jsonStr = buffer.slice(openBrace, endIdx);
+                    try {
+                        const jsonObj = JSON.parse(jsonStr);
+                        const textChunk = jsonObj.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (textChunk) {
+                            // 🎁 ส่งเศษคำที่ได้ออกไปอัปเดตบนหน้าจอแอปของคุณนาวีทันที!
+                            onChunk(textChunk); 
+                        }
+                    } catch (err) {
+                        // ข้ามก้อนข้อมูลที่ยังมาไม่สมบูรณ์
+                    }
+                    startIdx = endIdx;
+                } else {
+                    break;
+                }
+            }
+            buffer = buffer.slice(startIdx);
         }
     } catch (e) {
-        console.error("Gemini API Connection Error:", e);
-        return "❌ ไม่สามารถเชื่อมต่อกับ API ได้ กรุณาตรวจสอบอินเทอร์เน็ตของคุณนาวีอีกครั้งค่ะ";
+        console.error("Gemini Streaming Error:", e);
+        onError("❌ ไม่สามารถเชื่อมต่อกับ API ได้ กรุณาตรวจสอบอินเทอร์เน็ตของคุณนาวีอีกครั้งค่ะ");
     }
 }
 
@@ -942,7 +989,7 @@ async function sendAiQuestion() {
     let finalPrompt = pageText.trim() !== "" ? 
         `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถาม: ${userText}\n(วิเคราะห์และสรุปภาษาไทยแบบกระชับและเป็นมิตร)` : userText;
 
-    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
+    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้ค่ะ...");
     const result = await callGeminiAPI(finalPrompt);
     appendAiMessage("ai", result);
 }
