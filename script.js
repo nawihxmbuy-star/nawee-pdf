@@ -908,6 +908,7 @@ async function callGeminiAPI(promptText, onChunk, onError) {
         return;
     }
 
+    // 🎯 ใช้โมเดล gemini-3.5-flash ระบบไหลพ่นตามที่คุณนาวีตั้งค่าไว้เลยครับ
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?key=${API_KEY}`;
     
     try {
@@ -963,7 +964,7 @@ async function callGeminiAPI(promptText, onChunk, onError) {
                             onChunk(textChunk);
                         }
                     } catch (err) {
-                        // ข้ามก้อนที่ยังมาไม่สมบูรณ์
+                        // ข้ามก้อนข้อมูลที่ยังมาไม่ครบ
                     }
                     startIdx = endIdx;
                 } else {
@@ -978,11 +979,17 @@ async function callGeminiAPI(promptText, onChunk, onError) {
     }
 }
 
+// =================================================================
+// ↔️ 2. ฟังก์ชัน เปิด-ปิด แถบข้าง AI Sidebar
+// =================================================================
 function toggleAiSidebar() {
     const sidebar = document.getElementById('ai-sidebar');
     if (sidebar) sidebar.classList.toggle('open');
 }
 
+// =================================================================
+// 🎯 3. ฟังก์ชันกดปุ่มส่งข้อความแชท (เวอร์ชันไหลพ่นปรับปรุงเสถียรภาพ)
+// =================================================================
 async function sendAiQuestion() {
     const input = document.getElementById('ai-input'); if (!input) return;
     const userText = input.value.trim(); if (!userText) return;
@@ -995,87 +1002,90 @@ async function sendAiQuestion() {
     let finalPrompt = pageText.trim() !== "" ? 
         `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถาม: ${userText}\n(วิเคราะห์และสรุปภาษาไทยแบบกระชับและเป็นมิตร)` : userText;
 
-    // สร้างกล่องข้อความ AI ขึ้นมารอ โดยใช้หมุดรหัสลับตั้งชื่อไว้ชั่วคราว
-    const targetMarker = "⚡_LOADING_NAWEE_" + Date.now();
-    appendAiMessage("ai", targetMarker);
-
-    // วิ่งตามหา Element กล่องแชทล่าสุดเพื่อล็อกเป้าหมายในการพ่นคำ
-    let aiTargetElement = null;
-    const allElements = document.getElementsByTagName('*');
-    for (let i = allElements.length - 1; i >= 0; i--) {
-        if (allElements[i].innerText === targetMarker || allElements[i].textContent === targetMarker) {
-            aiTargetElement = allElements[i];
-            break;
-        }
-    }
-
-    if (aiTargetElement) {
-        aiTargetElement.innerText = "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...";
-    }
+    // ดึง Element กล่องข้อความ AI มาล็อกเป้าหมายโดยตรง แม่นยำ 100%
+    const aiTargetElement = appendAiMessage("ai", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
+    if (!aiTargetElement) return;
 
     let fullReply = "";
 
-    // 🎯 1. แยกฟังก์ชันย่อยออกมารับเศษคำ (ลดความซับซ้อนท้ายบรรทัด)
     function handleChunk(textChunk) {
-        if (fullReply === "" && aiTargetElement) {
-            aiTargetElement.innerText = "";
+        if (fullReply === "") {
+            aiTargetElement.innerText = ""; 
         }
         fullReply += textChunk;
-        if (aiTargetElement) {
-            aiTargetElement.innerText = fullReply; // ค่อยๆ ไหลคำตอบออกหน้าจอ
-        }
+        aiTargetElement.innerText = fullReply; 
     }
 
-    // 🎯 2. แยกฟังก์ชันย่อยจัดการข้อผิดพลาด
     function handleError(errorMessage) {
-        if (aiTargetElement) {
-            aiTargetElement.innerText = errorMessage;
-        }
+        aiTargetElement.innerText = errorMessage;
     }
 
-    // 🚀 3. เรียกใช้งานแบบส่งชื่อฟังก์ชันเข้าไปสั้นๆ คลีนๆ
     await callGeminiAPI(finalPrompt, handleChunk, handleError);
 } 
 
+// =================================================================
+// 📊 4. ฟังก์ชันกดปุ่มสรุปรายงาน (แก้ไขให้รองรับระบบไหลพ่นเรียบร้อย ไม่ทำโค้ดเอ๋อแล้ว)
+// =================================================================
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
     
-    if(!pageText.trim()) { appendAiMessage("ai", "❌ หน้านี้ไม่มีข้อความธรรมดาให้ดึงไปวิเคราะห์ค่ะ"); return; }
+    if(!pageText.trim()) { 
+        appendAiMessage("ai", "❌ หน้านี้ไม่มีข้อความธรรมดาให้ดึงไปวิเคราะห์ค่ะ"); 
+        return; 
+    }
     
-    appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
+    // ล็อกเป้าหมายกล่องข้อความ AI สำหรับรอรับข้อมูลสรุป
+    const aiTargetElement = appendAiMessage("ai", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
+    if (!aiTargetElement) return;
+
+    let fullReply = "";
     const prompt = `จงสรุปสาระสำคัญ ตัวเลข หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้อง:\n"""\n${pageText}\n"""`;
-    const result = await callGeminiAPI(prompt);
-    appendAiMessage("ai", result);
+    
+    function handleSummaryChunk(textChunk) {
+        if (fullReply === "") {
+            aiTargetElement.innerText = "";
+        }
+        fullReply += textChunk;
+        aiTargetElement.innerText = fullReply; // ข้อความสรุปค่อยๆ ไหลพ่นออกมา
+    }
+
+    function handleSummaryError(errorMessage) {
+        aiTargetElement.innerText = errorMessage;
+    }
+
+    await callGeminiAPI(prompt, handleSummaryChunk, handleSummaryError);
 }
 
+// =================================================================
+// 💬 5. ฟังก์ชันสร้างกล่องข้อความบนหน้าจอแชท (คืนค่า Element กลับไปใช้งาน)
+// =================================================================
 function appendAiMessage(sender, text) {
-    const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
+    const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return null;
     if (sender === 'system') {
         const tempMsg = document.createElement('div');
         tempMsg.className = 'ai-message system-msg temp-status'; tempMsg.innerText = text;
-        chatBox.appendChild(tempMsg); chatBox.scrollTop = chatBox.scrollHeight; return;
+        chatBox.appendChild(tempMsg); chatBox.scrollTop = chatBox.scrollHeight; return tempMsg;
     }
     const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
 
     const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
     msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
+    return msgDiv; // คืนค่า Element ล่าสุดกลับไปเพื่อฉีดเศษข้อความใส่ได้ตรงจุด
 }
+
 // =================================================================
-// 💾 ระบบบันทึกคีย์ API อัตโนมัติ (ป้องกันคีย์หายเวลารีเฟรชหน้าเว็บ)
+// 💾 6. ระบบบันทึกคีย์ API อัตโนมัติ (ป้องกันคีย์หายเวลารีเฟรชหน้าเว็บ)
 // =================================================================
 document.addEventListener('DOMContentLoaded', () => {
     const keyInput = document.getElementById('ai-api-key');
     if (keyInput) {
-        // 📥 1. ตอนเปิดแอปขึ้นมา: ไปแอบดูในความจำเครื่องว่าเคยเซฟคีย์ไว้ไหม ถ้ามีให้เอามาหยอดใส่กล่องทันที
         const savedKey = localStorage.getItem('nawee_gemini_api_key');
         if (savedKey) {
             keyInput.value = savedKey;
         }
-
-        // 💾 2. ตอนคุณนาวีพิมพ์หรือวางคีย์: ให้แอปคว้าคีย์นั้นไปบันทึกลงความจำเครื่องทันทีอัตโนมัติ
         keyInput.addEventListener('input', () => {
             localStorage.setItem('nawee_gemini_api_key', keyInput.value.trim());
         });
