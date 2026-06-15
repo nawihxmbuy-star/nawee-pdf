@@ -1063,3 +1063,21 @@ function appendAiMessage(sender, text) {
     const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
     msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
 }
+// =================================================================
+// 💾 ระบบบันทึกคีย์ API อัตโนมัติ (ป้องกันคีย์หายเวลารีเฟรชหน้าเว็บ)
+// =================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const keyInput = document.getElementById('ai-api-key');
+    if (keyInput) {
+        // 📥 1. ตอนเปิดแอปขึ้นมา: ไปแอบดูในความจำเครื่องว่าเคยเซฟคีย์ไว้ไหม ถ้ามีให้เอามาหยอดใส่กล่องทันที
+        const savedKey = localStorage.getItem('nawee_gemini_api_key');
+        if (savedKey) {
+            keyInput.value = savedKey;
+        }
+
+        // 💾 2. ตอนคุณนาวีพิมพ์หรือวางคีย์: ให้แอปคว้าคีย์นั้นไปบันทึกลงความจำเครื่องทันทีอัตโนมัติ
+        keyInput.addEventListener('input', () => {
+            localStorage.setItem('nawee_gemini_api_key', keyInput.value.trim());
+        });
+    }
+});
