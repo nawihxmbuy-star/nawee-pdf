@@ -889,14 +889,14 @@ function createDraggableTextNode(e) {
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
-// ซ่อมแซมระบบเรียกใช้งาน Gemini API
+// 🚀 ซ่อมแซมระบบเรียกใช้งาน Gemini API (อัปเดตเป็นโมเดล gemini-3.5-flash ฟรีล่าสุด)
 async function callGeminiAPI(promptText) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
-    // อัปเดตโมเดลเป็น gemini-1.5-flash ตามมาตรฐานปัจจุบัน
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    // 🎯 ปรับเส้นทาง URL ให้เรียกใช้โมเดลรุ่น 3.5 Flash ตามที่คุณนาวีต้องการเรียบร้อยครับ
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${API_KEY}`;
     
     try {
         const response = await fetch(url, {
@@ -920,7 +920,7 @@ async function callGeminiAPI(promptText) {
             return "❌ รูปแบบข้อมูลที่ตอบกลับมาไม่ถูกต้อง";
         }
     } catch (e) {
-        console.error("Gemini API Connection Error Error:", e);
+        console.error("Gemini API Connection Error:", e);
         return "❌ ไม่สามารถเชื่อมต่อกับ API ได้ กรุณาตรวจสอบอินเทอร์เน็ตของคุณนาวีอีกครั้งค่ะ";
     }
 }
