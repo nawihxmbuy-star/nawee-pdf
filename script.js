@@ -889,13 +889,13 @@ function createDraggableTextNode(e) {
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
-
+// ซ่อมแซมระบบเรียกใช้งาน Gemini API
 async function callGeminiAPI(promptText) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
-    // อัปเดตโมเดลเป็นรุ่นใหม่ล่าสุด (gemini-1.5-flash) ที่เร็วกว่าและเสถียรกว่า
+    // อัปเดตโมเดลเป็น gemini-1.5-flash ตามมาตรฐานปัจจุบัน
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
     
     try {
@@ -904,26 +904,24 @@ async function callGeminiAPI(promptText) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         });
-        
-        const data = await response.json();
 
-        // ดักจับกรณี API ของ Google ส่ง Error กลับมา (เช่น คีย์ผิด, ไม่ได้เปิด API, ฯลฯ)
+        // ดักเช็กกรณีเกิด Error จากฝั่ง Google Server เช่น คีย์ผิด หรือโมเดลผิด
         if (!response.ok) {
-            console.error("Gemini API Error details:", data);
-            return `❌ ข้อผิดพลาดจากระบบ: ${data.error?.message || "ไม่ทราบสาเหตุ (กรุณาเช็ก Console)"}`;
+            const errorData = await response.json();
+            return `❌ API ตอบกลับผิดพลาด: ${errorData.error?.message || response.statusText}`;
         }
 
-        // ตรวจสอบว่ามีคำตอบกลับมาจริงๆ ป้องกันการอ่านค่า undefined
-        if (data.candidates && data.candidates.length > 0) {
+        const data = await response.json();
+        
+        // ตรวจสอบโครงสร้างก่อนแกะเอาข้อความไปใช้งาน
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
             return data.candidates[0].content.parts[0].text;
         } else {
-            console.warn("Unexpected API Response:", data);
-            return "❌ AI ไม่ได้ส่งคำตอบกลับมาค่ะ (อาจถูกบล็อกโดยระบบความปลอดภัยของ Google)";
+            return "❌ รูปแบบข้อมูลที่ตอบกลับมาไม่ถูกต้อง";
         }
-
     } catch (e) {
-        console.error("Fetch Error:", e);
-        return "❌ เน็ตเวิร์กขัดข้อง ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ของ AI ได้ค่ะ";
+        console.error("Gemini API Connection Error Error:", e);
+        return "❌ ไม่สามารถเชื่อมต่อกับ API ได้ กรุณาตรวจสอบอินเทอร์เน็ตของคุณนาวีอีกครั้งค่ะ";
     }
 }
 
