@@ -1,5 +1,5 @@
 // 🎯 service-worker.js (ฉบับแก้ไขและเสถียรที่สุด รองรับการทำงานออฟไลน์ 100%)
-const CACHE_NAME = 'nawee-pro-studio-v15.0';
+const CACHE_NAME = 'nawee-pro-studio-v15.1';
 
 const ASSETS_TO_CACHE = [
   './',
