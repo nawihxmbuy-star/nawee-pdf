@@ -1134,3 +1134,37 @@ document.addEventListener('click', (e) => {
         popup.style.display = 'none';
     }
 });
+/**
+ * 12. ฟังก์ชันรีเซ็ตแอปพลิเคชันเพื่อเริ่มงานใหม่ (ซ่อมแซมปุ่ม งานใหม่ ใน HTML)
+ */
+function resetApp() {
+    if (confirm("คุณนาวีต้องการล้างหน้าจอเพื่อเริ่มงานใหม่ใช่ไหมคะ? ข้อมูลวาดเขียนที่ไม่ได้เซฟจะสูญหายค่ะ")) {
+        pdfDoc = null;
+        currentScale = 1.0;
+        
+        // รีเซ็ตหน้ากระดาษกลับสู่หน้าต่างต้อนรับเริ่มต้น
+        const container = document.getElementById('pdf-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="initial-notice">
+                    <p><i class="fa-solid fa-cloud-arrow-up" style="font-size: 48px; color: var(--accent-color); margin-bottom: 15px;"></i></p>
+                    <p>ยินดีต้อนรับสู่ระบบกรุณากดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มต้นทำงานค่ะ</p>
+                </div>
+            `;
+        }
+        
+        // รีเซ็ตล้างกล่องแชท AI คืนสู่สถานะเริ่มต้น
+        const chatBox = document.getElementById('ai-chat-box');
+        if (chatBox) {
+            chatBox.innerHTML = `<div class="ai-message system-msg">สวัสดีค่ะคุณนาวี! ให้หนูช่วยสรุปรายงาน วิเคราะห์ตาราง หรือแปลความหมายข้อมูลในหน้าเอกสารปัจจุบัน พิมพ์บอกได้เลยนะคะ 📝</div>`;
+        }
+        
+        // ล้างคลังไฟล์แนบตกค้าง
+        selectedFilesArray = [];
+        renderFilePreviews();
+        
+        // สลับโหมดกลับมาที่ PDF 
+        switchFileMode('pdf');
+        showNotification("🎨 รีเซ็ตสตูดิโอเริ่มงานใหม่เรียบร้อยแล้วค่ะ");
+    }
+}

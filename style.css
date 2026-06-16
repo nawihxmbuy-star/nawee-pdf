@@ -201,282 +201,101 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 }
 
 /* แถบข้าง AI Chat Sidebar */
-.ai-sidebar { 
-    position: fixed; 
-    top: 0; 
-    bottom: 0; 
-    right: -380px; 
-    width: 380px; 
-    max-width: 100%;
-    background: #1e293b; 
-    border-left: 2px solid var(--accent-color); 
-    z-index: 10005; 
-    display: flex; 
-    flex-direction: column; 
-    transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
-    box-shadow: -10px 0 30px rgba(0,0,0,0.5); 
-}
+.ai-sidebar { position: fixed; top: 0; right: -380px; width: 380px; height: 100vh; background: #1e293b; border-left: 2px solid var(--accent-color); z-index: 5000; display: flex; flex-direction: column; transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
 .ai-sidebar.open { right: 0; }
 .ai-sidebar-header { padding: 20px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; color: #fff; }
 .close-sidebar-btn { background: none; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; }
-
-/* คุมเลเยอร์ Flex Box ไม่ให้ขยายตัวดันองค์ประกอบอื่นทะลุขอบล่าง */
-.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; min-height: 0; }
-
+.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
 .api-key-container { display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 13px; }
 .api-key-container input { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 6px; color: #fff; outline: none; }
 .ai-quick-actions { width: 100%; }
 .btn-ai-action { width: 100%; background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05)); border: 1px solid var(--accent-color); color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
-
-/* เปลี่ยน min-height เป็น 0; เพื่อให้กล่องแชตยืดหยุ่นย่อขนาดตามอัตราพื้นที่คงเหลือจริง ป้องกันปุ่มและช่องพิมพ์แชตตกหน้าจอ */
-.ai-chat-box { flex: 1; background: #0f172a; border-radius: 10px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; border: 1px solid rgba(255,255,255,0.05); }
-
+.ai-chat-box { flex: 1; background: #0f172a; border-radius: 10px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 200px; border: 1px solid rgba(255,255,255,0.05); }
 .ai-message { padding: 10px 14px; border-radius: 8px; font-size: 13px; max-width: 85%; line-height: 1.4; word-wrap: break-word; }
-.system-msg { background: rgba(255, 255, 255, 0.05); color: #94a3b8; align-self: center; text-align: center; max-width: 100%; }
+.system-msg { background: rgba(255,255,255,0.05); color: #94a3b8; align-self: center; text-align: center; max-width: 100%; }
 .user-msg { background: var(--accent-color); color: #0f172a; align-self: flex-end; font-weight: 500; }
 .ai-msg { background: #1e293b; color: #fff; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
+.ai-sidebar-footer { padding: 15px; background: #0f172a; display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.1); position: relative; }
+.ai-sidebar-footer input { flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
+.ai-sidebar-footer button { background: var(--accent-color); border: none; width: 40px; height: 40px; border-radius: 8px; color: #0f172a; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 
 /* ==========================================================================
-   📸 ระบบควบคุมปุ่มและ UI ในส่วน Footer ของการอัปโหลดไฟล์/มัลติมีเดีย (เพิ่มใหม่)
+   📎 [NEW ADDITION] ระบบคลังไฟล์แนบ พรีวิวก่อนส่ง และป๊อปอัพมัลติมีเดียลอยฟ้า
    ========================================================================== */
-.ai-sidebar-footer { 
-    padding: 15px; 
-    background: #0f172a; 
-    display: flex; 
-    gap: 8px; 
-    border-top: 1px solid rgba(255,255,255,0.1); 
-    flex-shrink: 0; 
-    align-items: center; 
-    position: relative; 
-}
-.ai-sidebar-footer input[type="text"] { 
-    flex: 1; 
-    background: #1e293b; 
-    border: 1px solid rgba(255,255,255,0.1); 
-    padding: 10px 14px; 
-    border-radius: 8px; 
-    color: #fff; 
-    outline: none; 
-    font-size: 13px; 
-}
-.ai-sidebar-footer button { 
-    background: var(--accent-color); 
-    border: none; 
-    width: 40px; 
-    height: 40px; 
-    border-radius: 8px; 
-    color: #0f172a; 
-    cursor: pointer; 
-    font-size: 16px; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
+
+/* แผงรวมก้อนไฟล์พรีวิวที่เลือกไว้ จะขยายตัวเหนือบาร์พิมพ์ข้อความ */
+#file-preview-container {
+    display: none; /* เปิดเมื่อมีไฟล์ผ่าน script.js */
+    gap: 6px;
+    padding: 8px 15px;
+    background: #0f172a;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    width: 100%;
 }
 
-/* สไตล์เฉพาะสำหรับปุ่มจัดการไฟล์ชุดใหม่ */
-.ai-chat-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
+/* ตัวก้อนไฟล์แต่ละชิ้น */
+.ai-preview-item {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-.btn-attach-doc {
-    background: rgba(255, 255, 255, 0.05);
-    color: #94a3b8;
-}
-.btn-attach-doc:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #f1f5f9;
-}
-.btn-media-plus {
-    background: var(--accent-color);
-    color: #0f172a;
-    font-size: 20px;
-    font-weight: bold;
-    line-height: 1;
-}
-.btn-media-plus:hover {
-    background: #06b6d4;
-    transform: scale(1.05);
-}
-
-/* หน้าต่าง Pop-up เมนูลอยขึ้นมาให้เลือก สื่อสารกับไฟล์ */
-.media-popup {
-    position: absolute;
-    bottom: 65px;
-    left: 15px;
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 10px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-    display: flex;
-    flex-direction: column;
-    padding: 6px;
-    z-index: 10010;
-    min-width: 160px;
-    animation: popSlideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes popSlideUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.media-popup button {
-    width: 100% !important;
-    height: auto !important;
-    background: transparent !important;
-    color: #e2e8f0 !important;
-    border: none !important;
-    padding: 10px 14px !important;
-    text-align: left !important;
-    cursor: pointer !important;
-    border-radius: 6px !important;
-    font-size: 13px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    transition: background 0.15s !important;
-}
-.media-popup button:hover {
-    background: rgba(255, 255, 255, 0.06) !important;
-    color: var(--accent-color) !important;
-}
-
-/* ชิ้นงานแสดงตัวพรีวิวขนาดเล็ก */
-.ai-preview-item {
     position: relative;
-    display: inline-block;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
-    color: #cbd5e1;
 }
-.ai-preview-item .remove-preview-btn {
+
+/* ปุ่มกากบาทจิ๋วสำหรับกดลบไฟล์แนบออกจากตะกร้าสะสม */
+.remove-preview-btn {
     position: absolute;
-    top: -6px;
-    right: -6px;
+    top: -5px;
+    right: -2px;
+    width: 15px;
+    height: 15px;
     background: #ef4444;
-    color: white;
+    color: #ffffff;
     border-radius: 50%;
-    width: 18px;
-    height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 10px;
-    cursor: pointer;
     font-weight: bold;
-    border: 1px solid #0f172a;
-    transition: background 0.1s;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    transition: transform 0.1s;
 }
-.ai-preview-item .remove-preview-btn:hover {
+.remove-preview-btn:hover {
+    transform: scale(1.18);
     background: #dc2626;
 }
 
-/* ==========================================================================
-   📱 [แก้ไขตรงจุด 100%] ระบบซ่อนแชท AI ใต้จอ และจะสไลด์ขึ้นมาครึ่งจอเฉพาะเมื่อกดเรียก
-   ========================================================================== */
-@media (max-width: 1024px) {
-    
-    /* 📁 1. Status ปกติตอนปิด: พับเก็บลงไปซ่อนใต้จอ */
-    .ai-sidebar {
-        position: fixed !important;
-        top: auto !important;         
-        bottom: 0 !important;        
-        right: 0 !important;         
-        left: auto !important;       
-        width: 350px !important;     
-        max-width: 100% !important;  
-        height: 50vh !important;     
-        
-        transform: translateY(100%) !important;  
-        transition: transform 0.3s ease-in-out !important;
-        
-        border-radius: 20px 0 0 0 !important; 
-        border-right: none !important;
-        border-left: 2px solid var(--accent-color) !important;
-        border-top: 2px solid var(--accent-color) !important; 
-        box-shadow: -5px -5px 30px rgba(0, 0, 0, 0.5) !important; 
-    }
-
-    /* 📁 2. Status เปิดแชท: ดันหน้าต่างกระดกขึ้นมาจากขอบล่าง */
-    .ai-sidebar.active, 
-    .ai-sidebar.open, 
-    .ai-sidebar.show,
-    body.sidebar-open .ai-sidebar,
-    body.ai-open .ai-sidebar {
-        transform: translateY(0) !important; 
-        display: flex !important;
-    }
-
-    .ai-chat-box {
-        flex: 1 !important;
-        min-height: 0 !important; 
-        overflow-y: auto !important;
-        background: #0f172a !important;
-        padding: 12px !important;
-    }
+/* ➕ เมนูป๊อปอัพลอยฟ้าสำหรับเลือกสลับประเภทไฟล์ดิบ */
+#media-popup, .media-popup {
+    display: none; /* ควบคุมผ่านฟังก์ชัน toggleMediaPopup ในสคริปต์ */
+    position: absolute;
+    bottom: 65px; /* ลอยเด่นอยู่เหนือปุ่มบวกใน footer ของแชท */
+    left: 15px;
+    background: #1e293b;
+    border: 1px solid var(--accent-color);
+    border-radius: 12px;
+    padding: 6px;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+    z-index: 5010;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
 }
-
-/* ========================================================
-   📱 [FIX] จัดระเบียบแผง AI ใน "โหมดแนวนอน" (Landscape) ไม่ให้หลุดจอ
-   ======================================================== */
-.ai-sidebar.active, .ai-sidebar.open, .ai-sidebar.show {
-    transform: translateY(0) !important;
-    display: flex !important;
+#media-popup button, .media-popup button {
+    width: 100%;
+    background: transparent !important;
+    border: none !important;
+    padding: 10px 12px !important;
+    text-align: left;
+    color: #f8fafc;
+    border-radius: 6px !important;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
 }
-
-@media (orientation: landscape) and (max-height: 600px) {
-    .ai-sidebar {
-        top: 65px !important;                 
-        bottom: 0 !important;
-        height: calc(100vh - 65px) !important; 
-        width: 380px !important;               
-        max-width: 85% !important;
-        
-        transform: translateX(100%) !important; 
-        transition: transform 0.3s ease-in-out !important;
-        border-radius: 16px 0 0 0 !important;
-        border-left: 2px solid var(--accent-color) !important;
-        border-top: none !important;
-    }
-
-    .ai-sidebar.active, .ai-sidebar.open, .ai-sidebar.show {
-        transform: translateX(0) !important;
-    }
-
-    .ai-sidebar-body {
-        padding: 10px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-        overflow-y: auto !important;
-    }
-
-    .api-key-container {
-        margin-bottom: 0 !important;
-    }
-
-    .ai-quick-actions {
-        margin-bottom: 2px !important;
-    }
-
-    .ai-chat-box {
-        flex: 1 !important;
-        min-height: 100px !important; 
-        max-height: none !important;
-    }
-    
-    /* หลบป๊อปอัพขึ้นสูงขึ้นอีกนิดตอนจอแคบแนวนอน */
-    .media-popup {
-        bottom: 55px;
-    }
+#media-popup button:hover, .media-popup button:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--accent-color);
 }
