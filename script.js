@@ -935,30 +935,139 @@ async function sendAiQuestion() {
     const userText = input.value.trim(); if (!userText) return;
 
     appendAiMessage("user", userText); input.value = '';
+    saveChatToLocalStorage(); // บันทึกสเตจฝั่ง User ทันทีกันหลุดหน้าจอ
+    
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
+
+    appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์ข้อมูลและรูปภาพหน้าจอให้คุณนาวีค่ะ...");
+
+    // 📸 ดึงข้อมูลภาพหน้าจอ
+    const base64Screen = await captureActivePageBase64();
+
+    let currentTurnParts = [];
+    if (base64Screen) {
+        currentTurnParts.push({
+            inlineData: { mimeType: "image/jpeg", data: base64Screen } // ✨ แก้ไขคีย์เป็น CamelCase ตามมาตรฐาน Google API
+        });
+    }
 
     let finalPrompt = pageText.trim() !== "" ? 
-        `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถาม: ${userText}\n(วิเคราะห์และสรุปภาษาไทยแบบกระชับและเป็นมิตร)` : userText;
+        `ข้อมูลตัวหนังสือที่อ่านได้จากเอกสารหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถามเพิ่มเติมจากผู้ใช้: ${userText}\n(คำแนะนำสำหรับ AI: จงดูภาพถ่ายหน้าจอประกอบควบคู่กับตัวหนังสือ เพื่อตรวจสอบตาราง รูปวาดเขียน ไฮไลต์ หรือจุดที่ผู้ใช้วงไว้ แล้วอธิบายเป็นภาษาไทยอย่างกระชับและเป็นมิตร)` : userText;
 
-    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
-    const result = await callGeminiAPI(finalPrompt);
-    appendAiMessage("ai", result);
+    currentTurnParts.push({ text: finalPrompt });
+
+    // บันทึกลงคลังประวัติคุยต่อเนื่อง
+    geminiChatHistory.push({ role: "user", parts: currentTurnParts });
+
+    // ✨ [Payload Optimizer] เคลียร์ข้อมูลรูปภาพในรอบเก่าๆ ออก ป้องกันข้อมูลแชทบวมจนเกิดข้อผิดพลาด 413
+    const cleanedHistory = geminiChatHistory.map((msg, index) => ({
+        role: msg.role,
+        parts: msg.parts.map(part => {
+            if (part.inlineData && index !== geminiChatHistory.length - 1) {
+                return { text: "[ภาพถ่ายหน้าจอก่อนหน้านี้ได้รับการบันทึกในความจำหลักแล้ว]" };
+            }
+            return part;
+        })
+    }));
+
+    // สร้างกล่องแชต AI เปล่ารอรับการพิมพ์ตอบไล่ระดับ (Streaming)
+    const aiMessageDiv = createStreamingAiMessageElement();
+
+    await streamGeminiPayload(cleanedHistory, 
+        (newChunk) => {
+            if (aiMessageDiv) {
+                aiMessageDiv.innerText += newChunk;
+                const chatBox = document.getElementById('ai-chat-box');
+                if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+                saveChatToLocalStorage(); 
+            }
+        },
+        (fullResponseText) => {
+            geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
+            saveChatToLocalStorage(); 
+        },
+        (errorMsg) => {
+            if (aiMessageDiv) {
+                aiMessageDiv.innerText = errorMsg;
+                saveChatToLocalStorage();
+            }
+        }
+    );
 }
 
+// 📊 ฟังก์ชันวิเคราะห์สรุปรายงานอัจฉริยะ (Multimodal Report Analytics)
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
+    saveChatToLocalStorage();
+    
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
     
-    if(!pageText.trim()) { appendAiMessage("ai", "❌ หน้านี้ไม่มีข้อความธรรมดาให้ดึงไปวิเคราะห์ค่ะ"); return; }
-    
-    appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
-    const prompt = `จงสรุปสาระสำคัญ ตัวเลข หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้อง:\n"""\n${pageText}\n"""`;
-    const result = await callGeminiAPI(prompt);
-    appendAiMessage("ai", result);
+    appendAiMessage("system", "⚡ กำลังสแกนโครงสร้างหน้าจอรวมถึงรอยปากกาไฮไลต์เพื่อสรุปผลค่ะ...");
+
+    const base64Screen = await captureActivePageBase64();
+
+    let currentTurnParts = [];
+    if (base64Screen) {
+        currentTurnParts.push({
+            inlineData: { mimeType: "image/jpeg", data: base64Screen } // ✨ แก้ไขคีย์เป็น CamelCase ตามมาตรฐาน Google API
+        });
+    }
+
+    const prompt = `จงสรุปสาระสำคัญ ตัวเลข ผลลัพธ์ หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้องสูงสุด หากบนหน้าจอมีโครงสร้างภาพ แผนภูมิ หรือรอยเขียนปากกา/ยางลบลบข้อความใดๆ ให้รวมองค์ประกอบภาพเหล่านั้นมาวิเคราะห์ร่วมด้วยอย่างมีหลักการ:\n"""\n${pageText}\n"""`;
+    currentTurnParts.push({ text: prompt });
+
+    geminiChatHistory.push({ role: "user", parts: currentTurnParts });
+
+    // ✨ [Payload Optimizer] เคลียร์ข้อมูลรูปภาพเก่าในการสรุปรายงานด้วยเช่นกัน
+    const cleanedHistory = geminiChatHistory.map((msg, index) => ({
+        role: msg.role,
+        parts: msg.parts.map(part => {
+            if (part.inlineData && index !== geminiChatHistory.length - 1) {
+                return { text: "[ภาพถ่ายหน้าจอก่อนหน้านี้ได้รับการบันทึกในความจำหลักแล้ว]" };
+            }
+            return part;
+        })
+    }));
+
+    const aiMessageDiv = createStreamingAiMessageElement();
+
+    await streamGeminiPayload(cleanedHistory, 
+        (newChunk) => {
+            if (aiMessageDiv) {
+                aiMessageDiv.innerText += newChunk;
+                const chatBox = document.getElementById('ai-chat-box');
+                if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+                saveChatToLocalStorage(); 
+            }
+        },
+        (fullResponseText) => {
+            geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
+            saveChatToLocalStorage(); 
+        },
+        (errorMsg) => {
+            if (aiMessageDiv) {
+                aiMessageDiv.innerText = errorMsg;
+                saveChatToLocalStorage();
+            }
+        }
+    );
+}
+
+// สร้างกล่องข้อความ AI เปล่าสำหรับฉีดข้อมูล Streaming
+function createStreamingAiMessageElement() {
+    const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return null;
+    const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
+
+    const msgDiv = document.createElement('div'); 
+    msgDiv.className = `ai-message ai-msg`;
+    msgDiv.innerText = ""; 
+    chatBox.appendChild(msgDiv); 
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return msgDiv;
 }
 
 function appendAiMessage(sender, text) {
@@ -973,3 +1082,158 @@ function appendAiMessage(sender, text) {
     const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
     msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
 }
+
+
+// ==========================================================
+// 🛡️ [NEW v2.5] ระบบตรวจจับและขอยืนยันการอัปเดตอย่างปลอดภัย (Safe PWA Update)
+// ==========================================================
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js')
+    .then(reg => {
+        
+        // ฟังก์ชันขึ้นกล่องแจ้งเตือนถามคุณนาวีก่อนเปลี่ยนเวอร์ชัน เพื่อสกัดกั้นงานหายกลางคัน
+        function promptUserToUpdate(waitingWorker) {
+            const userAccepted = confirm(
+                "✨ [Nawee Studio] พบการอัปเดตระบบเวอร์ชันใหม่ล่าสุด!\n\n" +
+                "คุณต้องการเปลี่ยนผ่านระบบและเริ่มหน้าแอปใหม่ตอนนี้เลยไหมคะ?\n" +
+                "--------------------------------------------------\n" +
+                "⚠️ หากคุณกำลังติดงานพิมพ์ วาดแบบ หรือทำงานค้างอยู่ ให้กด 'ยกเลิก (Cancel)' เพื่อเซฟงานก่อนได้ค่ะ ระบบจะไม่รีโหลดจนกว่าคุณจะพร้อม"
+            );
+
+            if (userAccepted) {
+                // อนุมัติรหัสผ่านลับให้ Service Worker ก้าวข้ามสเตจ Waiting ไปรีบูตระบบได้ทันที
+                waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+        }
+
+        // กรณีที่ 1: ตรวจพบไฟล์อัปเดตดาวน์โหลดมารอก่อนหน้าแล้วในเครื่อง
+        if (reg.waiting) {
+            promptUserToUpdate(reg.waiting);
+        }
+
+        // กรณีที่ 2: ระบบตรวจจับเจออัปเดตใหม่ระหว่างกำลังเปิดหน้างานทิ้งไว้
+        reg.onupdatefound = () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+                installingWorker.onstatechange = () => {
+                    // เมื่อไฟล์เวอร์ชันใหม่ทั้งหมดถูกดาวน์โหลดและจัดสรรสเปซเสร็จสิ้นค้างไว้ที่แท่นจ่อคิว
+                    if (installingWorker.state === 'installed') {
+                        if (navigator.serviceWorker.controller) {
+                            promptUserToUpdate(installingWorker);
+                        }
+                    }
+                };
+            }
+        };
+
+    }).catch(err => console.error("Service Worker Registration Failed:", err));
+
+    // ผูกกระบวนการรีเฟรชหน้าจอ: จะเริ่มโหลดแอปใหม่ก้าวไปเวอร์ชันถัดไปก็ต่อเมื่อกดยอมรับ 'ตกลง' เท่านั้นค่ะ
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            window.location.reload();
+            refreshing = true;
+        }
+    });
+}
+// ==========================================================================
+// 🎨 [แก้ไขสมบูรณ์] โมดูลจัดการปุ่มสีด่วน + ซ่อมแซมระบบ AI + ซ่อนแป้นพิมพ์มือถือ
+// วางแทนที่โค้ดจานสีด่วนอันเดิมที่ท้ายสุดของไฟล์ script.js ได้เลยครับ
+// ==========================================================================
+(function() {
+    // 🛠️ ฟังก์ชันภายในสำหรับแปลงสี RGB เป็น HEX ป้องกันระบบสคริปต์หลักเอเรอร์
+    function safeRgbToHex(rgb) {
+        if (!rgb) return '#22d3ee';
+        if (rgb.startsWith('#')) return rgb;
+        const matches = rgb.match(/\d+/g);
+        if (!matches || matches.length < 3) return '#22d3ee';
+        const r = parseInt(matches[0]).toString(16).padStart(2, '0');
+        const g = parseInt(matches[1]).toString(16).padStart(2, '0');
+        const b = parseInt(matches[2]).toString(16).padStart(2, '0');
+        return `#${r}${g}${b}`;
+    }
+
+    function initQuickColorPalette() {
+        // 1. ระบบสีด่วนสำหรับ ปากกาวาดเขียน
+        const penDots = document.querySelectorAll('.pen-palette-dot');
+        const penColorPicker = document.getElementById('color-picker');
+        
+        penDots.forEach(dot => {
+            dot.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const selectedColor = this.getAttribute('data-color') || this.style.backgroundColor;
+                if (!selectedColor) return;
+
+                if (typeof currentActiveColor !== 'undefined') {
+                    currentActiveColor = selectedColor;
+                }
+                
+                if (penColorPicker) {
+                    penColorPicker.value = safeRgbToHex(selectedColor);
+                    penColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
+                    penColorPicker.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                
+                if (typeof updateBrushPreview === 'function') {
+                    updateBrushPreview();
+                }
+            });
+        });
+
+        // 2. ระบบสีด่วนสำหรับ ข้อความลอย (แก้ไขปัญหาแป้นพิมพ์เด้งกวนใจ)
+        const textDots = document.querySelectorAll('.text-palette-dot');
+        const mainTextColorPicker = document.getElementById('text-color-picker');
+        const floatingTextColorPicker = document.getElementById('floating-text-color');
+        
+        textDots.forEach(dot => {
+            dot.addEventListener('click', function(e) {
+                e.preventDefault();  /* 🛑 เบรกคำสั่งดั้งเดิม ไม่ให้เกิดการโฟกัสซ้ำ */
+                e.stopPropagation();
+                
+                // 📱 สั่งซ่อนแป้นพิมพ์มือถือทันที โดยล้างโฟกัสออกจากทุกอิลิเมนต์
+                if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                    document.activeElement.blur();
+                }
+
+                const selectedColor = this.getAttribute('data-color') || this.style.backgroundColor;
+                if (!selectedColor) return;
+
+                const hexColor = safeRgbToHex(selectedColor);
+
+                if (typeof currentTextActiveColor !== 'undefined') {
+                    currentTextActiveColor = hexColor;
+                }
+                
+                if (mainTextColorPicker) {
+                    mainTextColorPicker.value = hexColor;
+                    mainTextColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                
+                if (floatingTextColorPicker) {
+                    floatingTextColorPicker.value = hexColor;
+                    floatingTextColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+
+                // เปลี่ยนสีข้อความ Active Node ทันที และสั่งตัดโฟกัสป้องกันคีย์บอร์ดเด้ง
+                if (typeof activeDraggableNode !== 'undefined' && activeDraggableNode) {
+                    activeDraggableNode.style.color = hexColor;
+                    activeDraggableNode.style.borderColor = hexColor;
+                    activeDraggableNode.blur(); /* 📱 ล็อกย้ำอีกครั้งเพื่อความชัวร์ */
+                    
+                    if (typeof saveDrawingState === 'function') {
+                        saveDrawingState();
+                    }
+                }
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initQuickColorPalette);
+    } else {
+        initQuickColorPalette();
+    }
+})();
