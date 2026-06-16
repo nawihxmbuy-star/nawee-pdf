@@ -98,7 +98,7 @@ body.mode-word .workspace { padding-top: 140px; }
 .pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: block; }
 .drawing-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
 
-/* เลเยอร์ควบคุมกล่องข้อความ */
+/* เลอยอร์ควบคุมกล่องข้อความ */
 .text-overlay-layer { 
     position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; 
     overflow: hidden; pointer-events: none; 
@@ -200,47 +200,71 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
     background: rgba(34, 211, 238, 0.15); z-index: 9998; display: none;
 }
 
-/* แถบข้าง AI Chat Sidebar */
-.ai-sidebar { position: fixed; top: 0; right: -380px; width: 380px; height: 100vh; background: #1e293b; border-left: 2px solid var(--accent-color); z-index: 5000; display: flex; flex-direction: column; transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
+/* 📱 [UPGRADED RESPONSIVE] แถบข้าง AI Chat Sidebar ฟิตเป๊ะพอดีจอคอมและจอมือถือ */
+.ai-sidebar { 
+    position: fixed; 
+    top: 0; 
+    right: -100%; 
+    width: 100%; 
+    max-width: 380px; 
+    height: 100vh; 
+    height: 100dvh; /* ✨ แก้ไขปัญหาแถบ Address bar เบียดหลุดจอระบบมือถือ */
+    background: #1e293b; 
+    border-left: 2px solid var(--accent-color); 
+    z-index: 5000; 
+    display: flex; 
+    flex-direction: column; 
+    transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5); 
+}
 .ai-sidebar.open { right: 0; }
+
 .ai-sidebar-header { padding: 20px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; color: #fff; }
 .close-sidebar-btn { background: none; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; }
-.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .api-key-container { display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 13px; }
 .api-key-container input { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 6px; color: #fff; outline: none; }
 .ai-quick-actions { width: 100%; }
 .btn-ai-action { width: 100%; background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05)); border: 1px solid var(--accent-color); color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
-.ai-chat-box { flex: 1; background: #0f172a; border-radius: 10px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 200px; border: 1px solid rgba(255,255,255,0.05); }
+
+/* 💬 ปรับแต่งกล่องแชทให้ยืดหยุ่นสปริงตัวตามหน้าจอจริง */
+.ai-chat-box { 
+    flex: 1; 
+    background: #0f172a; 
+    border-radius: 10px; 
+    padding: 12px; 
+    overflow-y: auto; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px; 
+    min-height: 150px; 
+    border: 1px solid rgba(255,255,255,0.05); 
+}
+
 .ai-message { padding: 10px 14px; border-radius: 8px; font-size: 13px; max-width: 85%; line-height: 1.4; word-wrap: break-word; }
 .system-msg { background: rgba(255,255,255,0.05); color: #94a3b8; align-self: center; text-align: center; max-width: 100%; }
 .user-msg { background: var(--accent-color); color: #0f172a; align-self: flex-end; font-weight: 500; }
 .ai-msg { background: #1e293b; color: #fff; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
-.ai-sidebar-footer { padding: 15px; background: #0f172a; display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.1); position: relative; }
+.ai-sidebar-footer { padding: 15px; background: #0f172a; display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.1); }
 .ai-sidebar-footer input { flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
 .ai-sidebar-footer button { background: var(--accent-color); border: none; width: 40px; height: 40px; border-radius: 8px; color: #0f172a; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 
 /* ==========================================================================
-   📎 [NEW ADDITION] ระบบคลังไฟล์แนบ พรีวิวก่อนส่ง และป๊อปอัพมัลติมีเดียลอยฟ้า
+   📎 ระบบคลังไฟล์แนบ พรีวิวก่อนส่ง และป๊อปอัพมัลติมีเดียลอยฟ้า (เสถียร 100%)
    ========================================================================== */
-
-/* แผงรวมก้อนไฟล์พรีวิวที่เลือกไว้ จะขยายตัวเหนือบาร์พิมพ์ข้อความ */
 #file-preview-container {
-    display: none; /* เปิดเมื่อมีไฟล์ผ่าน script.js */
+    display: none;
     gap: 6px;
     padding: 8px 15px;
     background: #0f172a;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     width: 100%;
 }
-
-/* ตัวก้อนไฟล์แต่ละชิ้น */
 .ai-preview-item {
     display: flex;
     align-items: center;
     position: relative;
 }
-
-/* ปุ่มกากบาทจิ๋วสำหรับกดลบไฟล์แนบออกจากตะกร้าสะสม */
 .remove-preview-btn {
     position: absolute;
     top: -5px;
@@ -263,12 +287,10 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
     transform: scale(1.18);
     background: #dc2626;
 }
-
-/* ➕ เมนูป๊อปอัพลอยฟ้าสำหรับเลือกสลับประเภทไฟล์ดิบ */
 #media-popup, .media-popup {
-    display: none; /* ควบคุมผ่านฟังก์ชัน toggleMediaPopup ในสคริปต์ */
+    display: none;
     position: absolute;
-    bottom: 65px; /* ลอยเด่นอยู่เหนือปุ่มบวกใน footer ของแชท */
+    bottom: 65px;
     left: 15px;
     background: #1e293b;
     border: 1px solid var(--accent-color);
