@@ -210,7 +210,7 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
     max-width: 100%;
     background: #1e293b; 
     border-left: 2px solid var(--accent-color); 
-    z-index: 10005; /* 🎯 FIXED: ขยับขึ้นมาให้สูงกว่า .toolbar (9999) เพื่อแก้ปัญหาช่องพิมพ์จมหายหลังเมนูหลัก */
+    z-index: 10005; 
     display: flex; 
     flex-direction: column; 
     transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
@@ -220,7 +220,7 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 .ai-sidebar-header { padding: 20px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; color: #fff; }
 .close-sidebar-btn { background: none; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; }
 
-/* 🎯 FIXED: คุมเลเยอร์ Flex Box ไม่ให้ขยายตัวดันองค์ประกอบอื่นทะลุขอบล่าง */
+/* คุมเลเยอร์ Flex Box ไม่ให้ขยายตัวดันองค์ประกอบอื่นทะลุขอบล่าง */
 .ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; min-height: 0; }
 
 .api-key-container { display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 13px; }
@@ -228,38 +228,178 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 .ai-quick-actions { width: 100%; }
 .btn-ai-action { width: 100%; background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05)); border: 1px solid var(--accent-color); color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
 
-/* 🎯 FIXED: เปลี่ยน min-height เป็น 0; เพื่อให้กล่องแชตยืดหยุ่นย่อขนาดตามอัตราพื้นที่คงเหลือจริง ป้องกันปุ่มและช่องพิมพ์แชตตกหน้าจอ */
+/* เปลี่ยน min-height เป็น 0; เพื่อให้กล่องแชตยืดหยุ่นย่อขนาดตามอัตราพื้นที่คงเหลือจริง ป้องกันปุ่มและช่องพิมพ์แชตตกหน้าจอ */
 .ai-chat-box { flex: 1; background: #0f172a; border-radius: 10px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; border: 1px solid rgba(255,255,255,0.05); }
 
 .ai-message { padding: 10px 14px; border-radius: 8px; font-size: 13px; max-width: 85%; line-height: 1.4; word-wrap: break-word; }
 .system-msg { background: rgba(255, 255, 255, 0.05); color: #94a3b8; align-self: center; text-align: center; max-width: 100%; }
 .user-msg { background: var(--accent-color); color: #0f172a; align-self: flex-end; font-weight: 500; }
 .ai-msg { background: #1e293b; color: #fff; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
-.ai-sidebar-footer { padding: 15px; background: #0f172a; display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
-.ai-sidebar-footer input { flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; font-size: 13px; }
-.ai-sidebar-footer button { background: var(--accent-color); border: none; width: 40px; height: 40px; border-radius: 8px; color: #0f172a; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+
+/* ==========================================================================
+   📸 ระบบควบคุมปุ่มและ UI ในส่วน Footer ของการอัปโหลดไฟล์/มัลติมีเดีย (เพิ่มใหม่)
+   ========================================================================== */
+.ai-sidebar-footer { 
+    padding: 15px; 
+    background: #0f172a; 
+    display: flex; 
+    gap: 8px; 
+    border-top: 1px solid rgba(255,255,255,0.1); 
+    flex-shrink: 0; 
+    align-items: center; 
+    position: relative; 
+}
+.ai-sidebar-footer input[type="text"] { 
+    flex: 1; 
+    background: #1e293b; 
+    border: 1px solid rgba(255,255,255,0.1); 
+    padding: 10px 14px; 
+    border-radius: 8px; 
+    color: #fff; 
+    outline: none; 
+    font-size: 13px; 
+}
+.ai-sidebar-footer button { 
+    background: var(--accent-color); 
+    border: none; 
+    width: 40px; 
+    height: 40px; 
+    border-radius: 8px; 
+    color: #0f172a; 
+    cursor: pointer; 
+    font-size: 16px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+}
+
+/* สไตล์เฉพาะสำหรับปุ่มจัดการไฟล์ชุดใหม่ */
+.ai-chat-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+.btn-attach-doc {
+    background: rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+}
+.btn-attach-doc:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f1f5f9;
+}
+.btn-media-plus {
+    background: var(--accent-color);
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: bold;
+    line-height: 1;
+}
+.btn-media-plus:hover {
+    background: #06b6d4;
+    transform: scale(1.05);
+}
+
+/* หน้าต่าง Pop-up เมนูลอยขึ้นมาให้เลือก สื่อสารกับไฟล์ */
+.media-popup {
+    position: absolute;
+    bottom: 65px;
+    left: 15px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    z-index: 10010;
+    min-width: 160px;
+    animation: popSlideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes popSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.media-popup button {
+    width: 100% !important;
+    height: auto !important;
+    background: transparent !important;
+    color: #e2e8f0 !important;
+    border: none !important;
+    padding: 10px 14px !important;
+    text-align: left !important;
+    cursor: pointer !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    transition: background 0.15s !important;
+}
+.media-popup button:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: var(--accent-color) !important;
+}
+
+/* ชิ้นงานแสดงตัวพรีวิวขนาดเล็ก */
+.ai-preview-item {
+    position: relative;
+    display: inline-block;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: #cbd5e1;
+}
+.ai-preview-item .remove-preview-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    border: 1px solid #0f172a;
+    transition: background 0.1s;
+}
+.ai-preview-item .remove-preview-btn:hover {
+    background: #dc2626;
+}
+
 /* ==========================================================================
    📱 [แก้ไขตรงจุด 100%] ระบบซ่อนแชท AI ใต้จอ และจะสไลด์ขึ้นมาครึ่งจอเฉพาะเมื่อกดเรียก
-   วางแทนที่โค้ดควบคุมมือถือตัวเดิมที่ท้ายสุดของไฟล์ style.css ได้เลยครับ
    ========================================================================== */
 @media (max-width: 1024px) {
     
-    /* 📁 1. สถานะปกติ (ตอนปิดอยู่): ให้สแตนด์บายขวาล่าง แต่พับเก็บลงไปซ่อนใต้ขอบจอ */
+    /* 📁 1. Status ปกติตอนปิด: พับเก็บลงไปซ่อนใต้จอ */
     .ai-sidebar {
         position: fixed !important;
         top: auto !important;         
-        bottom: 0 !important;        /* วางฐานไว้ที่ขอบล่างสุด */
-        right: 0 !important;         /* ตรึงไว้ฝั่งขวาที่เดิม */
+        bottom: 0 !important;        
+        right: 0 !important;         
         left: auto !important;       
         width: 350px !important;     
         max-width: 100% !important;  
-        height: 50vh !important;     /* สูงครึ่งจอพอดี */
+        height: 50vh !important;     
         
-        /* 📱 ไฮไลต์: สั่งพับเก็บสไลด์ลงไปซ่อนใต้ขอบจอ 100% (ทำให้มองไม่เห็นในตอนแรก) */
         transform: translateY(100%) !important;  
-        transition: transform 0.3s ease-in-out !important; /* เอฟเฟกต์สไลด์เปิด-ปิดนุ่ม ๆ */
+        transition: transform 0.3s ease-in-out !important;
         
-        /* ดีไซน์กล่องป๊อปอัพทรงเหลี่ยมโค้งมน */
         border-radius: 20px 0 0 0 !important; 
         border-right: none !important;
         border-left: 2px solid var(--accent-color) !important;
@@ -267,18 +407,16 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
         box-shadow: -5px -5px 30px rgba(0, 0, 0, 0.5) !important; 
     }
 
-    /* 📁 2. สถานะเมื่อกดเรียกใช้งาน: ดักจับคลาสสั่งเปิดทุกรูปแบบของระบบเดิมคุณนาวี */
+    /* 📁 2. Status เปิดแชท: ดันหน้าต่างกระดกขึ้นมาจากขอบล่าง */
     .ai-sidebar.active, 
     .ai-sidebar.open, 
     .ai-sidebar.show,
     body.sidebar-open .ai-sidebar,
     body.ai-open .ai-sidebar {
-        /* 🚀 สไลด์กระดกขึ้นมาจากขอบล่างโผล่มาครึ่งจอทันทีเมื่อมีการกดปุ่มเปิด */
         transform: translateY(0) !important; 
         display: flex !important;
     }
 
-    /* จัดการกล่องแสดงข้อความแชทภายในป๊อปอัพ */
     .ai-chat-box {
         flex: 1 !important;
         min-height: 0 !important; 
@@ -287,26 +425,23 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
         padding: 12px !important;
     }
 }
+
 /* ========================================================
    📱 [FIX] จัดระเบียบแผง AI ใน "โหมดแนวนอน" (Landscape) ไม่ให้หลุดจอ
    ======================================================== */
-
-/* บังคับดันขึ้นมาสไลด์แสดงผลแน่นอนเมื่อคลาสทำงาน */
 .ai-sidebar.active, .ai-sidebar.open, .ai-sidebar.show {
     transform: translateY(0) !important;
     display: flex !important;
 }
 
-/* เจาะจงเมื่อผู้ใช้หมุนจอเป็น "แนวนอน" บนมือถือ/แท็บเล็ต (ความสูงจอน้อยกว่า 600px) */
 @media (orientation: landscape) and (max-height: 600px) {
     .ai-sidebar {
-        top: 65px !important;                 /* หลบแถบ Top-bar ด้านบนไม่ให้บัง */
+        top: 65px !important;                 
         bottom: 0 !important;
-        height: calc(100vh - 65px) !important; /* ให้สูงเต็มพื้นที่ที่เหลือ (ไม่ใช่ 50vh ที่จะเตี้ยเกินไป) */
-        width: 380px !important;               /* บีบความกว้างให้พอดีสายตา */
+        height: calc(100vh - 65px) !important; 
+        width: 380px !important;               
         max-width: 85% !important;
         
-        /* สลับจากรูดขึ้นจากข้างล่าง เป็นสไลด์ออกมาจากฝั่งขวาแทน เพื่อเข้ากับทรงหน้าจอแนวนอน */
         transform: translateX(100%) !important; 
         transition: transform 0.3s ease-in-out !important;
         border-radius: 16px 0 0 0 !important;
@@ -314,12 +449,10 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
         border-top: none !important;
     }
 
-    /* สถานะสไลด์ออกมาฝั่งขวาเมื่อสั่งเปิด */
     .ai-sidebar.active, .ai-sidebar.open, .ai-sidebar.show {
         transform: translateX(0) !important;
     }
 
-    /* จัดการไส้ในกล่องแชทแนวนอนให้กระชับ ไม่เบียดกันจนทะลัก */
     .ai-sidebar-body {
         padding: 10px !important;
         display: flex !important;
@@ -336,10 +469,14 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
         margin-bottom: 2px !important;
     }
 
-    /* กล่องแชทขยายเต็มที่ ยืดหยุ่นตามพื้นที่จริง */
     .ai-chat-box {
         flex: 1 !important;
         min-height: 100px !important; 
         max-height: none !important;
+    }
+    
+    /* หลบป๊อปอัพขึ้นสูงขึ้นอีกนิดตอนจอแคบแนวนอน */
+    .media-popup {
+        bottom: 55px;
     }
 }

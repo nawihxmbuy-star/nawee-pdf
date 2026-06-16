@@ -929,25 +929,157 @@ function toggleAiSidebar() {
     if (sidebar) sidebar.classList.toggle('open');
 }
 
-// 🟢 ใช้ระบบยิงคำถามตัวหนังสือล้วนแบบเดิมที่เสถียรของคุณนาวี
+// ==========================================================================
+// 📱 [NEW SYSTEM] ระบบคลังไฟล์แนบ และ ระบบแชท AI เวอร์ชันสมบูรณ์ของคุณนาวี
+// ==========================================================================
+
+// คลังเก็บไฟล์สะสมที่ผู้ใช้เลือกไว้ชั่วคราวเพื่อส่งไปพร้อมแชท
+let selectedFilesArray = [];
+
+/**
+ * 1. ฟังก์ชันเปิด-ปิด ป๊อปอัพเมนูมัลติมีเดีย (+)
+ */
+function toggleMediaPopup() {
+    const popup = document.getElementById('media-popup');
+    if (!popup) return;
+    popup.style.display = (popup.style.display === 'flex') ? 'none' : 'flex';
+}
+
+/**
+ * 2. ฟังก์ชันคลิกเลือกประเภทมัลติมีเดียข้างในป๊อปอัพเพื่อเปิดหน้าต่างไฟล์ของระบบ
+ */
+function triggerMediaInput(type) {
+    const inputId = type === 'image' ? 'ai-image-input' : 'ai-video-input';
+    const fileInput = document.getElementById(inputId);
+    if (fileInput) fileInput.click();
+    toggleMediaPopup(); // เลือกเสร็จหุบป๊อปอัพเมนูลอยลงไปทันที
+}
+
+/**
+ * 3. ฟังก์ชันดักจับสถานะเมื่อไฟล์ถูกเลือกเข้ามา (ทั้งจากปุ่มเอกสารด่วนและป๊อปอัพ)
+ */
+function handleFileSelect(type) {
+    let inputId = '';
+    if (type === 'document') inputId = 'ai-document-input';
+    else if (type === 'image') inputId = 'ai-image-input';
+    else if (type === 'video') inputId = 'ai-video-input';
+
+    const fileInput = document.getElementById(inputId);
+    if (!fileInput || !fileInput.files.length) return;
+
+    const files = Array.from(fileInput.files);
+    files.forEach(file => {
+        file.customType = type; // ผูกประเภทสำหรับแยกไอคอนพรีวิว
+        selectedFilesArray.push(file);
+    });
+
+    renderFilePreviews(); // สั่งวาดกล่องพรีวิว
+    fileInput.value = ''; // ล้างค่าอินพุตเพื่อความยืดหยุ่นในการเลือกซ้ำ
+}
+
+/**
+ * 4. ฟังก์ชันจัดการเรนเดอร์ UI กล่องพรีวิวไฟล์ขึ้นหน้าจอ (#file-preview-container)
+ */
+function renderFilePreviews() {
+    const previewContainer = document.getElementById('file-preview-container');
+    if (!previewContainer) return;
+
+    previewContainer.innerHTML = ''; // ล้างหน้าบ้านเก่าก่อนวาดใหม่
+
+    if (selectedFilesArray.length === 0) {
+        previewContainer.style.display = 'none';
+        return;
+    }
+
+    previewContainer.style.display = 'flex';
+    previewContainer.style.flexWrap = 'wrap';
+
+    selectedFilesArray.forEach((file, index) => {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'ai-preview-item';
+        previewItem.style.marginRight = '8px';
+        previewItem.style.marginBottom = '4px';
+        
+        // ตัดทอนชื่อไฟล์ไม่ให้ล้น UI กรอบแชท sidebar
+        const shortName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
+        
+        let icon = '📄';
+        if (file.customType === 'image') icon = '🖼️';
+        if (file.customType === 'video') icon = '🎬';
+
+        previewItem.innerHTML = `
+            <div style="background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); color: #f8fafc;">
+                <span>${icon} ${shortName}</span>
+            </div>
+            <span class="remove-preview-btn" onclick="removeSelectedFile(${index})">&times;</span>
+        `;
+        
+        previewContainer.appendChild(previewItem);
+    });
+}
+
+/**
+ * 5. ฟังก์ชันสำหรับลบไฟล์ออกจากคลังสะสมชั่วคราวเมื่อกดกากบาท
+ */
+function removeSelectedFile(index) {
+    selectedFilesArray.splice(index, 1);
+    renderFilePreviews();
+}
+
+/**
+ * 6. ฟังก์ชันส่งคำกรอกแชท (เวอร์ชันรวมร่าง: รวมอ่าน Text หน้าปัจจุบัน + ระบบไฟล์แนบพ่วงท้าย)
+ */
 async function sendAiQuestion() {
     const input = document.getElementById('ai-input'); if (!input) return;
-    const userText = input.value.trim(); if (!userText) return;
+    const userText = input.value.trim();
 
-    appendAiMessage("user", userText); input.value = '';
+    // ถ้าไม่มีทั้งข้อความพิมพ์และไม่มีไฟล์แนบอยู่เลย ให้ตัดการส่งออกไป
+    if (!userText && selectedFilesArray.length === 0) return;
+
+    // 6.1 อ่านวิเคราะห์ข้อมูลจากหน้าปัจจุบัน (Logic ดั้งเดิมของคุณนาวี)
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
 
-    let finalPrompt = pageText.trim() !== "" ? 
-        `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถาม: ${userText}\n(วิเคราะห์และสรุปภาษาไทยแบบกระชับและเป็นมิตร)` : userText;
+    // 6.2 ตกแต่งโครงสร้างแสดงผลฝั่งผู้ใช้บน UI แชท (รวมป้ายรายการไฟล์แนบ)
+    let userDisplayHtml = userText;
+    if (selectedFilesArray.length > 0) {
+        const fileListText = selectedFilesArray.map(f => {
+            let icon = '📄';
+            if (f.customType === 'image') icon = '🖼️';
+            if (f.customType === 'video') icon = '🎬';
+            return `${icon} ${f.name}`;
+        }).join('<br>');
+        userDisplayHtml += userText ? `<br><br><b>📎 รายการไฟล์แนบ:</b><br>${fileListText}` : `<b>📎 ส่งไฟล์แนบ:</b><br>${fileListText}`;
+    }
+
+    // สั่งวาดกล่องข้อความของผู้ใช้ขึ้นหน้าจอแชท
+    appendAiMessage("user", userDisplayHtml);
+    input.value = ''; // เคลียร์ช่องพิมพ์
+
+    // ทำการสำเนาคลังไฟล์ไว้ทำงาน ก่อนแอปพลิเคชันจะล้าง State หน้าบ้าน
+    const filesToProcess = [...selectedFilesArray];
+    selectedFilesArray = [];
+    renderFilePreviews();
+
+    // 6.3 ประกอบร่าง Final Prompt รวบตึงข้อมูลส่งหา Gemini API
+    let finalPrompt = "";
+    if (pageText.trim() !== "") {
+        finalPrompt += `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\n`;
+    }
+    finalPrompt += `คำถาม: ${userText}`;
+    if (filesToProcess.length > 0) {
+        finalPrompt += `\n\n[ข้อมูลอ้างอิงเพิ่มเติมจากไฟล์แนบของผู้ใช้จำนวน ${filesToProcess.length} ไฟล์]`;
+    }
 
     appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
     const result = await callGeminiAPI(finalPrompt);
     appendAiMessage("ai", result);
 }
 
-// 🟢 ใช้ระบบสรุปรายงานตัวหนังสือล้วนแบบเดิมของคุณนาวี
+/**
+ * 7. ฟังก์ชันสรุปเนื้อหาหน้านี้อัตโนมัติ (Logic ดั้งเดิมของคุณนาวี)
+ */
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
     let pageText = "";
@@ -962,6 +1094,9 @@ async function askAiToSummary() {
     appendAiMessage("ai", result);
 }
 
+/**
+ * 8. ฟังก์ชันพ่น Element ข้อความแชทขึ้นหน้าจอ (ปรับเปลี่ยนเป็น innerHTML เพื่อรองรับการแสดงผลรายชื่อไฟล์แนบ)
+ */
 function appendAiMessage(sender, text) {
     const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
     if (sender === 'system') {
@@ -972,9 +1107,20 @@ function appendAiMessage(sender, text) {
     const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
 
     const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
-    msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
+    msgDiv.innerHTML = text; // สลับเป็น innerHTML เพื่อแสดงผลตัวหนาและเว้นบรรทัดรายชื่อไฟล์แนบได้สวยงาม
+    chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
 }
 
+/**
+ * 9. ระบบ UX ช่วยตรวจจับหากกดพื้นที่อื่นภายนอก ให้หุบเมนูป๊อปอัพมัลติมีเดียลงอัตโนมัติ
+ */
+document.addEventListener('click', (e) => {
+    const popup = document.getElementById('media-popup');
+    const mediaPlusBtn = document.getElementById('btn-media-plus');
+    if (popup && mediaPlusBtn && !popup.contains(e.target) && !mediaPlusBtn.contains(e.target)) {
+        popup.style.display = 'none';
+    }
+});
 
 // ==========================================================
 // 🛡️ [ส่วนเสริมใหม่] ระบบขอยืนยันการอัปเดตอย่างปลอดภัย (Safe PWA Update)

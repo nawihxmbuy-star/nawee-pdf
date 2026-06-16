@@ -15,6 +15,111 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        .ai-sidebar-footer {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px;
+            background: #1e293b;
+            position: relative;
+        }
+        .ai-sidebar-footer #ai-input {
+            flex: 1;
+        }
+        .ai-chat-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        .btn-attach-doc {
+            background: rgba(255, 255, 255, 0.05);
+            color: #94a3b8;
+        }
+        .btn-attach-doc:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #f1f5f9;
+        }
+        .btn-media-plus {
+            background: #22d3ee;
+            color: #0f172a;
+            font-size: 20px;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .btn-media-plus:hover {
+            background: #06b6d4;
+            transform: scale(1.05);
+        }
+        .media-popup {
+            position: absolute;
+            bottom: 55px;
+            left: 10px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            padding: 6px;
+            z-index: 1000;
+            min-width: 155px;
+            animation: popSlideUp 0.15s ease-out;
+        }
+        @keyframes popSlideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .media-popup button {
+            background: transparent;
+            color: #e2e8f0;
+            border: none;
+            padding: 8px 12px;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.15s;
+            width: 100%;
+        }
+        .media-popup button:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #22d3ee;
+        }
+        .ai-preview-item {
+            position: relative;
+            display: inline-block;
+        }
+        .ai-preview-item .remove-preview-btn {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: bold;
+            border: 1px solid #1e293b;
+        }
+    </style>
 </head>
 <body class="mode-pdf"> 
     <header class="top-bar">
@@ -157,7 +262,25 @@
                 <div class="ai-message system-msg">สวัสดีค่ะคุณนาวี! ให้หนูช่วยสรุปรายงาน วิเคราะห์ตาราง หรือแปลความหมายข้อมูลในหน้าเอกสารปัจจุบัน พิมพ์บอกได้เลยนะคะ 📝</div>
             </div>
         </div>
+
+        <div id="file-preview-container" style="padding: 8px 12px; display: flex; gap: 10px; background: rgba(15, 23, 42, 0.6); border-top: 1px solid rgba(255,255,255,0.05); display: none;"></div>
+
         <div class="ai-sidebar-footer">
+            <input type="file" id="ai-document-input" accept=".pdf, .txt, .csv, .doc, .docx" style="display: none;" onchange="handleFileSelect('document')">
+            <button type="button" class="ai-chat-btn btn-attach-doc" onclick="document.getElementById('ai-document-input').click()" title="แนบไฟล์เอกสาร"><i class="fa-solid fa-paperclip"></i></button>
+
+            <div class="media-menu-container" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-media-plus" class="ai-chat-btn btn-media-plus" onclick="toggleMediaPopup()" title="เพิ่มรูปภาพหรือวิดีโอ">+</button>
+                
+                <div id="media-popup" class="media-popup" style="display: none;">
+                    <button type="button" onclick="triggerMediaInput('image')"><i class="fa-solid fa-image" style="color: #38bdf8;"></i> อัปโหลดรูปภาพ</button>
+                    <button type="button" onclick="triggerMediaInput('video')"><i class="fa-solid fa-video" style="color: #c084fc;"></i> อัปโหลดวิดีโอ</button>
+                </div>
+            </div>
+
+            <input type="file" id="ai-image-input" accept="image/*" style="display: none;" onchange="handleFileSelect('image')">
+            <input type="file" id="ai-video-input" accept="video/*" style="display: none;" onchange="handleFileSelect('video')">
+
             <input type="text" id="ai-input" placeholder="พิมพ์ถาม AI เกี่ยวกับเอกสารนี้..." onkeydown="if(event.key === 'Enter') sendAiQuestion()">
             <button onclick="sendAiQuestion()" title="ส่งคำสั่ง"><i class="fa-solid fa-paper-plane"></i></button>
         </div>
