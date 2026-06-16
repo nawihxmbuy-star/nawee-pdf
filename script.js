@@ -890,12 +890,11 @@ function createDraggableTextNode(e) {
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
 // 🚀 ซ่อมแซมระบบเรียกใช้งาน Gemini API (อัปเดตเป็นโมเดล gemini-3.5-flash ฟรีล่าสุด)
-async function callGeminiAPI(promptText) {
+async function callGeminiAPI(promptText) { // 🟢 แก้ไข Async เป็น async เรียบร้อยค่ะ
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
-    // 🎯 ปรับเส้นทาง URL ให้เรียกใช้โมเดลรุ่น 3.5 Flash ตามที่คุณนาวีต้องการเรียบร้อยครับ
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${API_KEY}`;
     
     try {
@@ -905,7 +904,6 @@ async function callGeminiAPI(promptText) {
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         });
 
-        // ดักเช็กกรณีเกิด Error จากฝั่ง Google Server เช่น คีย์ผิด หรือโมเดลผิด
         if (!response.ok) {
             const errorData = await response.json();
             return `❌ API ตอบกลับผิดพลาด: ${errorData.error?.message || response.statusText}`;
@@ -913,7 +911,6 @@ async function callGeminiAPI(promptText) {
 
         const data = await response.json();
         
-        // ตรวจสอบโครงสร้างก่อนแกะเอาข้อความไปใช้งาน
         if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
             return data.candidates[0].content.parts[0].text;
         } else {
@@ -935,7 +932,7 @@ async function sendAiQuestion() {
     const userText = input.value.trim(); if (!userText) return;
 
     appendAiMessage("user", userText); input.value = '';
-    saveChatToLocalStorage(); // บันทึกสเตจฝั่ง User ทันทีกันหลุดหน้าจอ
+    saveChatToLocalStorage(); 
     
     let pageText = "";
     const activePage = getActivePageWrapper();
@@ -943,36 +940,33 @@ async function sendAiQuestion() {
 
     appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์ข้อมูลและรูปภาพหน้าจอให้คุณนาวีค่ะ...");
 
-    // 📸 ดึงข้อมูลภาพหน้าจอ
     const base64Screen = await captureActivePageBase64();
 
     let currentTurnParts = [];
     if (base64Screen) {
         currentTurnParts.push({
-            inlineData: { mimeType: "image/jpeg", data: base64Screen } // ✨ แก้ไขคีย์เป็น CamelCase ตามมาตรฐาน Google API
+            inlineData: { mimeType: "image/jpeg", data: base64Screen } 
         });
     }
 
     let finalPrompt = pageText.trim() !== "" ? 
-        `ข้อมูลตัวหนังสือที่อ่านได้จากเอกสารหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถามเพิ่มเติมจากผู้ใช้: ${userText}\n(คำแนะนำสำหรับ AI: จงดูภาพถ่ายหน้าจอประกอบควบคู่กับตัวหนังสือ เพื่อตรวจสอบตาราง รูปวาดเขียน ไฮไลต์ หรือจุดที่ผู้ใช้วงไว้ แล้วอธิบายเป็นภาษาไทยอย่างกระชับและเป็นมิตร)` : userText;
+        `ข้อมูลตัวหนังสือที่อ่านได้จากเอกสารหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถามเพิ่มเติมจากผู้ใช้: ${userText}\n(คำแนะนำสำหรับ AI: จงดูภาพถ่ายหน้าจอประกอบควบคู่กับตัวหนังสือ เพื่อตรวจสอบตาราง รูปวาดเขียน ไฮไลต์ หรือจุดที่ผู้ใชวงไว้ แล้วอธิบายเป็นภาษาไทยอย่างกระชับและเป็นมิตร)` : userText;
 
     currentTurnParts.push({ text: finalPrompt });
 
-    // บันทึกลงคลังประวัติคุยต่อเนื่อง
     geminiChatHistory.push({ role: "user", parts: currentTurnParts });
 
-    // ✨ [Payload Optimizer] เคลียร์ข้อมูลรูปภาพในรอบเก่าๆ ออก ป้องกันข้อมูลแชทบวมจนเกิดข้อผิดพลาด 413
+    // 🛡️ เสริมเกราะดักป้องกันประวัติแชทพังล้มเหลวขณะลูป .map
     const cleanedHistory = geminiChatHistory.map((msg, index) => ({
         role: msg.role,
-        parts: msg.parts.map(part => {
+        parts: Array.isArray(msg.parts) ? msg.parts.map(part => {
             if (part.inlineData && index !== geminiChatHistory.length - 1) {
                 return { text: "[ภาพถ่ายหน้าจอก่อนหน้านี้ได้รับการบันทึกในความจำหลักแล้ว]" };
             }
             return part;
-        })
+        }) : []
     }));
 
-    // สร้างกล่องแชต AI เปล่ารอรับการพิมพ์ตอบไล่ระดับ (Streaming)
     const aiMessageDiv = createStreamingAiMessageElement();
 
     await streamGeminiPayload(cleanedHistory, 
@@ -997,7 +991,6 @@ async function sendAiQuestion() {
     );
 }
 
-// 📊 ฟังก์ชันวิเคราะห์สรุปรายงานอัจฉริยะ (Multimodal Report Analytics)
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
     saveChatToLocalStorage();
@@ -1013,7 +1006,7 @@ async function askAiToSummary() {
     let currentTurnParts = [];
     if (base64Screen) {
         currentTurnParts.push({
-            inlineData: { mimeType: "image/jpeg", data: base64Screen } // ✨ แก้ไขคีย์เป็น CamelCase ตามมาตรฐาน Google API
+            inlineData: { mimeType: "image/jpeg", data: base64Screen } 
         });
     }
 
@@ -1022,15 +1015,15 @@ async function askAiToSummary() {
 
     geminiChatHistory.push({ role: "user", parts: currentTurnParts });
 
-    // ✨ [Payload Optimizer] เคลียร์ข้อมูลรูปภาพเก่าในการสรุปรายงานด้วยเช่นกัน
+    // 🛡️ เสริมเกราะดักป้องกันจุดแชทพังสำหรับการสรุปรายงานด้วยค่ะ
     const cleanedHistory = geminiChatHistory.map((msg, index) => ({
         role: msg.role,
-        parts: msg.parts.map(part => {
+        parts: Array.isArray(msg.parts) ? msg.parts.map(part => {
             if (part.inlineData && index !== geminiChatHistory.length - 1) {
                 return { text: "[ภาพถ่ายหน้าจอก่อนหน้านี้ได้รับการบันทึกในความจำหลักแล้ว]" };
             }
             return part;
-        })
+        }) : []
     }));
 
     const aiMessageDiv = createStreamingAiMessageElement();
@@ -1057,7 +1050,6 @@ async function askAiToSummary() {
     );
 }
 
-// สร้างกล่องข้อความ AI เปล่าสำหรับฉีดข้อมูล Streaming
 function createStreamingAiMessageElement() {
     const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return null;
     const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
@@ -1083,15 +1075,9 @@ function appendAiMessage(sender, text) {
     msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-
-// ==========================================================
-// 🛡️ [NEW v2.5] ระบบตรวจจับและขอยืนยันการอัปเดตอย่างปลอดภัย (Safe PWA Update)
-// ==========================================================
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js')
     .then(reg => {
-        
-        // ฟังก์ชันขึ้นกล่องแจ้งเตือนถามคุณนาวีก่อนเปลี่ยนเวอร์ชัน เพื่อสกัดกั้นงานหายกลางคัน
         function promptUserToUpdate(waitingWorker) {
             const userAccepted = confirm(
                 "✨ [Nawee Studio] พบการอัปเดตระบบเวอร์ชันใหม่ล่าสุด!\n\n" +
@@ -1099,24 +1085,17 @@ if ('serviceWorker' in navigator) {
                 "--------------------------------------------------\n" +
                 "⚠️ หากคุณกำลังติดงานพิมพ์ วาดแบบ หรือทำงานค้างอยู่ ให้กด 'ยกเลิก (Cancel)' เพื่อเซฟงานก่อนได้ค่ะ ระบบจะไม่รีโหลดจนกว่าคุณจะพร้อม"
             );
-
             if (userAccepted) {
-                // อนุมัติรหัสผ่านลับให้ Service Worker ก้าวข้ามสเตจ Waiting ไปรีบูตระบบได้ทันที
                 waitingWorker.postMessage({ type: 'SKIP_WAITING' });
             }
         }
-
-        // กรณีที่ 1: ตรวจพบไฟล์อัปเดตดาวน์โหลดมารอก่อนหน้าแล้วในเครื่อง
         if (reg.waiting) {
             promptUserToUpdate(reg.waiting);
         }
-
-        // กรณีที่ 2: ระบบตรวจจับเจออัปเดตใหม่ระหว่างกำลังเปิดหน้างานทิ้งไว้
         reg.onupdatefound = () => {
             const installingWorker = reg.installing;
             if (installingWorker) {
                 installingWorker.onstatechange = () => {
-                    // เมื่อไฟล์เวอร์ชันใหม่ทั้งหมดถูกดาวน์โหลดและจัดสรรสเปซเสร็จสิ้นค้างไว้ที่แท่นจ่อคิว
                     if (installingWorker.state === 'installed') {
                         if (navigator.serviceWorker.controller) {
                             promptUserToUpdate(installingWorker);
@@ -1125,10 +1104,8 @@ if ('serviceWorker' in navigator) {
                 };
             }
         };
-
     }).catch(err => console.error("Service Worker Registration Failed:", err));
 
-    // ผูกกระบวนการรีเฟรชหน้าจอ: จะเริ่มโหลดแอปใหม่ก้าวไปเวอร์ชันถัดไปก็ต่อเมื่อกดยอมรับ 'ตกลง' เท่านั้นค่ะ
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!refreshing) {
@@ -1137,12 +1114,8 @@ if ('serviceWorker' in navigator) {
         }
     });
 }
-// ==========================================================================
-// 🎨 [แก้ไขสมบูรณ์] โมดูลจัดการปุ่มสีด่วน + ซ่อมแซมระบบ AI + ซ่อนแป้นพิมพ์มือถือ
-// วางแทนที่โค้ดจานสีด่วนอันเดิมที่ท้ายสุดของไฟล์ script.js ได้เลยครับ
-// ==========================================================================
+
 (function() {
-    // 🛠️ ฟังก์ชันภายในสำหรับแปลงสี RGB เป็น HEX ป้องกันระบบสคริปต์หลักเอเรอร์
     function safeRgbToHex(rgb) {
         if (!rgb) return '#22d3ee';
         if (rgb.startsWith('#')) return rgb;
@@ -1155,7 +1128,6 @@ if ('serviceWorker' in navigator) {
     }
 
     function initQuickColorPalette() {
-        // 1. ระบบสีด่วนสำหรับ ปากกาวาดเขียน
         const penDots = document.querySelectorAll('.pen-palette-dot');
         const penColorPicker = document.getElementById('color-picker');
         
@@ -1183,17 +1155,15 @@ if ('serviceWorker' in navigator) {
             });
         });
 
-        // 2. ระบบสีด่วนสำหรับ ข้อความลอย (แก้ไขปัญหาแป้นพิมพ์เด้งกวนใจ)
         const textDots = document.querySelectorAll('.text-palette-dot');
         const mainTextColorPicker = document.getElementById('text-color-picker');
         const floatingTextColorPicker = document.getElementById('floating-text-color');
         
         textDots.forEach(dot => {
             dot.addEventListener('click', function(e) {
-                e.preventDefault();  /* 🛑 เบรกคำสั่งดั้งเดิม ไม่ให้เกิดการโฟกัสซ้ำ */
+                e.preventDefault();  
                 e.stopPropagation();
                 
-                // 📱 สั่งซ่อนแป้นพิมพ์มือถือทันที โดยล้างโฟกัสออกจากทุกอิลิเมนต์
                 if (document.activeElement && typeof document.activeElement.blur === 'function') {
                     document.activeElement.blur();
                 }
@@ -1217,11 +1187,10 @@ if ('serviceWorker' in navigator) {
                     floatingTextColorPicker.dispatchEvent(new Event('input', { bubbles: true }));
                 }
 
-                // เปลี่ยนสีข้อความ Active Node ทันที และสั่งตัดโฟกัสป้องกันคีย์บอร์ดเด้ง
                 if (typeof activeDraggableNode !== 'undefined' && activeDraggableNode) {
                     activeDraggableNode.style.color = hexColor;
                     activeDraggableNode.style.borderColor = hexColor;
-                    activeDraggableNode.blur(); /* 📱 ล็อกย้ำอีกครั้งเพื่อความชัวร์ */
+                    activeDraggableNode.blur(); 
                     
                     if (typeof saveDrawingState === 'function') {
                         saveDrawingState();
