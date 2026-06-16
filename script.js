@@ -889,27 +889,121 @@ function createDraggableTextNode(e) {
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
-/**
- * ==========================================================================
- * 🤖 [MULTIMODAL UPGRADE] ระบบแชท AI เวอร์ชันตาดี + เจนภาพได้จริงของคุณนาวี
- * ==========================================================================
- */
+// ==========================================================================
+// 🤖 [COMPLETE SYSTEM] ระบบผู้ช่วย AI (Gemini 2.5 Flash) และระบบจัดการไฟล์แนบ
+// ==========================================================================
 
 /**
- * A1. อัปเกรดตัวเชื่อมโยงโมเดลให้รองรับชิ้นส่วนรูปภาพ (inlineData) และเปลี่ยนค่ายเป็น 1.5 Flash
+ * 1. ฟังก์ชันเปิด-ปิด แถบผู้ช่วย AI Sidebar (ซ่อมแซมจุดที่หลุดหาย)
+ */
+function toggleAiSidebar() {
+    const sidebar = document.getElementById('ai-sidebar');
+    if (sidebar) sidebar.classList.toggle('open');
+}
+
+// คลังเก็บไฟล์สะสมที่ผู้ใช้เลือกไว้ชั่วคราวเพื่อส่งไปพร้อมแชท
+let selectedFilesArray = [];
+
+/**
+ * 2. ฟังก์ชันเปิด-ปิด ป๊อปอัพเมนูมัลติมีเดีย (+)
+ */
+function toggleMediaPopup() {
+    const popup = document.getElementById('media-popup');
+    if (!popup) return;
+    popup.style.display = (popup.style.display === 'flex') ? 'none' : 'flex';
+}
+
+/**
+ * 3. ฟังก์ชันคลิกเลือกประเภทมัลติมีเดียข้างในป๊อปอัพเพื่อเปิดหน้าต่างไฟล์ของระบบ
+ */
+function triggerMediaInput(type) {
+    const inputId = type === 'image' ? 'ai-image-input' : 'ai-video-input';
+    const fileInput = document.getElementById(inputId);
+    if (fileInput) fileInput.click();
+    toggleMediaPopup();
+}
+
+/**
+ * 4. ฟังก์ชันดักจับสถานะเมื่อไฟล์ถูกเลือกเข้ามา (ทั้งจากปุ่มเอกสารด่วนและป๊อปอัพ)
+ */
+function handleFileSelect(type) {
+    let inputId = '';
+    if (type === 'document') inputId = 'ai-document-input';
+    else if (type === 'image') inputId = 'ai-image-input';
+    else if (type === 'video') inputId = 'ai-video-input';
+
+    const fileInput = document.getElementById(inputId);
+    if (!fileInput || !fileInput.files.length) return;
+
+    const files = Array.from(fileInput.files);
+    files.forEach(file => {
+        file.customType = type;
+        selectedFilesArray.push(file);
+    });
+
+    renderFilePreviews();
+    fileInput.value = '';
+}
+
+/**
+ * 5. ฟังก์ชันจัดการเรนเดอร์ UI กล่องพรีวิวไฟล์ขึ้นหน้าจอ (#file-preview-container)
+ */
+function renderFilePreviews() {
+    const previewContainer = document.getElementById('file-preview-container');
+    if (!previewContainer) return;
+
+    previewContainer.innerHTML = '';
+
+    if (selectedFilesArray.length === 0) {
+        previewContainer.style.display = 'none';
+        return;
+    }
+
+    previewContainer.style.display = 'flex';
+    previewContainer.style.flexWrap = 'wrap';
+
+    selectedFilesArray.forEach((file, index) => {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'ai-preview-item';
+        previewItem.style.marginRight = '8px';
+        previewItem.style.marginBottom = '4px';
+        
+        const shortName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
+        
+        let icon = '📄';
+        if (file.customType === 'image') icon = '🖼️';
+        if (file.customType === 'video') icon = '🎬';
+
+        previewItem.innerHTML = `
+            <div style="background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); color: #f8fafc;">
+                <span>${icon} ${shortName}</span>
+            </div>
+            <span class="remove-preview-btn" onclick="removeSelectedFile(${index})">&times;</span>
+        `;
+        
+        previewContainer.appendChild(previewItem);
+    });
+}
+
+/**
+ * 6. ฟังก์ชันสำหรับลบไฟล์ออกจากคลังสะสมชั่วคราวเมื่อกดกากบาท
+ */
+function removeSelectedFile(index) {
+    selectedFilesArray.splice(index, 1);
+    renderFilePreviews();
+}
+
+/**
+ * 7. ฟังก์ชันเชื่อมต่อ Gemini API (เวอร์ชันมัลติโมดอลรองรับดวงตา AI - มุ่งตรงไปที่รุ่น 2.5 Flash)
  */
 async function callGeminiAPI(promptText, imageParts = []) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
-    // 🚀 อัปเกรดไปใช้รุ่นมัลติโมดอลเพื่อเปิดตาให้ AI มองเห็นรูปภาพได้จริง
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-    
-    // ตั้งต้นชิ้นส่วนข้อมูลตัวแรกเป็นข้อความพิมพ์
     const parts = [{ text: promptText }];
     
-    // หากมีรูปภาพแนบมาด้วย ให้แพ็กโครงสร้างภาพยัดใส่เข้าไปในดวงตา AI ทันที
     imageParts.forEach(img => {
         parts.push({
             inlineData: {
@@ -932,28 +1026,23 @@ async function callGeminiAPI(promptText, imageParts = []) {
 }
 
 /**
- * A2. ปรับปรุงระบบส่งคำถามให้แปลงไฟล์ภาพเป็น Base64 และดักจับคำสั่งวาดรูปขึ้นจอแชท
+ * 8. ฟังก์ชันส่งคำกรอกแชท (อ่าน Text หน้าปัจจุบัน + ระบบวิเคราะห์ไฟล์แนบภาพ + ฟีเจอร์วาดรูป)
  */
 async function sendAiQuestion() {
     const input = document.getElementById('ai-input'); if (!input) return;
     const userText = input.value.trim();
 
-    // หากช่องพิมพ์ว่างและคลังไม่มีไฟล์แนบอยู่เลย ให้ระงับการส่งออก
     if (!userText && selectedFilesArray.length === 0) return;
 
-    // ------------------------------------------------------------------
-    // 🎨 [SPECIAL FEATURE] ระบบดักจับคำสั่งเพื่อวาดภาพขึ้นจอแชททันที
-    // ------------------------------------------------------------------
+    // ระบบดักจับคำสั่งเพื่อเจนภาพทันทีด้วย Pollinations AI
     if (userText.startsWith("วาดรูป") || userText.startsWith("สร้างภาพ")) {
         appendAiMessage("user", userText);
-        input.value = ''; // เคลียร์ช่องพิมพ์ทันที
+        input.value = '';
         appendAiMessage("system", "🎨 กำลังจินตนาการลายเส้นและวาดภาพให้คุณนาวีสักครู่นะคะ...");
         
-        // ตัดคำว่า วาดรูป/สร้างภาพ ออกเพื่อนำคีย์เวิร์ดเพียวๆ ไปสั่งเจนภาพ
         const promptKeyword = userText.replace(/วาดรูป|สร้างภาพ/g, "").trim();
         const cleanPrompt = encodeURIComponent(promptKeyword || "beautiful futuristic digital art");
         
-        // สั่งสร้างภาพผ่านโครงข่ายจินตนาการความเร็วสูง (Pollinations AI) พร้อมติดระบบสุ่ม Seed ไม่ให้ภาพซ้ำ
         setTimeout(() => {
             const randomSeed = Math.floor(Math.random() * 99999);
             const generatedImageUrl = `https://image.pollinations.ai/p/${cleanPrompt}?width=600&height=600&seed=${randomSeed}&enhance=true`;
@@ -967,18 +1056,15 @@ async function sendAiQuestion() {
             appendAiMessage("ai", imageTemplate);
         }, 1800);
 
-        // ล้างตระกร้าพรีวิวไฟล์แนบค้างคา (ถ้ามี)
         selectedFilesArray = [];
         renderFilePreviews();
         return; 
     }
 
-    // อ่านดึงเนื้อหา Text จากหน้าเอกสารปัจจุบัน (Logic ดั้งเดิมของคุณนาวี)
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
 
-    // จัดฟอร์แมตเพื่อวาดรายการป้ายชื่อไฟล์แนบขึ้นโชว์บน UI แชทฝั่งผู้ใช้
     let userDisplayHtml = userText;
     if (selectedFilesArray.length > 0) {
         const fileListText = selectedFilesArray.map(f => {
@@ -991,25 +1077,20 @@ async function sendAiQuestion() {
     }
 
     appendAiMessage("user", userDisplayHtml);
-    input.value = ''; // เคลียร์ช่องแชท
+    input.value = '';
 
-    // สำเนารายการไฟล์ในคลังออกมาก่อนจะถูกรีเซ็ตเคลียร์หน้าบ้าน
     const filesToProcess = [...selectedFilesArray];
     selectedFilesArray = [];
     renderFilePreviews();
 
-    // ------------------------------------------------------------------
-    // 🖼️ [MULTIMODAL CORE] ทำการแปลงไฟล์รูปภาพเป็น Base64 เพื่อยิงเข้า API จริง
-    // ------------------------------------------------------------------
     const imageParts = [];
-    
     for (let file of filesToProcess) {
         if (file.customType === 'image') {
             try {
                 const base64Data = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.readAsDataURL(file);
-                    reader.onload = () => resolve(reader.result.split(',')[1]); // ตัดหัวเดอร์ล้างข้อมูลเหลือแต่รหัสภาพเพียวๆ
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
                     reader.onerror = error => reject(error);
                 });
                 imageParts.push({ mimeType: file.type, base64: base64Data });
@@ -1019,14 +1100,12 @@ async function sendAiQuestion() {
         }
     }
 
-    // ประกอบโจทย์หลักรวบตึงข้อมูลส่งไปหาโมเดล
     let finalPrompt = "";
     if (pageText.trim() !== "") {
         finalPrompt += `ข้อมูลธรรมดาจากหน้าชีตปัจจุบัน:\n"""\n${pageText}\n"""\n`;
     }
     finalPrompt += `คำสั่งหรือคำถามของผู้ใช้: ${userText}`;
     
-    // บันทึกรายงานกรณีมีไฟล์ประเภทอื่นที่บอทยังอ่านพิกเซลดิบตรงๆ ไม่ได้พ่วงไปด้วย
     const nonImages = filesToProcess.filter(f => f.customType !== 'image');
     if (nonImages.length > 0) {
         finalPrompt += `\n\n[หมายเหตุระบบ: มีไฟล์แนบประเภทอื่นพ่วงมาด้วยจำนวน ${nonImages.length} ไฟล์ ซึ่ง AI รับรู้ชื่อเรียบร้อยแล้ว]`;
@@ -1034,16 +1113,30 @@ async function sendAiQuestion() {
 
     appendAiMessage("system", "⚡ กำลังประมวลผลวิเคราะห์ข้อความและภาพถ่ายให้คุณนาวีค่ะ...");
     
-    // เรียกใช้งาน API ตัวอัปเกรดมัลติโมดอล
     const aiResult = await callGeminiAPI(finalPrompt, imageParts);
-    
-    // เสริมระบบแปลงรูปแบบอักษร Markdown รูปภาพเผื่อกรณีบอทตอบกลับมาเป็นลิงก์ภาพ ให้กลายเป็นแท็ก <img> เสมอ
     const formattedResult = aiResult.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%; border-radius:8px; margin-top:8px;">');
     appendAiMessage("ai", formattedResult);
 }
 
 /**
- * A3. ฟังก์ชันพ่นข้อความแชทและคงไว้ซึ่งความสามารถในการเรนเดอร์โครงสร้าง HTML/แท็กรูปภาพอย่างปลอดภัย
+ * 9. ฟังก์ชันสรุปเนื้อหาหน้านี้อัตโนมัติ (Logic ดั้งเดิมของคุณนาวี)
+ */
+async function askAiToSummary() {
+    appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
+    let pageText = "";
+    const activePage = getActivePageWrapper();
+    if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
+    
+    if(!pageText.trim()) { appendAiMessage("ai", "❌ หน้านี้ไม่มีข้อความธรรมดาให้ดึงไปวิเคราะห์ค่ะ"); return; }
+    
+    appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
+    const prompt = `จงสรุปสาระสำคัญ ตัวเลข หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้อง:\n"""\n${pageText}\n"""`;
+    const result = await callGeminiAPI(prompt, []);
+    appendAiMessage("ai", result);
+}
+
+/**
+ * 10. ฟังก์ชันพ่นข้อความแชทและคงไว้ซึ่งความสามารถในการเรนเดอร์โครงสร้าง HTML/แท็กรูปภาพอย่างปลอดภัย
  */
 function appendAiMessage(sender, text) {
     const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
@@ -1055,12 +1148,12 @@ function appendAiMessage(sender, text) {
     const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
 
     const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
-    msgDiv.innerHTML = text; // ใช้ innerHTML เพื่อให้ระบบสามารถวาดรูป <img> ที่ตอบกลับมาจากคำสั่งสร้างภาพได้
+    msgDiv.innerHTML = text;
     chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 /**
- * 9. ระบบ UX ช่วยตรวจจับหากกดพื้นที่อื่นภายนอก ให้หุบเมนูป๊อปอัพมัลติมีเดียลงอัตโนมัติ
+ * 11. ระบบ UX ช่วยตรวจจับหากกดพื้นที่อื่นภายนอก ให้หุบเมนูป๊อปอัพมัลติมีเดียลงอัตโนมัติ
  */
 document.addEventListener('click', (e) => {
     const popup = document.getElementById('media-popup');
