@@ -6,9 +6,6 @@ if (pdfjsLib) {
     console.error("ไม่สามารถเชื่อมต่อไลบรารี PDF.js ได้ กรุณาตรวจสอบลิงก์ Script ในหน้า HTML นะคะ");
 }
 
-// ==========================================================================
-// 🌍 ตัวแปรส่วนกลางของระบบ (Global Variables)
-// ==========================================================================
 let currentScale = 1.0;
 let currentTool = 'pan'; 
 let currentActiveColor = "#22d3ee"; 
@@ -29,12 +26,12 @@ let appTitle = null;
 let activeDraggableNode = null; 
 let eraserShape = 'circle';
 
-// คลังเก็บไฟล์สะสมที่ผู้ใช้เลือกไว้ชั่วคราวเพื่อส่งไปพร้อมแชท AI
-let selectedFilesArray = [];
+// ตัวแปรเก็บสถานะไฟล์แนบสำหรับกล่องแชท AI
+let currentAttachedImage = null;
+let currentAttachedVideo = null;
+let currentAttachedDoc = null;
+let currentAttachedDocName = "";
 
-// ==========================================================================
-// 🛠️ ฟังก์ชันเครื่องมือทั่วไป (Utility Functions)
-// ==========================================================================
 function rgbToHex(rgb) {
     if (!rgb || !rgb.startsWith('rgb')) return rgb;
     const rgbValues = rgb.match(/\d+/g);
@@ -59,7 +56,6 @@ function showNotification(msg) {
 }
 window.alert = function(msg) { showNotification(msg); };
 
-// ระบบพรีวิววงกลมยางลบใต้เมาส์
 const eraserCursor = document.createElement('div');
 eraserCursor.id = 'eraser-cursor-preview';
 document.body.appendChild(eraserCursor);
@@ -84,9 +80,6 @@ function toggleEraserShape() {
     showNotification("เปลี่ยนรูปทรงยางลบเป็น: " + (eraserShape === 'circle' ? 'วงกลม ⭕' : 'สี่เหลี่ยม 🔲'));
 }
 
-// ==========================================================================
-// 🔤 ระบบจัดการกล่องข้อความลอยอิสระ (Text Node Management)
-// ==========================================================================
 function selectTextNode(node) {
     clearActiveDraggableNode();
     activeDraggableNode = node;
@@ -162,9 +155,6 @@ function deselectTextNode() {
     closeTextSheet();
 }
 
-// ==========================================================================
-// 📥 ตัวดักจับเหตุการณ์หลักเมื่อโหลดหน้า UI (Main DOM Content Loaded)
-// ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
     container = document.getElementById('pdf-container');
     workspace = document.querySelector('.workspace');
@@ -232,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // คลิกเลือกจุดจานสีด่วนฝั่ง ปากกา
     document.querySelectorAll('.pen-palette-dot').forEach(dot => {
         dot.addEventListener('click', (e) => {
             const pickedColor = e.target.getAttribute('data-color');
@@ -246,7 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // คลิกเลือกจุดจานสีด่วนฝั่ง ข้อความลอย
     document.querySelectorAll('.text-palette-dot').forEach(dot => {
         dot.addEventListener('click', (e) => {
             const pickedColor = e.target.getAttribute('data-color');
@@ -269,12 +257,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.dropdown-wrapper')) closeAllPopups();
+        if (!e.target.closest('.media-menu-container')) {
+            const popup = document.getElementById('media-popup');
+            if (popup) popup.style.display = 'none';
+        }
         if (!e.target.closest('.custom-draggable-text-node') && !e.target.closest('#text-settings-panel') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('.word-formatting-bar') && !e.target.closest('#text-node-bottom-bar')) {
             clearActiveDraggableNode();
         }
     });
 
-    // ระบบตรวจจับการซูมด้วยนิ้วสัมผัสบนมือถือ (Pinch to Zoom)
     if (workspace) {
         workspace.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
@@ -306,9 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ==========================================================================
-// 💾 ระบบฐานข้อมูลภายในเครื่อง (IndexedDB Storage)
-// ==========================================================================
 const DB_NAME = "NaweeStudio_Database_V2";
 const STORE_NAME = "DocumentStore";
 
@@ -351,9 +339,6 @@ async function saveToDatabase() {
     }
 }
 
-// ==========================================================================
-// 🔄 ระบบแปลงโหมดและส่งออกไฟล์ (Modes & File Export)
-// ==========================================================================
 function switchFileMode(mode) {
     currentFileMode = mode;
     currentScale = 1.0; 
@@ -409,6 +394,7 @@ async function exportToPDFFile() {
     
     const originalScale = currentScale;
     const element = document.getElementById('pdf-container');
+    
     const originalScrollTop = workspace ? workspace.scrollTop : 0;
     const originalScrollLeft = workspace ? workspace.scrollLeft : 0;
     
@@ -436,8 +422,30 @@ async function exportToPDFFile() {
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; width: ${pdfWidth}px !important; min-width: ${pdfWidth}px !important; max-width: ${pdfWidth}px !important; transform: none !important; }
-        .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; width: ${pdfWidth}px !important; min-width: ${pdfWidth}px !important; max-width: ${pdfWidth}px !important; height: ${pdfHeight}px !important; position: relative !important; }
+        #pdf-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            gap: 0 !important; 
+            display: block !important; 
+            width: ${pdfWidth}px !important; 
+            min-width: ${pdfWidth}px !important; 
+            max-width: ${pdfWidth}px !important;
+            transform: none !important; 
+        }
+        .page-wrapper { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            border: none !important; 
+            box-shadow: none !important; 
+            display: block !important; 
+            page-break-inside: avoid !important; 
+            break-inside: avoid !important; 
+            width: ${pdfWidth}px !important; 
+            min-width: ${pdfWidth}px !important; 
+            max-width: ${pdfWidth}px !important;
+            height: ${pdfHeight}px !important; 
+            position: relative !important; 
+        }
         .text-overlay-layer { overflow: visible !important; position: absolute !important; }
         .pdf-page-canvas, .drawing-page-canvas { width: 100% !important; height: 100% !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
@@ -468,6 +476,7 @@ async function shareToLine() {
     closeAllPopups(); if (!pdfDoc) { alert("ไม่พบเอกสารในการแชร์ค่ะ!"); return; }
     const originalScale = currentScale; 
     const element = document.getElementById('pdf-container');
+    
     const originalScrollTop = workspace ? workspace.scrollTop : 0;
     const originalScrollLeft = workspace ? workspace.scrollLeft : 0;
     
@@ -495,8 +504,30 @@ async function shareToLine() {
 
     const styleTag = document.createElement('style');
     styleTag.innerHTML = `
-        #pdf-container { padding: 0 !important; margin: 0 !important; gap: 0 !important; display: block !important; width: ${pdfWidth}px !important; min-width: ${pdfWidth}px !important; max-width: ${pdfWidth}px !important; transform: none !important; }
-        .page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; display: block !important; page-break-inside: avoid !important; break-inside: avoid !important; width: ${pdfWidth}px !important; min-width: ${pdfWidth}px !important; max-width: ${pdfWidth}px !important; height: ${pdfHeight}px !important; position: relative !important; }
+        #pdf-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            gap: 0 !important; 
+            display: block !important; 
+            width: ${pdfWidth}px !important; 
+            min-width: ${pdfWidth}px !important; 
+            max-width: ${pdfWidth}px !important;
+            transform: none !important; 
+        }
+        .page-wrapper { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            border: none !important; 
+            box-shadow: none !important; 
+            display: block !important; 
+            page-break-inside: avoid !important; 
+            break-inside: avoid !important; 
+            width: ${pdfWidth}px !important; 
+            min-width: ${pdfWidth}px !important; 
+            max-width: ${pdfWidth}px !important;
+            height: ${pdfHeight}px !important; 
+            position: relative !important; 
+        }
         .text-overlay-layer { overflow: visible !important; position: absolute !important; }
         .pdf-page-canvas, .drawing-page-canvas { width: 100% !important; height: 100% !important; }
         .custom-draggable-text-node { border: none !important; background: transparent !important; }
@@ -542,6 +573,7 @@ function formatWord(command, value = null) {
         }
         return; 
     }
+    
     if (currentFileMode === 'word') {
         document.execCommand(command, false, value);
     }
@@ -571,14 +603,27 @@ function toggleDropdown(menuId) {
 }
 function closeAllPopups() { document.querySelectorAll('.dropdown-popup').forEach(m => m.classList.remove('show')); }
 
+// ฟังก์ชันเปิด-ปิด กล่องเมนูแนบไฟล์รูปภาพ/วิดีโอด้านล่างสุด
+function toggleMediaPopup() {
+    const popup = document.getElementById('media-popup');
+    if (popup) {
+        popup.style.display = popup.style.display === 'none' ? 'flex' : 'none';
+    }
+}
+
+function triggerMediaInput(type) {
+    const popup = document.getElementById('media-popup');
+    if (popup) popup.style.display = 'none';
+    
+    if (type === 'image') document.getElementById('ai-image-input').click();
+    if (type === 'video') document.getElementById('ai-video-input').click();
+}
+
 function updateBrushPreview() {
     const preview = document.getElementById('brush-preview');
     if (preview) { preview.style.width = currentBrushSize + 'px'; preview.style.height = currentBrushSize + 'px'; preview.style.backgroundColor = currentActiveColor; }
 }
 
-// ==========================================================================
-// 📄 ระบบดึงข้อมูล เรนเดอร์ และวาดเขียนเอกสาร (PDF Render & Drawing Engine)
-// ==========================================================================
 async function handleFileOpen(e) {
     try {
         const file = e.target.files[0]; if (!file) return;
@@ -826,8 +871,10 @@ function createDraggableTextNode(e) {
         if (parent) {
             const halfWidth = node.offsetWidth / 2;
             const halfHeight = node.offsetHeight / 2;
+            
             if (targetLeft < halfWidth) targetLeft = halfWidth; 
             if (targetLeft > parent.offsetWidth - halfWidth) targetLeft = parent.offsetWidth - halfWidth; 
+            
             if (targetTop < halfHeight) targetTop = halfHeight; 
             if (targetTop > parent.offsetHeight - halfHeight) targetTop = parent.offsetHeight - halfHeight; 
         }
@@ -863,128 +910,115 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ==========================================================================
-// 🤖 [COMPLETE SYSTEM] ระบบผู้ช่วย AI (Gemini 2.5 Flash มัลติโมดอล + เจนภาพ)
-// ==========================================================================
-
-/**
- * 1. ฟังก์ชันเปิด-ปิด แถบผู้ช่วย AI Sidebar
- */
-function toggleAiSidebar() {
-    const sidebar = document.getElementById('ai-sidebar');
-    if (sidebar) sidebar.classList.toggle('open');
-}
-
-/**
- * 2. ฟังก์ชันเปิด-ปิด ป๊อปอัพเมนูมัลติมีเดีย (+)
- */
-function toggleMediaPopup() {
-    const popup = document.getElementById('media-popup');
-    if (!popup) return;
-    popup.style.display = (popup.style.display === 'flex') ? 'none' : 'flex';
-}
-
-/**
- * 3. ฟังก์ชันคลิกเลือกประเภทมัลติมีเดียข้างในป๊อปอัพเพื่อเปิดหน้าต่างไฟล์ของระบบ
- */
-function triggerMediaInput(type) {
-    const inputId = type === 'image' ? 'ai-image-input' : 'ai-video-input';
-    const fileInput = document.getElementById(inputId);
-    if (fileInput) fileInput.click();
-    toggleMediaPopup();
-}
-
-/**
- * 4. ฟังก์ชันดักจับสถานะเมื่อไฟล์ถูกเลือกเข้ามา (ทั้งจากปุ่มเอกสารด่วนและป๊อปอัพ)
- */
+// ฟังก์ชันดึงไฟล์แนบเข้ามาเตรียมส่ง
 function handleFileSelect(type) {
-    let inputId = '';
-    if (type === 'document') inputId = 'ai-document-input';
-    else if (type === 'image') inputId = 'ai-image-input';
-    else if (type === 'video') inputId = 'ai-video-input';
-
-    const fileInput = document.getElementById(inputId);
-    if (!fileInput || !fileInput.files.length) return;
-
-    const files = Array.from(fileInput.files);
-    files.forEach(file => {
-        file.customType = type;
-        selectedFilesArray.push(file);
-    });
-
-    renderFilePreviews();
-    fileInput.value = '';
-}
-
-/**
- * 5. ฟังก์ชันจัดการเรนเดอร์ UI กล่องพรีวิวไฟล์ขึ้นหน้าจอ (#file-preview-container)
- */
-function renderFilePreviews() {
     const previewContainer = document.getElementById('file-preview-container');
     if (!previewContainer) return;
 
-    previewContainer.innerHTML = '';
-
-    if (selectedFilesArray.length === 0) {
-        previewContainer.style.display = 'none';
-        return;
+    if (type === 'image') {
+        const input = document.getElementById('ai-image-input');
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentAttachedImage = e.target.result;
+                currentAttachedVideo = null;
+                currentAttachedDoc = null;
+                renderFilePreview('image', currentAttachedImage);
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    } else if (type === 'video') {
+        const input = document.getElementById('ai-video-input');
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentAttachedVideo = e.target.result;
+                currentAttachedImage = null;
+                currentAttachedDoc = null;
+                renderFilePreview('video', input.files[0].name);
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    } else if (type === 'document') {
+        const input = document.getElementById('ai-document-input');
+        if (input.files && input.files[0]) {
+            currentAttachedDocName = input.files[0].name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentAttachedDoc = e.target.result;
+                currentAttachedImage = null;
+                currentAttachedVideo = null;
+                renderFilePreview('document', currentAttachedDocName);
+            };
+            reader.readAsText(input.files[0]);
+        }
     }
+}
 
+function renderFilePreview(type, dataOrName) {
+    const previewContainer = document.getElementById('file-preview-container');
     previewContainer.style.display = 'flex';
-    previewContainer.style.flexWrap = 'wrap';
-
-    selectedFilesArray.forEach((file, index) => {
-        const previewItem = document.createElement('div');
-        previewItem.className = 'ai-preview-item';
-        previewItem.style.marginRight = '8px';
-        previewItem.style.marginBottom = '4px';
-        
-        const shortName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
-        
-        let icon = '📄';
-        if (file.customType === 'image') icon = '🖼️';
-        if (file.customType === 'video') icon = '🎬';
-
-        previewItem.innerHTML = `
-            <div style="background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); color: #f8fafc;">
-                <span>${icon} ${shortName}</span>
+    if (type === 'image') {
+        previewContainer.innerHTML = `
+            <div class="ai-preview-item">
+                <img src="${dataOrName}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);">
+                <div class="remove-preview-btn" onclick="clearAttachedFile()">×</div>
             </div>
-            <span class="remove-preview-btn" onclick="removeSelectedFile(${index})">&times;</span>
         `;
-        
-        previewContainer.appendChild(previewItem);
-    });
+    } else if (type === 'video') {
+        previewContainer.innerHTML = `
+            <div class="ai-preview-item" style="color: #fff; font-size: 11px; background: rgba(255,255,255,0.08); padding: 6px 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1);">
+                <i class="fa-solid fa-video" style="color: #c084fc;"></i> <span style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${dataOrName}</span>
+                <div class="remove-preview-btn" onclick="clearAttachedFile()">×</div>
+            </div>
+        `;
+    } else if (type === 'document') {
+        previewContainer.innerHTML = `
+            <div class="ai-preview-item" style="color: #fff; font-size: 11px; background: rgba(255,255,255,0.08); padding: 6px 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1);">
+                <i class="fa-solid fa-file-lines" style="color: #94a3b8;"></i> <span style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${dataOrName}</span>
+                <div class="remove-preview-btn" onclick="clearAttachedFile()">×</div>
+            </div>
+        `;
+    }
 }
 
-/**
- * 6. ฟังก์ชันสำหรับลบไฟล์ออกจากคลังสะสมชั่วคราวเมื่อกดกากบาท
- */
-function removeSelectedFile(index) {
-    selectedFilesArray.splice(index, 1);
-    renderFilePreviews();
+function clearAttachedFile() {
+    currentAttachedImage = null;
+    currentAttachedVideo = null;
+    currentAttachedDoc = null;
+    currentAttachedDocName = "";
+    document.getElementById('ai-image-input').value = "";
+    document.getElementById('ai-video-input').value = "";
+    document.getElementById('ai-document-input').value = "";
+    const previewContainer = document.getElementById('file-preview-container');
+    if (previewContainer) {
+        previewContainer.style.display = 'none';
+        previewContainer.innerHTML = '';
+    }
 }
 
-/**
- * 7. ฟังก์ชันเชื่อมต่อ Gemini API (เวอร์ชันมัลติโมดอลรองรับดวงตา AI - มุ่งตรงไปที่รุ่น 2.5 Flash)
- */
-async function callGeminiAPI(promptText, imageParts = []) {
+// อัปเกรดฟังก์ชันเชื่อมต่อ Gemini API 2.5 Flash เพื่อความเสถียรและรองรับ Multimodal (ส่งภาพวิเคราะห์ได้จริง)
+async function callGeminiAPI(promptText, base64Image = null) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-    const parts = [{ text: promptText }];
-    
-    imageParts.forEach(img => {
-        parts.push({
-            inlineData: {
-                mimeType: img.mimeType,
-                data: img.base64
-            }
-        });
-    });
-
     try {
+        const parts = [{ text: promptText }];
+        
+        // ตรวจสอบและประกบโครงสร้าง Base64 Image ให้กับ Gemini API
+        if (base64Image && base64Image.includes(',')) {
+            const mimeType = base64Image.substring(base64Image.indexOf(":") + 1, base64Image.indexOf(";"));
+            const base64Data = base64Image.substring(base64Image.indexOf(",") + 1);
+            parts.push({
+                inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                }
+            });
+        }
+
         const response = await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: parts }] })
@@ -992,107 +1026,62 @@ async function callGeminiAPI(promptText, imageParts = []) {
         const data = await response.json();
         return data.candidates[0].content.parts[0].text;
     } catch (e) {
-        return "❌ คีย์เชื่อมต่อไม่ถูกต้อง หรือเน็ตเวิร์กขัดข้องชั่วคราวค่ะ";
+        return "❌ คีย์เชื่อมต่อไม่ถูกต้อง คีย์หมดอายุ หรือเน็ตเวิร์กขัดข้องชั่วคราวค่ะ";
     }
 }
 
-/**
- * 8. ฟังก์ชันส่งคำกรอกแชท (อ่าน Text หน้าปัจจุบัน + ระบบวิเคราะห์ไฟล์แนบภาพ + ฟีเจอร์วาดรูป)
- */
+function toggleAiSidebar() {
+    const sidebar = document.getElementById('ai-sidebar');
+    if (sidebar) sidebar.classList.toggle('open');
+}
+
 async function sendAiQuestion() {
     const input = document.getElementById('ai-input'); if (!input) return;
-    const userText = input.value.trim();
+    const userText = input.value.trim(); 
+    
+    // หากไม่มีทั้งข้อความพิมพ์และไม่มีไฟล์ใดๆ แนบเลย ให้ยกเลิกการส่ง
+    if (!userText && !currentAttachedImage && !currentAttachedVideo && !currentAttachedDoc) return;
 
-    if (!userText && selectedFilesArray.length === 0) return;
-
-    // 🎨 ระบบดักจับคำสั่งเพื่อเจนภาพทันทีด้วย Pollinations AI
-    if (userText.startsWith("วาดรูป") || userText.startsWith("สร้างภาพ")) {
-        appendAiMessage("user", userText);
-        input.value = '';
-        appendAiMessage("system", "🎨 กำลังจินตนาการลายเส้นและวาดภาพให้คุณนาวีสักครู่นะคะ...");
-        
-        const promptKeyword = userText.replace(/วาดรูป|สร้างภาพ/g, "").trim();
-        const cleanPrompt = encodeURIComponent(promptKeyword || "beautiful futuristic digital art");
-        
-        setTimeout(() => {
-            const randomSeed = Math.floor(Math.random() * 99999);
-            const generatedImageUrl = `https://image.pollinations.ai/p/${cleanPrompt}?width=600&height=600&seed=${randomSeed}&enhance=true`;
-            
-            const imageTemplate = `
-                <div style="margin-top: 8px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-width: 100%;">
-                    <img src="${generatedImageUrl}" alt="AI Generated Image" style="width: 100%; display: block; object-fit: cover;">
-                </div>
-                <p style="margin-top: 8px; color: #22d3ee; font-weight: 500;">✨ หนูวาดรูป "${promptKeyword || 'ภาพศิลปะดิจิทัล'}" เสร็จเรียบร้อยแล้วค่ะคุณนาวี!</p>
-            `;
-            appendAiMessage("ai", imageTemplate);
-        }, 1800);
-
-        selectedFilesArray = [];
-        renderFilePreviews();
-        return; 
+    // เรนเดอร์สิ่งที่คุณนาวีแนบลงในกล่องข้อความฝั่งผู้ใช้ตามประเภทจริง
+    if (currentAttachedImage) {
+        appendAiMessage("user", currentAttachedImage, "image");
+    }
+    if (currentAttachedVideo) {
+        appendAiMessage("user", currentAttachedVideo, "video");
+    }
+    if (currentAttachedDoc) {
+        appendAiMessage("user", `📎 ไฟล์แนบ: ${currentAttachedDocName}`, "text");
+    }
+    if (userText) {
+        appendAiMessage("user", userText, "text");
     }
 
+    input.value = '';
+
+    // อ่านข้อความบนแผ่นเอกสารชีทสเปซปัจจุบันมาทำคลังบริบท
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
 
-    let userDisplayHtml = userText;
-    if (selectedFilesArray.length > 0) {
-        const fileListText = selectedFilesArray.map(f => {
-            let icon = '📄';
-            if (f.customType === 'image') icon = '🖼️';
-            if (f.customType === 'video') icon = '🎬';
-            return `${icon} ${f.name}`;
-        }).join('<br>');
-        userDisplayHtml += userText ? `<br><br><b>📎 รายการไฟล์แนบ:</b><br>${fileListText}` : `<b>📎 ส่งไฟล์แนบ:</b><br>${fileListText}`;
-    }
-
-    appendAiMessage("user", userDisplayHtml);
-    input.value = '';
-
-    const filesToProcess = [...selectedFilesArray];
-    selectedFilesArray = [];
-    renderFilePreviews();
-
-    // แปลงไฟล์ภาพถ่ายเป็น Base64
-    const imageParts = [];
-    for (let file of filesToProcess) {
-        if (file.customType === 'image') {
-            try {
-                const base64Data = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = () => resolve(reader.result.split(',')[1]);
-                    reader.onerror = error => reject(error);
-                });
-                imageParts.push({ mimeType: file.type, base64: base64Data });
-            } catch (err) {
-                console.error("ผิดพลาดในการแปลงไฟล์ภาพ:", err);
-            }
-        }
-    }
-
     let finalPrompt = "";
     if (pageText.trim() !== "") {
-        finalPrompt += `ข้อมูลธรรมดาจากหน้าชีตปัจจุบัน:\n"""\n${pageText}\n"""\n`;
+        finalPrompt += `บริบทข้อความภายในเอกสารหลักปัจจุบัน:\n"""\n${pageText}\n"""\n`;
     }
-    finalPrompt += `คำสั่งหรือคำถามของผู้ใช้: ${userText}`;
+    if (currentAttachedDoc) {
+        finalPrompt += `บริบทข้อความจากไฟล์แนบเสริม (${currentAttachedDocName}):\n"""\n${currentAttachedDoc}\n"""\n`;
+    }
     
-    const nonImages = filesToProcess.filter(f => f.customType !== 'image');
-    if (nonImages.length > 0) {
-        finalPrompt += `\n\n[หมายเหตุระบบ: มีไฟล์แนบประเภทอื่นพ่วงมาด้วยจำนวน ${nonImages.length} ไฟล์ ซึ่ง AI รับรู้ชื่อเรียบร้อยแล้ว]`;
-    }
+    finalPrompt += `คำสั่ง/คำถาม: ${userText || "โปรดช่วยวิเคราะห์รูปภาพหรือข้อมูลที่แนบไปนี้ให้ทีค่ะ"}\n\n(รบกวนวิเคราะห์และให้คำตอบสรุปเป็นภาษาไทยอย่างกระชับและเป็นมิตรด้วยนะคะ)`;
 
-    appendAiMessage("system", "⚡ กำลังประมวลผลวิเคราะห์ข้อความและภาพถ่ายให้คุณนาวีค่ะ...");
-    
-    const aiResult = await callGeminiAPI(finalPrompt, imageParts);
-    const formattedResult = aiResult.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%; border-radius:8px; margin-top:8px;">');
-    appendAiMessage("ai", formattedResult);
+    // ล็อคข้อมูลภาพไว้ส่ง แล้วเคลียร์ชุดพรีวิวทันทีตามมาตรฐาน UI แชททั่วไป
+    const imageToSend = currentAttachedImage;
+    clearAttachedFile();
+
+    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
+    const result = await callGeminiAPI(finalPrompt, imageToSend);
+    appendAiMessage("ai", result, "text");
 }
 
-/**
- * 9. ฟังก์ชันสรุปเนื้อหาหน้านี้อัตโนมัติ (Logic ดั้งเดิมของคุณนาวี)
- */
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
     let pageText = "";
@@ -1103,68 +1092,40 @@ async function askAiToSummary() {
     
     appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
     const prompt = `จงสรุปสาระสำคัญ ตัวเลข หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้อง:\n"""\n${pageText}\n"""`;
-    const result = await callGeminiAPI(prompt, []);
-    appendAiMessage("ai", result);
+    const result = await callGeminiAPI(prompt);
+    appendAiMessage("ai", result, "text");
 }
 
-/**
- * 10. ฟังก์ชันพ่นข้อความแชทขึ้นหน้าจอ (สลับเป็น innerHTML เพื่อรองรับการแสดงภาพและตัวหนา)
- */
-function appendAiMessage(sender, text) {
+// ปรับปรุงฟังก์ชันแสดงข้อความแชทหลัก ให้มีพารามิเตอร์ประเภทไฟล์ (type) รองรับทั้งภาพและวิดีโออย่างสมบูรณ์
+function appendAiMessage(sender, content, type = 'text') {
     const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
+    
     if (sender === 'system') {
         const tempMsg = document.createElement('div');
-        tempMsg.className = 'ai-message system-msg temp-status'; tempMsg.innerText = text;
+        tempMsg.className = 'ai-message system-msg temp-status'; tempMsg.innerText = content;
         chatBox.appendChild(tempMsg); chatBox.scrollTop = chatBox.scrollHeight; return;
     }
+    
     const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
 
     const msgDiv = document.createElement('div'); msgDiv.className = `ai-message ${sender}-msg`;
-    msgDiv.innerHTML = text;
-    chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-/**
- * 11. ระบบ UX ช่วยตรวจจับหากกดพื้นที่อื่นภายนอก ให้หุบเมนูป๊อปอัพมัลติมีเดียลงอัตโนมัติ
- */
-document.addEventListener('click', (e) => {
-    const popup = document.getElementById('media-popup');
-    const mediaPlusBtn = document.getElementById('btn-media-plus');
-    if (popup && mediaPlusBtn && !popup.contains(e.target) && !mediaPlusBtn.contains(e.target)) {
-        popup.style.display = 'none';
+    
+    // ตรวจสอบโครงสร้าง Content ในการ Render สื่อลง UI จริงๆ
+    if (type === 'image') {
+        const img = document.createElement('img');
+        img.src = content;
+        img.className = 'chat-media-render';
+        msgDiv.appendChild(img);
+    } else if (type === 'video') {
+        const video = document.createElement('video');
+        video.src = content;
+        video.className = 'chat-media-render';
+        video.controls = true;
+        msgDiv.appendChild(video);
+    } else {
+        msgDiv.innerText = content;
     }
-});
-/**
- * 12. ฟังก์ชันรีเซ็ตแอปพลิเคชันเพื่อเริ่มงานใหม่ (ซ่อมแซมปุ่ม งานใหม่ ใน HTML)
- */
-function resetApp() {
-    if (confirm("คุณนาวีต้องการล้างหน้าจอเพื่อเริ่มงานใหม่ใช่ไหมคะ? ข้อมูลวาดเขียนที่ไม่ได้เซฟจะสูญหายค่ะ")) {
-        pdfDoc = null;
-        currentScale = 1.0;
-        
-        // รีเซ็ตหน้ากระดาษกลับสู่หน้าต่างต้อนรับเริ่มต้น
-        const container = document.getElementById('pdf-container');
-        if (container) {
-            container.innerHTML = `
-                <div class="initial-notice">
-                    <p><i class="fa-solid fa-cloud-arrow-up" style="font-size: 48px; color: var(--accent-color); margin-bottom: 15px;"></i></p>
-                    <p>ยินดีต้อนรับสู่ระบบกรุณากดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มต้นทำงานค่ะ</p>
-                </div>
-            `;
-        }
-        
-        // รีเซ็ตล้างกล่องแชท AI คืนสู่สถานะเริ่มต้น
-        const chatBox = document.getElementById('ai-chat-box');
-        if (chatBox) {
-            chatBox.innerHTML = `<div class="ai-message system-msg">สวัสดีค่ะคุณนาวี! ให้หนูช่วยสรุปรายงาน วิเคราะห์ตาราง หรือแปลความหมายข้อมูลในหน้าเอกสารปัจจุบัน พิมพ์บอกได้เลยนะคะ 📝</div>`;
-        }
-        
-        // ล้างคลังไฟล์แนบตกค้าง
-        selectedFilesArray = [];
-        renderFilePreviews();
-        
-        // สลับโหมดกลับมาที่ PDF 
-        switchFileMode('pdf');
-        showNotification("🎨 รีเซ็ตสตูดิโอเริ่มงานใหม่เรียบร้อยแล้วค่ะ");
-    }
+    
+    chatBox.appendChild(msgDiv); 
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
