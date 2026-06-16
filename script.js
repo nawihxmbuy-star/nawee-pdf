@@ -897,7 +897,7 @@ async function callGeminiAPI(promptText) {
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
     // ใช้โมเดลตามโครงสร้างเดิมที่คุณนาวีแจ้งว่าใช้งานได้ปกติ
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${API_KEY}`;
     
     try {
         const response = await fetch(url, {
