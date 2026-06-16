@@ -890,11 +890,13 @@ function createDraggableTextNode(e) {
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
 // 🚀 ซ่อมแซมระบบเรียกใช้งาน Gemini API (อัปเดตเป็นโมเดล gemini-3.5-flash ฟรีล่าสุด)
-async function callGeminiAPI(promptText) { // 🟢 แก้ไข Async เป็น async เรียบร้อยค่ะ
+// 🟢 แก้ไขตัวพิมพ์เล็กตามมาตรฐานเพื่อความปลอดภัยสูงสุดค่ะ
+async function callGeminiAPI(promptText) {
     const keyInput = document.getElementById('ai-api-key');
     const API_KEY = keyInput ? keyInput.value.trim() : "";
     if(!API_KEY) return "❌ โปรดใส่ Gemini API Key ของคุณนาวีในแถบด้านบนก่อนเริ่มส่งคำสั่งนะคะ";
 
+    // ใช้โมเดลตามโครงสร้างเดิมที่คุณนาวีแจ้งว่าใช้งานได้ปกติ
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${API_KEY}`;
     
     try {
@@ -927,139 +929,37 @@ function toggleAiSidebar() {
     if (sidebar) sidebar.classList.toggle('open');
 }
 
+// 🟢 ใช้ระบบยิงคำถามตัวหนังสือล้วนแบบเดิมที่เสถียรของคุณนาวี
 async function sendAiQuestion() {
     const input = document.getElementById('ai-input'); if (!input) return;
     const userText = input.value.trim(); if (!userText) return;
 
     appendAiMessage("user", userText); input.value = '';
-    saveChatToLocalStorage(); 
-    
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
-
-    appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์ข้อมูลและรูปภาพหน้าจอให้คุณนาวีค่ะ...");
-
-    const base64Screen = await captureActivePageBase64();
-
-    let currentTurnParts = [];
-    if (base64Screen) {
-        currentTurnParts.push({
-            inlineData: { mimeType: "image/jpeg", data: base64Screen } 
-        });
-    }
 
     let finalPrompt = pageText.trim() !== "" ? 
-        `ข้อมูลตัวหนังสือที่อ่านได้จากเอกสารหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถามเพิ่มเติมจากผู้ใช้: ${userText}\n(คำแนะนำสำหรับ AI: จงดูภาพถ่ายหน้าจอประกอบควบคู่กับตัวหนังสือ เพื่อตรวจสอบตาราง รูปวาดเขียน ไฮไลต์ หรือจุดที่ผู้ใชวงไว้ แล้วอธิบายเป็นภาษาไทยอย่างกระชับและเป็นมิตร)` : userText;
+        `ข้อมูลจากหน้าปัจจุบัน:\n"""\n${pageText}\n"""\nคำถาม: ${userText}\n(วิเคราะห์และสรุปภาษาไทยแบบกระชับและเป็นมิตร)` : userText;
 
-    currentTurnParts.push({ text: finalPrompt });
-
-    geminiChatHistory.push({ role: "user", parts: currentTurnParts });
-
-    // 🛡️ เสริมเกราะดักป้องกันประวัติแชทพังล้มเหลวขณะลูป .map
-    const cleanedHistory = geminiChatHistory.map((msg, index) => ({
-        role: msg.role,
-        parts: Array.isArray(msg.parts) ? msg.parts.map(part => {
-            if (part.inlineData && index !== geminiChatHistory.length - 1) {
-                return { text: "[ภาพถ่ายหน้าจอก่อนหน้านี้ได้รับการบันทึกในความจำหลักแล้ว]" };
-            }
-            return part;
-        }) : []
-    }));
-
-    const aiMessageDiv = createStreamingAiMessageElement();
-
-    await streamGeminiPayload(cleanedHistory, 
-        (newChunk) => {
-            if (aiMessageDiv) {
-                aiMessageDiv.innerText += newChunk;
-                const chatBox = document.getElementById('ai-chat-box');
-                if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-                saveChatToLocalStorage(); 
-            }
-        },
-        (fullResponseText) => {
-            geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
-            saveChatToLocalStorage(); 
-        },
-        (errorMsg) => {
-            if (aiMessageDiv) {
-                aiMessageDiv.innerText = errorMsg;
-                saveChatToLocalStorage();
-            }
-        }
-    );
+    appendAiMessage("system", "⚡ กำลังคิดคำตอบให้คุณนาวีค่ะ...");
+    const result = await callGeminiAPI(finalPrompt);
+    appendAiMessage("ai", result);
 }
 
+// 🟢 ใช้ระบบสรุปรายงานตัวหนังสือล้วนแบบเดิมของคุณนาวี
 async function askAiToSummary() {
     appendAiMessage("user", "โปรดสรุปข้อมูลหน้านี้ให้ทีครับ");
-    saveChatToLocalStorage();
-    
     let pageText = "";
     const activePage = getActivePageWrapper();
     if (activePage) activePage.querySelectorAll('.word-text-node').forEach(node => pageText += node.innerText + " ");
     
-    appendAiMessage("system", "⚡ กำลังสแกนโครงสร้างหน้าจอรวมถึงรอยปากกาไฮไลต์เพื่อสรุปผลค่ะ...");
-
-    const base64Screen = await captureActivePageBase64();
-
-    let currentTurnParts = [];
-    if (base64Screen) {
-        currentTurnParts.push({
-            inlineData: { mimeType: "image/jpeg", data: base64Screen } 
-        });
-    }
-
-    const prompt = `จงสรุปสาระสำคัญ ตัวเลข ผลลัพธ์ หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้องสูงสุด หากบนหน้าจอมีโครงสร้างภาพ แผนภูมิ หรือรอยเขียนปากกา/ยางลบลบข้อความใดๆ ให้รวมองค์ประกอบภาพเหล่านั้นมาวิเคราะห์ร่วมด้วยอย่างมีหลักการ:\n"""\n${pageText}\n"""`;
-    currentTurnParts.push({ text: prompt });
-
-    geminiChatHistory.push({ role: "user", parts: currentTurnParts });
-
-    // 🛡️ เสริมเกราะดักป้องกันจุดแชทพังสำหรับการสรุปรายงานด้วยค่ะ
-    const cleanedHistory = geminiChatHistory.map((msg, index) => ({
-        role: msg.role,
-        parts: Array.isArray(msg.parts) ? msg.parts.map(part => {
-            if (part.inlineData && index !== geminiChatHistory.length - 1) {
-                return { text: "[ภาพถ่ายหน้าจอก่อนหน้านี้ได้รับการบันทึกในความจำหลักแล้ว]" };
-            }
-            return part;
-        }) : []
-    }));
-
-    const aiMessageDiv = createStreamingAiMessageElement();
-
-    await streamGeminiPayload(cleanedHistory, 
-        (newChunk) => {
-            if (aiMessageDiv) {
-                aiMessageDiv.innerText += newChunk;
-                const chatBox = document.getElementById('ai-chat-box');
-                if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-                saveChatToLocalStorage(); 
-            }
-        },
-        (fullResponseText) => {
-            geminiChatHistory.push({ role: "model", parts: [{ text: fullResponseText }] });
-            saveChatToLocalStorage(); 
-        },
-        (errorMsg) => {
-            if (aiMessageDiv) {
-                aiMessageDiv.innerText = errorMsg;
-                saveChatToLocalStorage();
-            }
-        }
-    );
-}
-
-function createStreamingAiMessageElement() {
-    const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return null;
-    const tempStatus = chatBox.querySelector('.temp-status'); if (tempStatus) tempStatus.remove();
-
-    const msgDiv = document.createElement('div'); 
-    msgDiv.className = `ai-message ai-msg`;
-    msgDiv.innerText = ""; 
-    chatBox.appendChild(msgDiv); 
-    chatBox.scrollTop = chatBox.scrollHeight;
-    return msgDiv;
+    if(!pageText.trim()) { appendAiMessage("ai", "❌ หน้านี้ไม่มีข้อความธรรมดาให้ดึงไปวิเคราะห์ค่ะ"); return; }
+    
+    appendAiMessage("system", "⚡ กำลังอ่านวิเคราะห์รายงานตารางหน้านี้ให้ค่ะ...");
+    const prompt = `จงสรุปสาระสำคัญ ตัวเลข หรือตารางข้อมูลจากรายงานหน้านี้อย่างเป็นขั้นเป็นตอนและถูกต้อง:\n"""\n${pageText}\n"""`;
+    const result = await callGeminiAPI(prompt);
+    appendAiMessage("ai", result);
 }
 
 function appendAiMessage(sender, text) {
@@ -1075,15 +975,19 @@ function appendAiMessage(sender, text) {
     msgDiv.innerText = text; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
 }
 
+
+// ==========================================================
+// 🛡️ [ส่วนเสริมใหม่] ระบบขอยืนยันการอัปเดตอย่างปลอดภัย (Safe PWA Update)
+// ==========================================================
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js')
     .then(reg => {
         function promptUserToUpdate(waitingWorker) {
             const userAccepted = confirm(
                 "✨ [Nawee Studio] พบการอัปเดตระบบเวอร์ชันใหม่ล่าสุด!\n\n" +
-                "คุณต้องการเปลี่ยนผ่านระบบและเริ่มหน้าแอปใหม่ตอนนี้เลยไหมคะ?\n" +
+                "คุณต้องการอัพเดทหรือไม่\n" +
                 "--------------------------------------------------\n" +
-                "⚠️ หากคุณกำลังติดงานพิมพ์ วาดแบบ หรือทำงานค้างอยู่ ให้กด 'ยกเลิก (Cancel)' เพื่อเซฟงานก่อนได้ค่ะ ระบบจะไม่รีโหลดจนกว่าคุณจะพร้อม"
+                "⚠️ หากคุณกำลังติดงานพิมพ์ วาดแบบ หรือทำงานค้างอยู่ ให้กด 'ยกเลิก (Cancel)' เพื่อเซฟงานก่อนได้ค่ะ"
             );
             if (userAccepted) {
                 waitingWorker.postMessage({ type: 'SKIP_WAITING' });
@@ -1115,6 +1019,10 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+
+// ==========================================================================
+// 🎨 [ส่วนเสริมใหม่] โมดูลจัดการปุ่มสีด่วน + ซ่อนแป้นพิมพ์มือถือขณะจิ้มเลือกสี
+// ==========================================================================
 (function() {
     function safeRgbToHex(rgb) {
         if (!rgb) return '#22d3ee';
