@@ -294,6 +294,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }, { passive: false });
+
+        // ยุบรวม Event คลิกพื้นที่พัฒนาข้อความสเปซเข้ามาที่นี่เพื่อความปลอดภัย
+        workspace.addEventListener('click', (e) => {
+            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('#text-node-bottom-bar')) {
+                createDraggableTextNode(e);
+            }
+        });
     }
 });
 
@@ -759,6 +766,15 @@ function clearCurrentDrawings() {
         showNotification("ล้างหน้าประวัติวาดเขียนแล้วค่ะ");
     }
 }
+function clearCurrentDrawings() {
+    const activePage = getActivePageWrapper(); if (!activePage) return;
+    const canvas = activePage.querySelector('.drawing-page-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const currentState = canvas.toDataURL(); canvas.undoStack.push(currentState); canvas.redoStack = [];
+        showNotification("ล้างหน้าประวัติวาดเขียนแล้วค่ะ");
+    }
+}
 
 function getActivePageWrapper() {
     const wrappers = document.querySelectorAll('.page-wrapper'); if (wrappers.length === 0) return null;
@@ -852,6 +868,12 @@ function createDraggableTextNode(e) {
         startTop = parseFloat(node.style.top) || 0;
         
         selectTextNode(node);
+
+        // แก้ไขเพิ่มประสิทธิภาพ: ผูก Event เมื่อเริ่มลากเท่านั้น
+        document.addEventListener('mousemove', dragMove); 
+        document.addEventListener('mouseup', dragEnd);
+        document.addEventListener('touchmove', dragMove, {passive: false}); 
+        document.addEventListener('touchend', dragEnd);
     }
 
     function dragMove(ev) {
@@ -867,31 +889,36 @@ function createDraggableTextNode(e) {
         let targetLeft = startLeft + deltaX;
         let targetTop = startTop + deltaY;
         
+        // ปรับปรุงลอจิกจำกัดขอบเขต (Boundary Limit) ให้ถูกต้องแม่นยำ
         const parent = node.parentElement; 
         if (parent) {
-            const halfWidth = node.offsetWidth / 2;
-            const halfHeight = node.offsetHeight / 2;
+            const nodeWidth = node.offsetWidth;
+            const nodeHeight = node.offsetHeight;
             
-            if (targetLeft < halfWidth) targetLeft = halfWidth; 
-            if (targetLeft > parent.offsetWidth - halfWidth) targetLeft = parent.offsetWidth - halfWidth; 
+            if (targetLeft < 0) targetLeft = 0; 
+            if (targetLeft > parent.offsetWidth - nodeWidth) targetLeft = parent.offsetWidth - nodeWidth; 
             
-            if (targetTop < halfHeight) targetTop = halfHeight; 
-            if (targetTop > parent.offsetHeight - halfHeight) targetTop = parent.offsetHeight - halfHeight; 
+            if (targetTop < 0) targetTop = 0; 
+            if (targetTop > parent.offsetHeight - nodeHeight) targetTop = parent.offsetHeight - nodeHeight; 
         }
         
         node.style.left = targetLeft + 'px'; 
         node.style.top = targetTop + 'px';
     }
 
-    function dragEnd() { isDraggingNode = false; }
+    // แก้ไขเพิ่มประสิทธิภาพ: ถอด Event ทันทีเมื่อปล่อยมือ
+    function dragEnd() { 
+        if (isDraggingNode) {
+            isDraggingNode = false; 
+            document.removeEventListener('mousemove', dragMove);
+            document.removeEventListener('mouseup', dragEnd);
+            document.removeEventListener('touchmove', dragMove);
+            document.removeEventListener('touchend', dragEnd);
+        }
+    }
 
     node.addEventListener('mousedown', dragStart); 
-    document.addEventListener('mousemove', dragMove); 
-    document.addEventListener('mouseup', dragEnd);
-    
     node.addEventListener('touchstart', dragStart, {passive: true}); 
-    document.addEventListener('touchmove', dragMove, {passive: false}); 
-    document.addEventListener('touchend', dragEnd);
 
     overlay.appendChild(node);
     
@@ -899,16 +926,6 @@ function createDraggableTextNode(e) {
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    if (workspace) {
-        workspace.addEventListener('click', (e) => {
-            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('#text-node-bottom-bar')) {
-                createDraggableTextNode(e);
-            }
-        });
-    }
-});
 
 // ฟังก์ชันดึงไฟล์แนบเข้ามาเตรียมส่ง
 function handleFileSelect(type) {
@@ -1096,7 +1113,7 @@ async function askAiToSummary() {
     appendAiMessage("ai", result, "text");
 }
 
-// ปรับปรุงฟังก์ชันแสดงข้อความแชทหลัก ให้มีพารามิเตอร์ประเภทไฟล์ (type) รองรับทั้งภาพและวิดีโออย่างสมบูรณ์
+// ปรับปรุงฟังก์ชันแสดงข้อความแชทหลัก ให้ทำงานได้สมบูรณ์ (นำวงเล็บปีกกาที่เกินออกแล้ว)
 function appendAiMessage(sender, content, type = 'text') {
     const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
     

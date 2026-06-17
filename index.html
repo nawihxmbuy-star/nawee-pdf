@@ -13,10 +13,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
+        /* ==========================================================================
+           AI SIDEBAR & CHAT INTERFACE UPDATES (FIX: Overlapping & Mobile Height)
+           ========================================================================== */
+        .ai-sidebar {
+            z-index: 10005 !important; /* ดันให้ลอยเหนือแถบเครื่องมือด้านล่าง (.toolbar มี 9999) */
+            height: 100dvh !important;  /* รองรับแถบ URL เบราเซอร์บนมือถือ ไม่ให้ดันแถบแชทตกจอ */
+            bottom: 0 !important;
+        }
+
         .ai-sidebar-footer {
             display: flex;
             align-items: center;
@@ -60,6 +68,12 @@
             background: #06b6d4;
             transform: scale(1.05);
         }
+        
+        /* Container และป๊อปอัปแนบสื่อ */
+        .media-menu-container {
+            position: relative; 
+            display: inline-block;
+        }
         .media-popup {
             position: absolute;
             bottom: 55px;
@@ -71,7 +85,7 @@
             display: flex;
             flex-direction: column;
             padding: 6px;
-            z-index: 1000;
+            z-index: 10010; /* เพิ่มให้อยู่เหนือเลเยอร์พื้นหลังของบาร์ข้าง */
             min-width: 155px;
             animation: popSlideUp 0.15s ease-out;
         }
@@ -98,6 +112,15 @@
             background: rgba(255, 255, 255, 0.05);
             color: #22d3ee;
         }
+        
+        /* พรีวิวไฟล์รอก่อนส่งเข้าแชท AI */
+        #file-preview-container {
+            padding: 8px 12px; 
+            display: flex; 
+            gap: 10px; 
+            background: rgba(15, 23, 42, 0.6); 
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
         .ai-preview-item {
             position: relative;
             display: inline-block;
@@ -118,6 +141,89 @@
             cursor: pointer;
             font-weight: bold;
             border: 1px solid #1e293b;
+        }
+
+        /* ==========================================================================
+           FLOATING TEXT NODE BOTTOM BAR CLEANUP (FIX: Inline Styles Removal)
+           ========================================================================== */
+        .text-node-floating-bar .floating-bar-content {
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px;
+        }
+        .text-node-floating-bar .floating-bar-header {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        .text-node-floating-bar .btn-confirm-node {
+            background: var(--accent-color); 
+            color: #0f172a; 
+            width: auto; 
+            padding: 6px 14px; 
+            font-size: 13px; 
+            font-weight: bold; 
+            gap: 4px; 
+            display: flex; 
+            align-items: center; 
+            border-radius: 10px; 
+            border: none; 
+            cursor: pointer;
+        }
+        .text-node-floating-bar .text-node-controls {
+            background: rgba(255, 255, 255, 0.02); 
+            padding: 10px; 
+            border-radius: 12px; 
+            width: 100%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 12px; 
+            flex-wrap: wrap;
+        }
+        .text-node-floating-bar #floating-text-color {
+            width: 34px; 
+            height: 34px; 
+            border: none; 
+            background: transparent; 
+            cursor: pointer; 
+            padding: 0; 
+            flex-shrink: 0;
+        }
+        .text-node-floating-bar .quick-color-palette-wrapper {
+            margin-right: 4px;
+        }
+        .text-node-floating-bar .bar-separator {
+            width: 1px; 
+            height: 30px; 
+            background: rgba(255, 255, 255, 0.15);
+        }
+        .text-node-floating-bar .btn-format-node {
+            background: rgba(255, 255, 255, 0.05); 
+            color: #fff; 
+            width: 36px; 
+            height: 36px; 
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+        }
+        .text-node-floating-bar .btn-size-node {
+            background: rgba(34, 211, 238, 0.1); 
+            color: var(--accent-color); 
+            width: 36px; 
+            height: 36px; 
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+        }
+        .text-node-floating-bar .btn-delete-node {
+            background: rgba(239, 68, 68, 0.1); 
+            color: #ef4444; 
+            width: 36px; 
+            height: 36px; 
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -263,13 +369,13 @@
             </div>
         </div>
 
-        <div id="file-preview-container" style="padding: 8px 12px; display: flex; gap: 10px; background: rgba(15, 23, 42, 0.6); border-top: 1px solid rgba(255,255,255,0.05); display: none;"></div>
+        <div id="file-preview-container" style="display: none;"></div>
 
         <div class="ai-sidebar-footer">
             <input type="file" id="ai-document-input" accept=".pdf, .txt, .csv, .doc, .docx" style="display: none;" onchange="handleFileSelect('document')">
             <button type="button" class="ai-chat-btn btn-attach-doc" onclick="document.getElementById('ai-document-input').click()" title="แนบไฟล์เอกสาร"><i class="fa-solid fa-paperclip"></i></button>
 
-            <div class="media-menu-container" style="position: relative; display: inline-block;">
+            <div class="media-menu-container">
                 <button type="button" id="btn-media-plus" class="ai-chat-btn btn-media-plus" onclick="toggleMediaPopup()" title="เพิ่มรูปภาพหรือวิดีโอ">+</button>
                 
                 <div id="media-popup" class="media-popup" style="display: none;">
@@ -287,17 +393,17 @@
     </div>
 
     <div id="text-node-bottom-bar" class="text-node-floating-bar">
-        <div class="floating-bar-content" style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="floating-bar-content">
+            <div class="floating-bar-header">
                 <span class="bar-title"><i class="fa-solid fa-font text-glow"></i> ปรับแต่งข้อความลอย</span>
-                <button onclick="closeTextSheet()" class="btn-confirm-node" style="background: var(--accent-color); color: #0f172a; width: auto; padding: 6px 14px; font-size: 13px; font-weight: bold; gap: 4px; display: flex; align-items: center; border-radius: 10px; border: none; cursor: pointer;">
+                <button onclick="closeTextSheet()" class="btn-confirm-node">
                     <i class="fa-solid fa-circle-check"></i> ยืนยันตำแหน่ง
                 </button>
             </div>
-            <div class="text-node-controls" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 12px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
-                <input type="color" id="floating-text-color" title="เปลี่ยนสีตัวอักษร" style="width: 34px; height: 34px; border: none; background: transparent; cursor: pointer; padding: 0; flex-shrink: 0;">
+            <div class="text-node-controls">
+                <input type="color" id="floating-text-color" title="เปลี่ยนสีตัวอักษร">
                 
-                <div class="quick-color-palette" style="margin-right: 4px;">
+                <div class="quick-color-palette-wrapper">
                     <div class="color-palette-dot text-palette-dot" data-color="#000000" style="background: #000000;" title="สีดำ"></div>
                     <div class="color-palette-dot text-palette-dot" data-color="#ff0000" style="background: #ff0000;" title="สีแดง"></div>
                     <div class="color-palette-dot text-palette-dot" data-color="#0000ff" style="background: #0000ff;" title="สีน้ำเงิน"></div>
@@ -305,15 +411,17 @@
                     <div class="color-palette-dot text-palette-dot" data-color="#ffff00" style="background: #ffff00;" title="สีเหลือง"></div>
                 </div>
 
-                <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.15);"></div>
-                <button onclick="formatWord('bold')" title="ตัวหนา" style="background: rgba(255,255,255,0.05); color: #fff; width: 36px; height: 36px; border-radius: 8px;"><i class="fa-solid fa-bold"></i></button>
-                <button onclick="formatWord('italic')" title="ตัวเอียง" style="background: rgba(255,255,255,0.05); color: #fff; width: 36px; height: 36px; border-radius: 8px;"><i class="fa-solid fa-italic"></i></button>
-                <button onclick="formatWord('underline')" title="ขีดเส้นใต้" style="background: rgba(255,255,255,0.05); color: #fff; width: 36px; height: 36px; border-radius: 8px;"><i class="fa-solid fa-underline"></i></button>
-                <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.15);"></div>
-                <button onclick="changeActiveNodeSize(2)" title="ขยายขนาดฟอนต์" style="background: rgba(34, 211, 238, 0.1); color: var(--accent-color); width: 36px; height: 36px; border-radius: 8px;"><i class="fa-solid fa-square-plus"></i></button>
-                <button onclick="changeActiveNodeSize(-2)" title="ย่อขนาดฟอนต์" style="background: rgba(34, 211, 238, 0.1); color: var(--accent-color); width: 36px; height: 36px; border-radius: 8px;"><i class="fa-solid fa-square-minus"></i></button>
-                <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.15);"></div>
-                <button onclick="deleteActiveTextNode()" class="btn-delete-node" title="ลบข้อความชิ้นนี้" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; width: 36px; height: 36px; border-radius: 8px;"><i class="fa-solid fa-trash-can"></i></button>
+                <div class="bar-separator"></div>
+                <button onclick="formatFloatingText('bold')" title="ตัวหนา" class="btn-format-node"><i class="fa-solid fa-bold"></i></button>
+                <button onclick="formatFloatingText('italic')" title="ตัวเอียง" class="btn-format-node"><i class="fa-solid fa-italic"></i></button>
+                <button onclick="formatFloatingText('underline')" title="ขีดเส้นใต้" class="btn-format-node"><i class="fa-solid fa-underline"></i></button>
+                
+                <div class="bar-separator"></div>
+                <button onclick="changeActiveNodeSize(2)" title="ขยายขนาดฟอนต์" class="btn-size-node"><i class="fa-solid fa-square-plus"></i></button>
+                <button onclick="changeActiveNodeSize(-2)" title="ย่อขนาดฟอนต์" class="btn-size-node"><i class="fa-solid fa-square-minus"></i></button>
+                
+                <div class="bar-separator"></div>
+                <button onclick="deleteActiveTextNode()" class="btn-delete-node" title="ลบข้อความชิ้นนี้"><i class="fa-solid fa-trash-can"></i></button>
             </div>
         </div>
     </div>
