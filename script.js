@@ -294,13 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }, { passive: false });
-
-        // ยุบรวม Event คลิกพื้นที่พัฒนาข้อความสเปซเข้ามาที่นี่เพื่อความปลอดภัย
-        workspace.addEventListener('click', (e) => {
-            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('#text-node-bottom-bar')) {
-                createDraggableTextNode(e);
-            }
-        });
     }
 });
 
@@ -766,15 +759,6 @@ function clearCurrentDrawings() {
         showNotification("ล้างหน้าประวัติวาดเขียนแล้วค่ะ");
     }
 }
-function clearCurrentDrawings() {
-    const activePage = getActivePageWrapper(); if (!activePage) return;
-    const canvas = activePage.querySelector('.drawing-page-canvas');
-    if (canvas) {
-        const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const currentState = canvas.toDataURL(); canvas.undoStack.push(currentState); canvas.redoStack = [];
-        showNotification("ล้างหน้าประวัติวาดเขียนแล้วค่ะ");
-    }
-}
 
 function getActivePageWrapper() {
     const wrappers = document.querySelectorAll('.page-wrapper'); if (wrappers.length === 0) return null;
@@ -868,12 +852,6 @@ function createDraggableTextNode(e) {
         startTop = parseFloat(node.style.top) || 0;
         
         selectTextNode(node);
-
-        // แก้ไขเพิ่มประสิทธิภาพ: ผูก Event เมื่อเริ่มลากเท่านั้น
-        document.addEventListener('mousemove', dragMove); 
-        document.addEventListener('mouseup', dragEnd);
-        document.addEventListener('touchmove', dragMove, {passive: false}); 
-        document.addEventListener('touchend', dragEnd);
     }
 
     function dragMove(ev) {
@@ -889,36 +867,31 @@ function createDraggableTextNode(e) {
         let targetLeft = startLeft + deltaX;
         let targetTop = startTop + deltaY;
         
-        // ปรับปรุงลอจิกจำกัดขอบเขต (Boundary Limit) ให้ถูกต้องแม่นยำ
         const parent = node.parentElement; 
         if (parent) {
-            const nodeWidth = node.offsetWidth;
-            const nodeHeight = node.offsetHeight;
+            const halfWidth = node.offsetWidth / 2;
+            const halfHeight = node.offsetHeight / 2;
             
-            if (targetLeft < 0) targetLeft = 0; 
-            if (targetLeft > parent.offsetWidth - nodeWidth) targetLeft = parent.offsetWidth - nodeWidth; 
+            if (targetLeft < halfWidth) targetLeft = halfWidth; 
+            if (targetLeft > parent.offsetWidth - halfWidth) targetLeft = parent.offsetWidth - halfWidth; 
             
-            if (targetTop < 0) targetTop = 0; 
-            if (targetTop > parent.offsetHeight - nodeHeight) targetTop = parent.offsetHeight - nodeHeight; 
+            if (targetTop < halfHeight) targetTop = halfHeight; 
+            if (targetTop > parent.offsetHeight - halfHeight) targetTop = parent.offsetHeight - halfHeight; 
         }
         
         node.style.left = targetLeft + 'px'; 
         node.style.top = targetTop + 'px';
     }
 
-    // แก้ไขเพิ่มประสิทธิภาพ: ถอด Event ทันทีเมื่อปล่อยมือ
-    function dragEnd() { 
-        if (isDraggingNode) {
-            isDraggingNode = false; 
-            document.removeEventListener('mousemove', dragMove);
-            document.removeEventListener('mouseup', dragEnd);
-            document.removeEventListener('touchmove', dragMove);
-            document.removeEventListener('touchend', dragEnd);
-        }
-    }
+    function dragEnd() { isDraggingNode = false; }
 
     node.addEventListener('mousedown', dragStart); 
+    document.addEventListener('mousemove', dragMove); 
+    document.addEventListener('mouseup', dragEnd);
+    
     node.addEventListener('touchstart', dragStart, {passive: true}); 
+    document.addEventListener('touchmove', dragMove, {passive: false}); 
+    document.addEventListener('touchend', dragEnd);
 
     overlay.appendChild(node);
     
@@ -926,6 +899,16 @@ function createDraggableTextNode(e) {
     node.classList.add('is-editing');
     setTimeout(() => { span.focus(); document.execCommand('selectAll', false, null); }, 60);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (workspace) {
+        workspace.addEventListener('click', (e) => {
+            if (currentTool === 'text' && !e.target.closest('.custom-draggable-text-node') && !e.target.closest('.toolbar') && !e.target.closest('.text-node-floating-bar') && !e.target.closest('#text-node-bottom-bar')) {
+                createDraggableTextNode(e);
+            }
+        });
+    }
+});
 
 // ฟังก์ชันดึงไฟล์แนบเข้ามาเตรียมส่ง
 function handleFileSelect(type) {
@@ -1088,7 +1071,13 @@ async function sendAiQuestion() {
         finalPrompt += `บริบทข้อความจากไฟล์แนบเสริม (${currentAttachedDocName}):\n"""\n${currentAttachedDoc}\n"""\n`;
     }
     
-    finalPrompt += `คำสั่ง/คำถาม: ${userText || "โปรดช่วยวิเคราะห์รูปภาพหรือข้อมูลที่แนบไปนี้ให้ทีค่ะ"}\n\n(รบกวนวิเคราะห์และให้คำตอบสรุปเป็นภาษาไทยอย่างกระชับและเป็นมิตรด้วยนะคะ)`;
+    // ปรับปรุง Prompt ให้ฝังเงื่อนไขบังคับให้สร้างรูปแบบลิงก์ภาพหากถูกสั่งให้วาดรูป
+    finalPrompt += `คำสั่ง/คำถาม: ${userText || "โปรดช่วยวิเคราะห์รูปภาพหรือข้อมูลที่แนบไปนี้ให้ทีค่ะ"}\n\n`;
+    finalPrompt += `ข้อกำหนดและกติกาของระบบแชท:\n`;
+    finalPrompt += `1. รบกวนวิเคราะห์และให้คำตอบสรุปเป็นภาษาไทยอย่างกระชับและเป็นมิตรด้วยนะคะ\n`;
+    finalPrompt += `2. [สำคัญวิกฤต] หากผู้ใช้สั่งให้ "วาดภาพ", "วาดรูป", "สร้างภาพ", "ออกแบบภาพ" หรือร้องขอรูปภาพสิ่งใดก็ตาม ห้ามปฏิเสธ และห้ามส่งข้อความบรรยายอธิบายตัวหนังสือเปล่าๆ ให้แปลงคำขอของผู้ใช้ให้กลายเป็นภาษาอังกฤษที่ระบุรายละเอียดความต้องการแบบชัดเจนยาวๆ (Detailed English Prompt) แล้วส่งกลับมาเป็น Markdown รูปภาพของระบบสร้างภาพ Pollinations.ai ตามโครงสร้างนี้เท่านั้น:\n`;
+    finalPrompt += `![คำอธิบายภาพ](https://image.pollinations.ai/p/ใส่ข้อความPromptภาษาอังกฤษที่นี่คำแต่ละคำเชื่อมด้วยเปอร์เซ็นต์หรือเว้นวรรคปกติ?width=768&height=768&seed=${Math.floor(Math.random() * 100000)}&nologo=true)\n`;
+    finalPrompt += `ห้ามพิมพ์คำนำหน้าหรือข้อความอื่นใดล้อมรอบลิงก์นี้ถ้าเป็นการสั่งวาดภาพค่ะ`;
 
     // ล็อคข้อมูลภาพไว้ส่ง แล้วเคลียร์ชุดพรีวิวทันทีตามมาตรฐาน UI แชททั่วไป
     const imageToSend = currentAttachedImage;
@@ -1113,7 +1102,7 @@ async function askAiToSummary() {
     appendAiMessage("ai", result, "text");
 }
 
-// ปรับปรุงฟังก์ชันแสดงข้อความแชทหลัก ให้ทำงานได้สมบูรณ์ (นำวงเล็บปีกกาที่เกินออกแล้ว)
+// ปรับปรุงฟังก์ชันแสดงข้อความแชทหลัก ให้มีพารามิเตอร์ประเภทไฟล์ (type) รองรับทั้งภาพและวิดีโออย่างสมบูรณ์ รวมถึงการเรนเดอร์ภาพจาก Markdown ลิงก์
 function appendAiMessage(sender, content, type = 'text') {
     const chatBox = document.getElementById('ai-chat-box'); if (!chatBox) return;
     
@@ -1140,7 +1129,16 @@ function appendAiMessage(sender, content, type = 'text') {
         video.controls = true;
         msgDiv.appendChild(video);
     } else {
-        msgDiv.innerText = content;
+        // อัปเกรดส่วนนี้: ตรวจสอบว่าข้อความที่ส่งมามีแท็กรูปภาพ Markdown ![alt](url) อยู่ข้างในหรือไม่
+        const markdownImageRegex = /!\[(.*?)\]\((.*?)\)/g;
+        if (markdownImageRegex.test(content)) {
+            // ทำการแปลงข้อความ Markdown Image นั้นให้ออกมาเป็นแท็กรูปภาพ <img> บนเว็บแอปพลิเคชันเพื่อการแสดงผลภาพจริง
+            msgDiv.innerHTML = content.replace(markdownImageRegex, (match, alt, url) => {
+                return `<div style="margin-top: 6px;"><img src="${url}" alt="${alt}" class="chat-media-render" style="max-width: 100%; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 12px rgba(0,0,0,0.4);"></div>`;
+            });
+        } else {
+            msgDiv.innerText = content;
+        }
     }
     
     chatBox.appendChild(msgDiv); 
