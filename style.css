@@ -115,7 +115,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .patch-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
 /* ==========================================================================
-   SMART PATCH (INSET FIT & CLEAN EDGES)
+   SMART PATCH (INSET FIT & RENDERING CONTRAST)
    ========================================================================== */
 .selection-box {
     position: absolute;
@@ -141,7 +141,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .patch-input-inline {
     border: none;
     outline: none;
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Sarabun', sans-serif !important;
     background: transparent;
     padding: 0;
     margin: 0;
@@ -149,15 +149,20 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     height: 100%;
     line-height: 1.15;
     vertical-align: middle;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    text-rendering: optimizeLegibility !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
 }
 
-/* กล่องหลังพิมพ์เสร็จ: ตัดขอบล้นทิ้ง เนียนสนิท ไม่บังเส้นตาราง */
+/* กล่องหลังพิมพ์เสร็จ: คมกริบ ไร้รอยขอบต่อ ไม่บังเส้นตาราง */
 .committed-patch-node {
     position: absolute;
     z-index: 90;
     pointer-events: auto !important;
     cursor: pointer;
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Sarabun', sans-serif !important;
     display: inline-flex;
     align-items: center;
     box-sizing: border-box;
@@ -167,6 +172,11 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     box-shadow: none !important;
     user-select: text;
     white-space: nowrap;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    text-rendering: optimizeLegibility !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
 }
 .committed-patch-node:hover {
     outline: 1px dashed var(--accent) !important;
