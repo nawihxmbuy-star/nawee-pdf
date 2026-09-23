@@ -1,5 +1,5 @@
 // 🎯 service-worker.js (v18.0 - Sunita PDF Studio & Offline Engine)
-const CACHE_NAME = 'sunita-pdf-v18.0';
+const CACHE_NAME = 'sunita-pdf-v18.5';
 
 // ไฟล์หลักของโปรเจกต์ภายในเครื่อง
 const CORE_ASSETS = [
