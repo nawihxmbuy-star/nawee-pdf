@@ -23,6 +23,9 @@ body {
     -webkit-user-select: none;
 }
 
+/* ==========================================================================
+   TOP BAR
+   ========================================================================== */
 .top-bar {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 56px;
@@ -66,6 +69,9 @@ body {
     .btn-text { display: none; }
 }
 
+/* ==========================================================================
+   WORKSPACE & CANVASES
+   ========================================================================== */
 .workspace {
     width: 100vw; height: 100vh;
     overflow: auto;
@@ -108,6 +114,9 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 
 .patch-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
+/* ==========================================================================
+   SMART PATCH & NUDGE TOOLBAR
+   ========================================================================== */
 .selection-box {
     position: absolute;
     border: 1.5px dashed var(--accent);
@@ -160,7 +169,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 
 .nudge-toolbar {
     position: absolute;
-    top: -30px;
+    top: -32px;
     left: 0;
     display: flex;
     gap: 3px;
@@ -210,6 +219,80 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     outline: 1px dashed rgba(14, 165, 233, 0.6);
 }
 
+/* ==========================================================================
+   INTERACTIVE VECTOR SHAPES (RECTANGLE & ELLIPSE)
+   ========================================================================== */
+.shape-interactive-node {
+    position: absolute;
+    box-sizing: border-box;
+    cursor: move;
+    touch-action: none;
+    z-index: 95;
+    pointer-events: auto !important;
+}
+
+.shape-interactive-node.shape-rect {
+    border: 2.5px solid var(--shape-color, #0033aa);
+    border-radius: 4px;
+}
+
+.shape-interactive-node.shape-circle {
+    border: 2.5px solid var(--shape-color, #0033aa);
+    border-radius: 50%;
+}
+
+.shape-handle {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    background: #ffffff;
+    border: 2px solid #0ea5e9;
+    border-radius: 50%;
+    z-index: 105;
+}
+.shape-handle.handle-tl { top: -5px; left: -5px; cursor: nwse-resize; }
+.shape-handle.handle-tr { top: -5px; right: -5px; cursor: nesw-resize; }
+.shape-handle.handle-bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.shape-handle.handle-br { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+.shape-quick-toolbar {
+    position: absolute;
+    top: -34px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 3px 6px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    z-index: 110;
+}
+.shape-color-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 1px solid #fff;
+    transition: transform 0.1s;
+}
+.shape-color-dot:hover { transform: scale(1.2); }
+.shape-del-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+    display: flex;
+    align-items: center;
+}
+
+/* ==========================================================================
+   FLOATING DOCK TOOLBAR
+   ========================================================================== */
 .floating-dock {
     position: fixed;
     bottom: 20px; left: 50%;
@@ -251,6 +334,9 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .color-circle:hover { transform: scale(1.15); }
 .color-circle.active { transform: scale(1.25); border-color: #fff; }
 
+/* ==========================================================================
+   SIGNATURE / DRAGGABLE NODE
+   ========================================================================== */
 .custom-draggable-sig {
     position: absolute;
     cursor: move;
@@ -269,6 +355,9 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     cursor: pointer; border: 1px solid #fff;
 }
 
+/* ==========================================================================
+   MODAL
+   ========================================================================== */
 .modal-backdrop {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
     background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px);
