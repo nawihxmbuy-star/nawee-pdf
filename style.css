@@ -26,20 +26,24 @@ body {
 }
 
 /* ==========================================================================
-   TOP BAR & BRAND AVATAR (คงขนาดเดิม 56px สมบูรณ์ 100%)
+   TOP BAR & BRAND AVATAR (ความสูง 56px คงเดิม สวยหรู กะทัดรัด)
    ========================================================================== */
 .top-bar {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 56px;
     background: #111827;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0 18px;
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    padding: 0 16px;
+    gap: 10px;
     z-index: 1000;
 }
 .brand {
-    display: flex; align-items: center; gap: 10px;
-    font-size: 17px; font-weight: 700; color: #fff;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 16px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
 }
 .brand-avatar {
     width: 32px;
@@ -49,13 +53,99 @@ body {
     border: 2px solid var(--accent);
     box-shadow: 0 0 8px var(--accent-glow);
 }
+.brand-fallback {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(14, 165, 233, 0.15);
+    color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    border: 2px solid var(--accent);
+}
 .text-glow { color: var(--accent); }
 .pro-badge {
     background: linear-gradient(135deg, #0284c7, #38bdf8);
-    color: #0f172a; font-size: 10px; font-weight: 800;
-    padding: 2px 6px; border-radius: 4px;
+    color: #0f172a; font-size: 9px; font-weight: 800;
+    padding: 2px 5px; border-radius: 4px;
 }
-.action-buttons { display: flex; gap: 8px; align-items: center; }
+
+/* ==========================================================================
+   TOP DOCK BAR (แถบเครื่องมือฝังตัวใน Header ระดับความสูง 38px)
+   ========================================================================== */
+.top-dock-bar {
+    display: flex;
+    align-items: center;
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 3px 8px;
+    gap: 4px;
+    max-height: 42px;
+    overflow-x: auto;
+    backdrop-filter: blur(8px);
+}
+.top-dock-bar::-webkit-scrollbar { display: none; }
+
+.dock-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s ease;
+    flex-shrink: 0;
+}
+.dock-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+.dock-btn.active {
+    background: var(--accent);
+    color: #0f172a;
+    box-shadow: 0 1px 6px var(--accent-glow);
+}
+
+.dock-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.14);
+    margin: 0 4px;
+    flex-shrink: 0;
+}
+
+.color-dock-group {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    flex-shrink: 0;
+}
+.color-circle {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    transition: transform 0.1s ease;
+}
+.color-circle:hover { transform: scale(1.15); }
+.color-circle.active {
+    transform: scale(1.25);
+    border-color: #fff;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+}
+
+.action-buttons { 
+    display: flex; 
+    gap: 8px; 
+    align-items: center; 
+    flex-shrink: 0;
+}
 .btn-secondary {
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -75,18 +165,18 @@ body {
 }
 .btn-primary:hover { transform: translateY(-1px); }
 
-@media (max-width: 600px) {
+@media (max-width: 860px) {
     .btn-text { display: none; }
+    .top-dock-bar { max-width: 50vw; }
 }
 
 /* ==========================================================================
-   WORKSPACE & CANVASES (ปรับ padding-top หลบบาร์ด้านบนอย่างพอดี)
+   WORKSPACE & CANVASES (เปิดโล่ง 100% ไม่มีบาร์เกะกะ)
    ========================================================================== */
 .workspace {
     width: 100vw; height: 100vh;
     overflow: auto;
-    /* เว้นพื้นที่ด้านบน 126px ให้บาร์เครื่องมือ และลดด้านล่างเหลือ 32px */
-    padding: 126px 20px 32px 20px;
+    padding: 72px 20px 30px 20px;
     display: flex; flex-direction: column; align-items: center;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y;
@@ -138,8 +228,16 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 
 .patch-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
+/* SVG Canvas สำหรับวาดเส้นโยง Leader Line */
+.leader-lines-svg {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 4;
+    pointer-events: none;
+}
+
 /* ==========================================================================
-   SMART PATCH & NUDGE TOOLBAR
+   SMART PATCH & NUDGE TOOLBAR (แก้คำในตาราง)
    ========================================================================== */
 .selection-box {
     position: absolute;
@@ -249,7 +347,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 }
 
 /* ==========================================================================
-   INTERACTIVE VECTOR SHAPES (RECTANGLE, ELLIPSE & TAGS)
+   INTERACTIVE VECTOR SHAPES & DRAGGABLE CALLOUT BOX
    ========================================================================== */
 .shape-interactive-node {
     position: absolute;
@@ -261,12 +359,12 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 }
 
 .shape-interactive-node.shape-rect {
-    border: 2.5px solid var(--shape-color, #0033aa);
+    border: 2.5px solid var(--shape-color, #ef4444);
     border-radius: 4px;
 }
 
 .shape-interactive-node.shape-circle {
-    border: 2.5px solid var(--shape-color, #0033aa);
+    border: 2.5px solid var(--shape-color, #ef4444);
     border-radius: 50%;
 }
 
@@ -286,7 +384,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 
 .shape-quick-toolbar {
     position: absolute;
-    top: -40px;
+    top: -42px;
     left: 50%;
     transform: translateX(-50%);
     background: #1e293b;
@@ -338,9 +436,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     gap: 4px;
     white-space: nowrap;
 }
-.shape-confirm-btn:hover {
-    background: #38bdf8;
-}
+.shape-confirm-btn:hover { background: #38bdf8; }
 
 .shape-del-btn {
     background: none;
@@ -353,100 +449,38 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     align-items: center;
 }
 
-.shape-attached-tag {
+/* 🎯 กล่องคอมเมนต์สีแดง (Draggable Callout Box) ที่ลากไปไหนก็ได้ */
+.shape-callout-bubble {
     position: absolute;
-    top: -14px;
-    left: 8px;
-    background: var(--shape-color, #0033aa);
+    background: var(--shape-color, #ef4444);
     color: #ffffff;
     font-family: 'Sarabun', sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
     white-space: nowrap;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    z-index: 106;
+    pointer-events: auto !important;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+.shape-callout-bubble:active {
+    cursor: grabbing;
+}
+.shape-callout-bubble .callout-text {
     pointer-events: none;
 }
-
-/* ==========================================================================
-   TOP FLOATING DOCK TOOLBAR (ย้ายขึ้นบน - สไตล์โมเดิร์น กระชับ ไม่แย่งสายตา)
-   ========================================================================== */
-.floating-dock {
-    position: fixed;
-    top: 66px; /* ห้อยลงมาจาก Top Bar 56px + ช่องว่าง 10px */
-    bottom: auto;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--dock-bg);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 14px;
-    padding: 4px 10px;
-    display: flex; 
-    align-items: center; 
-    gap: 4px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    z-index: 999;
-    max-width: 95vw;
-    overflow-x: auto;
-}
-.floating-dock::-webkit-scrollbar { display: none; }
-
-.dock-btn {
-    background: transparent; 
-    border: none;
-    color: var(--text-muted); 
-    width: 38px; 
-    height: 38px;
-    border-radius: 10px; 
+.shape-callout-bubble .callout-edit-icon {
+    font-size: 10px;
+    opacity: 0.8;
     cursor: pointer;
-    font-size: 16px; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
-    position: relative; 
-    transition: all 0.15s ease; 
-    flex-shrink: 0;
-}
-.dock-btn:hover { 
-    color: #fff; 
-    background: rgba(255, 255, 255, 0.08); 
-}
-.dock-btn.active {
-    background: var(--accent); 
-    color: #0f172a;
-    box-shadow: 0 2px 8px var(--accent-glow);
-}
-
-.dock-divider {
-    width: 1px; 
-    height: 20px; 
-    background: rgba(255, 255, 255, 0.12);
-    flex-shrink: 0; 
-    margin: 0 3px;
-}
-
-.color-dock-group { 
-    display: flex; 
-    gap: 6px; 
-    align-items: center; 
-    flex-shrink: 0; 
-}
-.color-circle {
-    width: 20px; 
-    height: 20px; 
-    border-radius: 50%;
-    cursor: pointer; 
-    border: 2px solid rgba(255, 255, 255, 0.25);
-    transition: transform 0.12s ease;
-}
-.color-circle:hover { transform: scale(1.15); }
-.color-circle.active { 
-    transform: scale(1.22); 
-    border-color: #fff; 
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
 }
 
 /* ==========================================================================
