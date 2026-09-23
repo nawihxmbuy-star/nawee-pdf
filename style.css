@@ -22,7 +22,7 @@ body {
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
-    touch-action: none; /* ล็อกการเคลื่อนไหวเบราว์เซอร์ เพื่อให้ระบบ Gestures ของเราคุม 100% */
+    touch-action: none;
 }
 
 /* ==========================================================================
@@ -41,7 +41,6 @@ body {
     display: flex; align-items: center; gap: 10px;
     font-size: 17px; font-weight: 700; color: #fff;
 }
-/* รูปโปรไฟล์น้องแมวบน Header */
 .brand-avatar {
     width: 32px;
     height: 32px;
@@ -89,7 +88,7 @@ body {
     padding: 76px 20px 100px 20px;
     display: flex; flex-direction: column; align-items: center;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-x pan-y; /* ให้เลื่อนด้วยมือได้ */
+    touch-action: pan-x pan-y;
 }
 .welcome-box {
     background: #1e293b;
@@ -103,7 +102,6 @@ body {
 .welcome-avatar-wrap {
     margin-bottom: 16px;
 }
-/* รูปน้องแมวบนการ์ดต้อนรับ */
 .welcome-cat-avatar {
     width: 84px;
     height: 84px;
@@ -124,7 +122,7 @@ body {
 #document-container {
     margin: 0 auto;
     transform-origin: top center;
-    transition: transform 0.04s ease-out; /* ซูมลื่นไหลแบบ Native */
+    transition: transform 0.04s ease-out;
 }
 .page-wrapper {
     position: relative;
@@ -140,7 +138,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .patch-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
 /* ==========================================================================
-   SMART PATCH & TABLET NUDGE TOOLBAR
+   SMART PATCH & NUDGE TOOLBAR (กะทัดรัด ไม่บังตาราง)
    ========================================================================== */
 .selection-box {
     position: absolute;
@@ -160,6 +158,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     border: 1.5px solid var(--accent);
     padding: 0 2px;
     box-sizing: border-box;
+    transition: width 0.05s ease-out;
 }
 
 .patch-input-inline {
@@ -192,25 +191,27 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 
 .nudge-toolbar {
     position: absolute;
-    top: -38px;
+    top: -34px;
     left: 0;
     display: flex;
-    gap: 4px;
+    gap: 3px;
     background: #1e293b;
-    padding: 4px 8px;
-    border-radius: 8px;
+    padding: 3px 6px;
+    border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     z-index: 1000;
+    transform: scale(0.92);
+    transform-origin: bottom left;
 }
 .nudge-btn {
     background: rgba(255, 255, 255, 0.05);
     border: none;
     color: var(--text-muted);
-    font-size: 13px;
-    padding: 4px 8px;
+    font-size: 12px;
+    padding: 3px 6px;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -219,12 +220,16 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     color: #fff;
     background: rgba(255, 255, 255, 0.18);
 }
+.nudge-btn.active {
+    background: var(--accent);
+    color: #0f172a;
+}
 .nudge-btn.btn-done {
     background: #0ea5e9;
     color: #0f172a;
     font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 6px;
+    padding: 3px 8px;
+    border-radius: 4px;
 }
 .nudge-btn.btn-done:hover {
     background: #38bdf8;
@@ -264,7 +269,6 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     border-radius: 50%;
 }
 
-/* ขยายปุ่ม Handle ให้แตะด้วยนิ้วบนแท็บเล็ตได้ถนัดขึ้น */
 .shape-handle {
     position: absolute;
     width: 14px;
@@ -385,7 +389,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .floating-dock::-webkit-scrollbar { display: none; }
 .dock-btn {
     background: transparent; border: none;
-    color: var(--text-muted); width: 44px; height: 44px; /* ปรับขนาดปุ่ม 44px ตามมาตรฐาน Touch Target ของแท็บเล็ต */
+    color: var(--text-muted); width: 44px; height: 44px;
     border-radius: 12px; cursor: pointer;
     font-size: 18px; display: flex; align-items: center; justify-content: center;
     position: relative; transition: all 0.15s; flex-shrink: 0;
