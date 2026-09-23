@@ -153,7 +153,6 @@ async function renderPage(pageNum, container) {
     const textContent = await page.getTextContent();
     const displayViewport = page.getViewport({ scale: 1.0 });
 
-    // 🎯 แปลงพิกัดฟอนต์ให้สอดคล้องกับพิกัดบนหน้าจอจริง 1:1
     const pageTextMetadata = textContent.items.map(item => {
         const tx = pdfjsLib.Util.transform(displayViewport.transform, item.transform);
         const fontHeight = Math.hypot(tx[2], tx[3]);
@@ -177,9 +176,6 @@ async function renderPage(pageNum, container) {
     bindDrawingEngine(annotCanvas, pageNum);
 }
 
-// -------------------------------------------------------------
-// ระบบสัมผัสบนแท็บเล็ต: Pinch-to-Zoom & Pan
-// -------------------------------------------------------------
 function initTabletGestures() {
     const workspaceEl = document.querySelector('.workspace');
     let initialDistance = 0;
@@ -225,9 +221,6 @@ function initTabletGestures() {
     });
 }
 
-// -------------------------------------------------------------
-// 1. ฟังก์ชันคำนวณพิกัดสัมผัสแบบ Absolute Safe (แก้ปัญหากล่องกระโดด/ซูมเพี้ยน)
-// -------------------------------------------------------------
 function getPageAccurateCoords(e, wrapper) {
     const rect = wrapper.getBoundingClientRect();
     const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
@@ -246,7 +239,7 @@ function getPageAccurateCoords(e, wrapper) {
 }
 
 // -------------------------------------------------------------
-// 2. ระบบดูดสีเนียนสนิทพิเศษ (ตัด Anti-aliasing ขอบเบลอทิ้ง)
+// ระบบดูดสี (พร้อม Clamp ป้องกันค่าสีเกิน 1.0)
 // -------------------------------------------------------------
 function analyzeBoxColors(canvas, x, y, width, height) {
     const ctx = canvas.getContext('2d');
@@ -303,10 +296,18 @@ function analyzeBoxColors(canvas, x, y, width, height) {
             textB = bgBrightness < 128 ? 255 : 39;
         }
 
-        const toHex = (n) => Math.min(255, Math.max(0, n)).toString(16).padStart(2, '0');
+        const toHex = (n) => Math.min(255, Math.max(0, Math.round(n))).toString(16).padStart(2, '0');
+        const clampRatio = (val) => Math.min(1.0, Math.max(0.0, val / 255));
+
         return {
-            bg: { r: bgR / 255, g: bgG / 255, b: bgB / 255, hex: `#${toHex(bgR)}${toHex(bgG)}${toHex(bgB)}` },
-            text: { r: textR / 255, g: textG / 255, b: textB / 255, hex: `#${toHex(textR)}${toHex(textG)}${toHex(textB)}` }
+            bg: { 
+                r: clampRatio(bgR), g: clampRatio(bgG), b: clampRatio(bgB), 
+                hex: `#${toHex(bgR)}${toHex(bgG)}${toHex(bgB)}` 
+            },
+            text: { 
+                r: clampRatio(textR), g: clampRatio(textG), b: clampRatio(textB), 
+                hex: `#${toHex(textR)}${toHex(textG)}${toHex(textB)}` 
+            }
         };
     } catch (e) {
         return {
@@ -316,9 +317,6 @@ function analyzeBoxColors(canvas, x, y, width, height) {
     }
 }
 
-// -------------------------------------------------------------
-// 3. ดึงขนาดฟอนต์จริง น้ำหนักตัวหนา และพิกัดจากคำที่แตะ
-// -------------------------------------------------------------
 function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
     if (!textMetadata || textMetadata.length === 0) return null;
 
@@ -365,9 +363,6 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
     };
 }
 
-// -------------------------------------------------------------
-// 4. Engine การแตะคำ: ล็อกเฉพาะคำติดกัน ไม่หลุด ไม่กระโดด
-// -------------------------------------------------------------
 function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     let startX = 0, startY = 0;
     let isDragging = false;
@@ -473,9 +468,6 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     });
 }
 
-// -------------------------------------------------------------
-// 5. Interactive Shape Engine
-// -------------------------------------------------------------
 function createInteractiveShape(wrapper, pageNum, left, top, width, height, type, initialColor) {
     const layer = wrapper.querySelector('.patch-layer');
 
@@ -639,9 +631,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     setTimeout(() => noteInput.focus(), 60);
 }
 
-// -------------------------------------------------------------
-// 6. กล่อง Input: ปรับฟอนต์และสีตามต้นฉบับอัตโนมัติ (ไม่ล้น ไม่บวม)
-// -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
@@ -940,9 +929,6 @@ function createReEditHotspot(wrapper, pageNum, pdfCanvas, left, top, width, heig
     layer.appendChild(hotspot);
 }
 
-// -------------------------------------------------------------
-// Drawing Engine
-// -------------------------------------------------------------
 function bindDrawingEngine(canvas, pageNum) {
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
@@ -1003,9 +989,6 @@ function bindDrawingEngine(canvas, pageNum) {
     window.addEventListener('pointerup', endDraw);
 }
 
-// -------------------------------------------------------------
-// ระบบเซ็นลายเซ็น
-// -------------------------------------------------------------
 function openSignatureModal() {
     document.getElementById('sig-modal').style.display = 'flex';
     clearSigCanvas();
@@ -1102,7 +1085,7 @@ function placeSignatureOnDoc() {
 }
 
 // -------------------------------------------------------------
-// 7. ส่งออก Vector PDF คมชัด 100%
+// ส่งออก Vector PDF (พร้อม Clamp ค่าสีป้องกัน Error 0.0 - 1.0)
 // -------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; }
@@ -1138,12 +1121,21 @@ async function exportVectorPDF() {
                 pData.patches.forEach(pt => {
                     const boxX = pt.boxLeft !== undefined ? pt.boxLeft : pt.x;
                     const boxY = pt.patchBoxY !== undefined ? pt.patchBoxY : (pt.y - (pt.height * 0.1));
+                    
+                    const safeBgR = Math.min(1.0, Math.max(0.0, pt.bgColor.r));
+                    const safeBgG = Math.min(1.0, Math.max(0.0, pt.bgColor.g));
+                    const safeBgB = Math.min(1.0, Math.max(0.0, pt.bgColor.b));
+
+                    const safeTxtR = Math.min(1.0, Math.max(0.0, pt.textColor.r));
+                    const safeTxtG = Math.min(1.0, Math.max(0.0, pt.textColor.g));
+                    const safeTxtB = Math.min(1.0, Math.max(0.0, pt.textColor.b));
+
                     targetPage.drawRectangle({
                         x: boxX,
                         y: boxY,
                         width: pt.width,
                         height: pt.height,
-                        color: rgb(pt.bgColor.r, pt.bgColor.g, pt.bgColor.b),
+                        color: rgb(safeBgR, safeBgG, safeBgB),
                     });
 
                     targetPage.drawText(pt.text, {
@@ -1151,7 +1143,7 @@ async function exportVectorPDF() {
                         y: pt.y,
                         size: pt.fontSize,
                         font: thaiFont,
-                        color: rgb(pt.textColor.r, pt.textColor.g, pt.textColor.b),
+                        color: rgb(safeTxtR, safeTxtG, safeTxtB),
                     });
                 });
             }
@@ -1160,7 +1152,11 @@ async function exportVectorPDF() {
                 pData.shapes.forEach(sh => {
                     const hexToRgb = (hex) => {
                         const num = parseInt(hex.replace('#', ''), 16);
-                        return rgb((num >> 16 & 255) / 255, (num >> 8 & 255) / 255, (num & 255) / 255);
+                        return rgb(
+                            Math.min(1, Math.max(0, (num >> 16 & 255) / 255)),
+                            Math.min(1, Math.max(0, (num >> 8 & 255) / 255)),
+                            Math.min(1, Math.max(0, (num & 255) / 255))
+                        );
                     };
                     const shapeColor = hexToRgb(sh.color);
 
