@@ -10,224 +10,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
+    <!-- PDF Rendering & Font Engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/@pdf-lib/fontkit@0.0.4/dist/fontkit.umd.min.js"></script>
+    
+    <!-- Legacy Export Fallbacks & Icons -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-    <style>
-        /* ==========================================================================
-           AI SIDEBAR & CHAT INTERFACE UPDATES (FIX: Overlapping & Mobile Height)
-           ========================================================================== */
-        .ai-sidebar {
-            z-index: 10005 !important; /* ดันให้ลอยเหนือแถบเครื่องมือด้านล่าง (.toolbar มี 9999) */
-            height: 100dvh !important;  /* รองรับแถบ URL เบราเซอร์บนมือถือ ไม่ให้ดันแถบแชทตกจอ */
-            bottom: 0 !important;
-        }
-
-        .ai-sidebar-footer {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 10px;
-            background: #1e293b;
-            position: relative;
-        }
-        .ai-sidebar-footer #ai-input {
-            flex: 1;
-        }
-        .ai-chat-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 15px;
-            transition: all 0.2s ease;
-            flex-shrink: 0;
-        }
-        .btn-attach-doc {
-            background: rgba(255, 255, 255, 0.05);
-            color: #94a3b8;
-        }
-        .btn-attach-doc:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #f1f5f9;
-        }
-        .btn-media-plus {
-            background: #22d3ee;
-            color: #0f172a;
-            font-size: 20px;
-            font-weight: bold;
-            line-height: 1;
-        }
-        .btn-media-plus:hover {
-            background: #06b6d4;
-            transform: scale(1.05);
-        }
-        
-        /* Container และป๊อปอัปแนบสื่อ */
-        .media-menu-container {
-            position: relative; 
-            display: inline-block;
-        }
-        .media-popup {
-            position: absolute;
-            bottom: 55px;
-            left: 10px;
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            display: flex;
-            flex-direction: column;
-            padding: 6px;
-            z-index: 10010; /* เพิ่มให้อยู่เหนือเลเยอร์พื้นหลังของบาร์ข้าง */
-            min-width: 155px;
-            animation: popSlideUp 0.15s ease-out;
-        }
-        @keyframes popSlideUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .media-popup button {
-            background: transparent;
-            color: #e2e8f0;
-            border: none;
-            padding: 8px 12px;
-            text-align: left;
-            cursor: pointer;
-            border-radius: 6px;
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: background 0.15s;
-            width: 100%;
-        }
-        .media-popup button:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: #22d3ee;
-        }
-        
-        /* พรีวิวไฟล์รอก่อนส่งเข้าแชท AI */
-        #file-preview-container {
-            padding: 8px 12px; 
-            display: flex; 
-            gap: 10px; 
-            background: rgba(15, 23, 42, 0.6); 
-            border-top: 1px solid rgba(255,255,255,0.05);
-        }
-        .ai-preview-item {
-            position: relative;
-            display: inline-block;
-        }
-        .ai-preview-item .remove-preview-btn {
-            position: absolute;
-            top: -6px;
-            right: -6px;
-            background: #ef4444;
-            color: white;
-            border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            cursor: pointer;
-            font-weight: bold;
-            border: 1px solid #1e293b;
-        }
-
-        /* ==========================================================================
-           FLOATING TEXT NODE BOTTOM BAR CLEANUP (FIX: Inline Styles Removal)
-           ========================================================================== */
-        .text-node-floating-bar .floating-bar-content {
-            display: flex; 
-            flex-direction: column; 
-            gap: 10px;
-        }
-        .text-node-floating-bar .floating-bar-header {
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-        }
-        .text-node-floating-bar .btn-confirm-node {
-            background: var(--accent-color); 
-            color: #0f172a; 
-            width: auto; 
-            padding: 6px 14px; 
-            font-size: 13px; 
-            font-weight: bold; 
-            gap: 4px; 
-            display: flex; 
-            align-items: center; 
-            border-radius: 10px; 
-            border: none; 
-            cursor: pointer;
-        }
-        .text-node-floating-bar .text-node-controls {
-            background: rgba(255, 255, 255, 0.02); 
-            padding: 10px; 
-            border-radius: 12px; 
-            width: 100%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 12px; 
-            flex-wrap: wrap;
-        }
-        .text-node-floating-bar #floating-text-color {
-            width: 34px; 
-            height: 34px; 
-            border: none; 
-            background: transparent; 
-            cursor: pointer; 
-            padding: 0; 
-            flex-shrink: 0;
-        }
-        .text-node-floating-bar .quick-color-palette-wrapper {
-            margin-right: 4px;
-        }
-        .text-node-floating-bar .bar-separator {
-            width: 1px; 
-            height: 30px; 
-            background: rgba(255, 255, 255, 0.15);
-        }
-        .text-node-floating-bar .btn-format-node {
-            background: rgba(255, 255, 255, 0.05); 
-            color: #fff; 
-            width: 36px; 
-            height: 36px; 
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-        }
-        .text-node-floating-bar .btn-size-node {
-            background: rgba(34, 211, 238, 0.1); 
-            color: var(--accent-color); 
-            width: 36px; 
-            height: 36px; 
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-        }
-        .text-node-floating-bar .btn-delete-node {
-            background: rgba(239, 68, 68, 0.1); 
-            color: #ef4444; 
-            width: 36px; 
-            height: 36px; 
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-        }
-    </style>
 </head>
 <body class="mode-pdf"> 
+    <!-- TOP BAR -->
     <header class="top-bar">
         <div class="brand">
             <i class="fa-solid fa-file-invoice text-glow"></i>
@@ -237,27 +31,35 @@
             <button onclick="resetApp()" title="ล้างหน้าจอเพื่อเริ่มงานใหม่" style="background: rgba(239, 68, 68, 0.08); color: #f87171;">
                 <i class="fa-solid fa-square-plus"></i> <span class="lbl">งานใหม่</span>
             </button>
-            <button onclick="document.getElementById('upload').click()" title="เปิดไฟล์ PDF"><i class="fa-solid fa-folder-open"></i> <span class="lbl">เปิดไฟล์</span></button>
-            <button onclick="saveToDatabase()" title="บันทึกลงฐานข้อมูลตรงๆ ไม่ดาวน์โหลด"><i class="fa-solid fa-floppy-disk"></i> <span class="lbl">เซฟไฟล์</span></button>
-            <button onclick="shareToLine()" title="แชร์ผ่าน LINE" class="btn-line"><i class="fa-brands fa-line"></i> <span class="lbl">แชร์ LINE</span></button>
+            <button onclick="document.getElementById('upload').click()" title="เปิดไฟล์ PDF">
+                <i class="fa-solid fa-folder-open"></i> <span class="lbl">เปิดไฟล์</span>
+            </button>
+            <button onclick="saveToDatabase()" title="บันทึกลงฐานข้อมูลตรงๆ ไม่ดาวน์โหลด">
+                <i class="fa-solid fa-floppy-disk"></i> <span class="lbl">เซฟไฟล์</span>
+            </button>
+            <button onclick="shareToLine()" title="แชร์ผ่าน LINE" class="btn-line">
+                <i class="fa-brands fa-line"></i> <span class="lbl">แชร์ LINE</span>
+            </button>
             
             <div class="dropdown-wrapper">
-                <button onclick="toggleDropdown('convert-menu')" class="btn-premium" title="เมนูแปลงไฟล์"><i class="fa-solid fa-arrows-rotate"></i> <span class="lbl">แปลงไฟล์</span></button>
+                <button onclick="toggleDropdown('convert-menu')" class="btn-premium" title="เมนูแปลงและส่งออกไฟล์">
+                    <i class="fa-solid fa-arrows-rotate"></i> <span class="lbl">ส่งออก</span>
+                </button>
                 <div id="convert-menu" class="dropdown-popup">
-                    <button onclick="triggerPdfToWord()"><i class="fa-solid fa-file-word" style="color: #2b579a;"></i> แปลงไฟล์ PDF เป็น Word</button>
-                    <button onclick="triggerWordToPdf()"><i class="fa-solid fa-file-pdf" style="color: #e44d26;"></i> แปลงไฟล์ Word เป็น PDF</button>
-                    <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 4px 0;">
-                    <button onclick="exportToPDFFile()"><i class="fa-solid fa-download"></i> ดาวน์โหลดไฟล์ PDF </button>
+                    <button onclick="exportToPDFFile()"><i class="fa-solid fa-file-pdf" style="color: #22d3ee;"></i> บันทึก PDF เวกเตอร์แท้ (คมชัด 100%)</button>
+                    <button onclick="triggerPdfToWord()"><i class="fa-solid fa-file-word" style="color: #2b579a;"></i> สลับไปโหมด Word</button>
+                    <button onclick="triggerWordToPdf()"><i class="fa-solid fa-eye" style="color: #e44d26;"></i> สลับกลับโหมด PDF</button>
                 </div>
             </div>
 
-            <button onclick="toggleAiSidebar()" class="btn-ai" title="เปิดผู้ช่วย AI อัจฉริยะ" style="background: rgba(34, 211, 238, 0.15); border: 1px solid var(--accent-color, #22d3ee); color: #fff; cursor: pointer; padding: 8px 14px; border-radius: 8px;">
-                <i class="fa-solid fa-wand-magic-sparkles" style="color: #22d3ee;"></i> 
+            <button onclick="toggleAiSidebar()" class="btn-ai" title="เปิดผู้ช่วย AI อัจฉริยะ">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> 
                 <span class="lbl">ผู้ช่วย AI</span>
             </button>
         </div>
     </header>
 
+    <!-- WORD FORMATTING BAR (สำหรับโหมดแก้แบบเดิม) -->
     <div class="word-formatting-bar">
         <div class="format-group">
             <button onclick="formatWord('bold')" title="ตัวหนา"><i class="fa-solid fa-bold"></i></button>
@@ -280,15 +82,17 @@
 
     <input type="file" id="upload" accept="application/pdf" style="display:none;">
 
+    <!-- WORKSPACE -->
     <main class="workspace">
         <div id="pdf-container">
             <div class="initial-notice">
                 <p><i class="fa-solid fa-cloud-arrow-up" style="font-size: 48px; color: var(--accent-color); margin-bottom: 15px;"></i></p>
-                <p>ยินดีต้อนรับสู่ระบบกรุณากดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มต้นทำงานค่ะ</p>
+                <p>ยินดีต้อนรับสู่ระบบ กรุณากดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มต้นทำงานค่ะ</p>
             </div>
         </div>
     </main>
 
+    <!-- PEN & ERASER SUB-PANEL -->
     <div id="pen-settings-panel" class="pen-sub-panel">
         <div id="pen-color-group" class="panel-item">
             <label><i class="fa-solid fa-palette"></i> สีปากกา:</label>
@@ -308,9 +112,10 @@
                 <div id="brush-preview"></div>
             </div>
         </div>
-        <button onclick="toggleEraserShape()" id="btn-toggle-shape" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; display: none;">สลับทรงยางลบ</button>
+        <button onclick="toggleEraserShape()" id="btn-toggle-shape">สลับทรงยางลบ</button>
     </div>
 
+    <!-- FLOATING TEXT SUB-PANEL -->
     <div id="text-settings-panel" class="pen-sub-panel">
         <div class="panel-item">
             <label><i class="fa-solid fa-palette"></i> สีข้อความลอย:</label>
@@ -324,32 +129,114 @@
             </div>
         </div>
         <div class="panel-item">
-            <label><i class="fa-solid fa-text-height"></i> ขนาดฟอนต์ลอย: <span id="text-size-val">24px</span></label>
+            <label><i class="fa-solid fa-text-height"></i> ขนาดฟอนต์: <span id="text-size-val">24px</span></label>
             <input type="range" id="text-size-slider" min="12" max="72" value="24">
         </div>
     </div>
 
+    <!-- MAIN RESPONSIVE BOTTOM TOOLBAR -->
     <nav class="toolbar">
         <button onclick="scrollWorkspace('prev')" id="tool-prev" class="nav-btn" title="เลื่อนขึ้นหน้าบน"><i class="fa-solid fa-circle-chevron-left"></i></button>
         <div class="divider"></div>
         
-        <button onclick="undoAction()" id="tool-undo" class="nav-btn-action" title="ย้อนกลับการวาดเขียน (Undo)"><i class="fa-solid fa-rotate-left"></i></button>
-        <button onclick="redoAction()" id="tool-redo" class="nav-btn-action" title="ทำซ้ำการวาดเขียน (Redo)"><i class="fa-solid fa-rotate-right"></i></button>
+        <button onclick="undoAction()" id="tool-undo" class="nav-btn-action" title="ย้อนกลับ (Undo)"><i class="fa-solid fa-rotate-left"></i></button>
+        <button onclick="redoAction()" id="tool-redo" class="nav-btn-action" title="ทำซ้ำ (Redo)"><i class="fa-solid fa-rotate-right"></i></button>
         <button onclick="clearCurrentDrawings()" id="tool-clear" class="nav-btn-action" title="ล้างหน้าวาดนี้" style="color: #ef4444;"><i class="fa-solid fa-trash-can"></i></button>
         <div class="divider"></div>
         
+        <!-- โหมดพื้นฐาน -->
         <button onclick="setTool('pan')" id="tool-pan" class="tool-btn active" title="โหมดเลื่อนดูงาน"><i class="fa-solid fa-hand"></i></button>
         <button onclick="setTool('pen')" id="tool-pen" class="tool-btn" title="ปากกาวาดเขียน"><i class="fa-solid fa-pen-fancy"></i></button>
         <button onclick="setTool('text')" id="tool-text" class="tool-btn" title="พิมพ์ข้อความลอย"><i class="fa-solid fa-font"></i></button>
         <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn" title="ยางลบ"><i class="fa-solid fa-eraser"></i></button>
-        
         <div class="divider"></div>
+
+        <!-- โหมดงานแก้เอกสารแบบแนบเนียน (Vector Engine) -->
+        <button onclick="setTool('edit-text')" id="tool-edit-text" class="tool-btn" title="แตะแก้ไขข้อความเดิมของ PDF"><i class="fa-solid fa-i-cursor"></i></button>
+        <button onclick="setTool('whiteout')" id="tool-whiteout" class="tool-btn" title="ลากบล็อกสีทับลบคำเดิม"><i class="fa-solid fa-vector-square"></i></button>
+        <button onclick="openSignatureModal()" id="tool-signature" class="tool-btn" title="เซ็นลายเซ็น / แปะรูปตราประทับ"><i class="fa-solid fa-signature"></i></button>
+        <div class="divider"></div>
+        
         <button onclick="zoomIn()" title="ขยาย"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
         <button onclick="zoomOut()" title="ย่อ"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
         <div class="divider"></div>
         <button onclick="scrollWorkspace('next')" id="tool-next" class="nav-btn" title="เลื่อนลงหน้าล่าง"><i class="fa-solid fa-circle-chevron-right"></i></button>
     </nav>
 
+    <!-- MODAL: แตะแก้ไขข้อความเดิมของ PDF -->
+    <div id="text-edit-modal" class="custom-modal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h4><i class="fa-solid fa-i-cursor text-glow"></i> แก้ไขข้อความในเอกสาร</h4>
+                <button onclick="closeTextEditModal()" class="close-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>ข้อความเดิม:</label>
+                <div id="modal-old-text" class="text-preview-box"></div>
+                <label style="margin-top: 10px;">ข้อความใหม่ที่จะใส่แทนที่:</label>
+                <input type="text" id="modal-new-text" placeholder="พิมพ์ข้อความใหม่ที่นี่...">
+                
+                <div class="modal-options-row">
+                    <div>
+                        <label>ขนาดตัวอักษร:</label>
+                        <input type="number" id="modal-font-size" min="6" max="72" value="14"> px
+                    </div>
+                    <div>
+                        <label>สีตัวหนังสือ:</label>
+                        <input type="color" id="modal-text-color" value="#000000">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeTextEditModal()" class="btn-cancel">ยกเลิก</button>
+                <button onclick="confirmTextPatch()" class="btn-primary">บันทึกข้อความแนบเนียน</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ลายเซ็นดิจิทัล & อัปโหลดรูปภาพ -->
+    <div id="signature-modal" class="custom-modal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h4><i class="fa-solid fa-signature text-glow"></i> เซ็นลายเซ็น / แปะรูปตราประทับ</h4>
+                <button onclick="closeSignatureModal()" class="close-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="sig-tabs">
+                    <button id="tab-draw-sig" class="active" onclick="switchSigTab('draw')">วาดลายเซ็นสด</button>
+                    <button id="tab-upload-sig" onclick="switchSigTab('upload')">อัปโหลดไฟล์รูป / ตราประทับ</button>
+                </div>
+                
+                <div id="sig-draw-pane">
+                    <canvas id="signature-pad" width="360" height="160"></canvas>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                        <button onclick="clearSignaturePad()" class="btn-mini"><i class="fa-solid fa-eraser"></i> ล้างลายเซ็น</button>
+                        <div class="color-select-mini">
+                            <span class="dot-mini" style="background:#000000" onclick="setSigColor('#000000')"></span>
+                            <span class="dot-mini" style="background:#0000ff" onclick="setSigColor('#0000ff')"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="sig-upload-pane" style="display: none;">
+                    <div class="upload-dropzone" onclick="document.getElementById('sig-file-input').click()">
+                        <i class="fa-solid fa-file-image" style="font-size: 32px; color: var(--accent-color);"></i>
+                        <p>แตะเพื่อเลือกรูปภาพ PNG/JPG โปร่งใส</p>
+                        <input type="file" id="sig-file-input" accept="image/*" style="display:none;" onchange="handleSigFileUpload(event)">
+                    </div>
+                    <div id="sig-upload-preview" style="display:none; text-align:center; margin-top:10px;">
+                        <img id="sig-img-preview" style="max-height: 120px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeSignatureModal()" class="btn-cancel">ยกเลิก</button>
+                <button onclick="insertSignatureToDoc()" class="btn-primary">วางลงบนหน้าเอกสาร</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI SIDEBAR -->
     <div id="ai-sidebar" class="ai-sidebar">
         <div class="ai-sidebar-header">
             <h3><i class="fa-solid fa-wand-magic-sparkles" style="color: #22d3ee;"></i> Studio AI Assistant</h3>
@@ -392,6 +279,7 @@
         </div>
     </div>
 
+    <!-- FLOATING TEXT BOTTOM BAR -->
     <div id="text-node-bottom-bar" class="text-node-floating-bar">
         <div class="floating-bar-content">
             <div class="floating-bar-header">
