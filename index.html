@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nawee PDF Studio</title>
+    <title>Sunita PDF Studio</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="cat-avatar.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -21,8 +22,8 @@
     <!-- TOP NAVIGATION BAR -->
     <header class="top-bar">
         <div class="brand">
-            <i class="fa-solid fa-file-signature text-glow"></i>
-            <span>Nawee PDF <small class="pro-badge">PRO</small></span>
+            <img src="cat-avatar.png" alt="Cat Logo" class="brand-avatar" onerror="this.style.display='none'">
+            <span>Sunita PDF <small class="pro-badge">PRO</small></span>
         </div>
         <div class="action-buttons">
             <button onclick="resetApp()" class="btn-secondary" title="เริ่มเอกสารใหม่">
@@ -43,9 +44,11 @@
     <main class="workspace">
         <div id="document-container">
             <div class="welcome-box">
-                <div class="welcome-icon"><i class="fa-solid fa-file-pdf"></i></div>
-                <h2>ยินดีต้อนรับสู่ Nawee PDF Studio</h2>
-                <p>แก้ไขเอกสารแบบแนบเนียน ลบคำผิด ดูดสีพื้นหลัง วาดกรอบสี่เหลี่ยม วงรี และส่งออกไฟล์คมชัดระดับเวกเตอร์</p>
+                <div class="welcome-avatar-wrap">
+                    <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\'welcome-icon\'><i class=\'fa-solid fa-file-pdf\'></i></div>'">
+                </div>
+                <h2>ยินดีต้อนรับสู่ Sunita PDF Studio</h2>
+                <p>เครื่องมือตรวจแก้เอกสารและใบเสนอราคาฉบับพิเศษ ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี และส่งออกคมชัดระดับเวกเตอร์</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
@@ -55,43 +58,43 @@
 
     <!-- FLOATING DOCK TOOLBAR -->
     <nav class="floating-dock">
-        <!-- 1. เลื่อนดูเอกสาร -->
+        <!-- เลื่อนดูเอกสาร -->
         <button onclick="setTool('pan')" id="tool-pan" class="dock-btn" title="เลื่อนดูเอกสาร">
             <i class="fa-solid fa-hand"></i>
         </button>
         <div class="dock-divider"></div>
 
-        <!-- 2. แก้ไขคำแนบเนียน -->
+        <!-- แก้ไขคำแนบเนียน -->
         <button onclick="setTool('patch')" id="tool-patch" class="dock-btn active" title="ลบคำผิดและพิมพ์ทับ">
             <i class="fa-solid fa-i-cursor"></i>
         </button>
 
-        <!-- 3. กรอบสี่เหลี่ยม -->
+        <!-- กรอบสี่เหลี่ยม -->
         <button onclick="setTool('rect')" id="tool-rect" class="dock-btn" title="วาดกรอบสี่เหลี่ยม">
             <i class="fa-regular fa-square"></i>
         </button>
 
-        <!-- 4. วงกลม/วงรี -->
+        <!-- วงกลม/วงรี -->
         <button onclick="setTool('circle')" id="tool-circle" class="dock-btn" title="วาดวงกลม/วงรีเน้นข้อความ">
             <i class="fa-regular fa-circle"></i>
         </button>
 
-        <!-- 5. ปากกาฟรีแฮนด์ -->
+        <!-- ปากกาฟรีแฮนด์ -->
         <button onclick="setTool('pen')" id="tool-pen" class="dock-btn" title="ปากกาเซ็นชื่อ/เขียนโน้ต">
             <i class="fa-solid fa-pen-nib"></i>
         </button>
 
-        <!-- 6. ไฮไลต์ -->
+        <!-- ไฮไลต์ -->
         <button onclick="setTool('highlighter')" id="tool-highlighter" class="dock-btn" title="ปากกาไฮไลต์เรืองแสง">
             <i class="fa-solid fa-highlighter"></i>
         </button>
 
-        <!-- 7. ยางลบ -->
+        <!-- ยางลบ -->
         <button onclick="setTool('eraser')" id="tool-eraser" class="dock-btn" title="ยางลบเส้นวาด">
             <i class="fa-solid fa-eraser"></i>
         </button>
 
-        <!-- 8. ตรายาง / ลายเซ็น -->
+        <!-- ตรายาง / ลายเซ็น -->
         <button onclick="openSignatureModal()" id="tool-signature" class="dock-btn" title="เซ็นลายเซ็น / แปะรูปตราประทับ">
             <i class="fa-solid fa-signature"></i>
         </button>
