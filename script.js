@@ -5,7 +5,7 @@ if (pdfjsLib) {
 
 // Global States
 let currentTool = 'patch';
-let currentInkColor = '#ef4444'; // ตั้งสีเริ่มต้นเป็นสีแดง
+let currentInkColor = '#ef4444'; // สีเริ่มต้นเป็นสีแดงสด
 let currentScale = 1.0;
 let pdfDoc = null;
 let originalPdfBytes = null;
@@ -82,7 +82,7 @@ function resetApp() {
                     <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\\'welcome-icon\\'><i class=\\'fa-solid fa-file-pdf\\'></i></div>'">
                 </div>
                 <h2>ยินดีต้อนรับสู่ Sunita PDF Studio</h2>
-                <p>เครื่องมือตรวจแก้เอกสาร ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี และส่งออกคมชัดระดับเวกเตอร์</p>
+                <p>เครื่องมือตรวจแก้เอกสาร ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี ชี้เป้าแก้ไข และส่งออกคมชัดระดับเวกเตอร์</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
@@ -137,6 +137,11 @@ async function renderPage(pageNum, container) {
     annotCanvas.width = viewport.width;
     annotCanvas.height = viewport.height;
     wrapper.appendChild(annotCanvas);
+
+    // SVG สำหรับวาดเส้นโยงระหว่างรูปทรงกับกล่องคอมเมนต์สีแดง
+    const svgLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgLayer.setAttribute('class', 'leader-lines-svg');
+    wrapper.appendChild(svgLayer);
 
     const patchLayer = document.createElement('div');
     patchLayer.className = 'patch-layer';
@@ -354,7 +359,8 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     wrapper.addEventListener('pointerdown', (e) => {
         if (currentTool !== 'patch' && currentTool !== 'rect' && currentTool !== 'circle') return;
         if (e.target.closest('.active-patch-node') || e.target.closest('.nudge-toolbar') || 
-            e.target.closest('.shape-interactive-node') || e.target.closest('.custom-draggable-sig')) return;
+            e.target.closest('.shape-interactive-node') || e.target.closest('.shape-callout-bubble') ||
+            e.target.closest('.custom-draggable-sig')) return;
 
         const coords = getPageAccurateCoords(e, wrapper);
         startX = coords.x;
@@ -451,11 +457,13 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 }
 
 // -------------------------------------------------------------
-// Interactive Shape Engine (บันทึกกรอบลง PDF 100% แน่นอน)
+// Interactive Shape + Draggable Callout with Leader Line
 // -------------------------------------------------------------
 function createInteractiveShape(wrapper, pageNum, left, top, width, height, type, initialColor) {
     const layer = wrapper.querySelector('.patch-layer');
+    const svgLayer = wrapper.querySelector('.leader-lines-svg');
 
+    // 1. ตัวรูปทรงหลัก (Rectangle หรือ Circle)
     const shapeNode = document.createElement('div');
     shapeNode.className = `shape-interactive-node shape-${type}`;
     shapeNode.style.left = left + 'px';
@@ -464,11 +472,7 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     shapeNode.style.height = height + 'px';
     shapeNode.style.setProperty('--shape-color', initialColor);
 
-    const attachedTag = document.createElement('div');
-    attachedTag.className = 'shape-attached-tag';
-    attachedTag.style.display = 'none';
-    shapeNode.appendChild(attachedTag);
-
+    // ทูลบาร์ด่วนสำหรับตั้งค่า
     const toolbar = document.createElement('div');
     toolbar.className = 'shape-quick-toolbar';
     toolbar.innerHTML = `
@@ -476,12 +480,13 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         <span class="shape-color-dot" style="background:#0033aa" data-c="#0033aa"></span>
         <span class="shape-color-dot" style="background:#111827" data-c="#111827"></span>
         <span class="shape-color-dot" style="background:#10b981" data-c="#10b981"></span>
-        <input type="text" class="shape-note-input" placeholder="พิมพ์แท็ก...">
+        <input type="text" class="shape-note-input" placeholder="พิมพ์ข้อความชี้เป้า...">
         <button type="button" class="shape-confirm-btn" title="ยืนยันการตั้งค่า"><i class="fa-solid fa-check"></i> ตกลง</button>
         <button type="button" class="shape-del-btn" title="ลบ"><i class="fa-solid fa-trash-can"></i></button>
     `;
     shapeNode.appendChild(toolbar);
 
+    // ด้ามจับยืดขยายมุม (Resize Handles)
     const handles = [];
     ['tl', 'tr', 'bl', 'br'].forEach(pos => {
         const h = document.createElement('div');
@@ -490,9 +495,33 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         handles.push(h);
     });
 
+    // 2. เส้นโยง Leader Line (SVG Line)
+    const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    leaderLine.setAttribute('stroke', initialColor);
+    leaderLine.setAttribute('stroke-width', '2');
+    leaderLine.setAttribute('stroke-linecap', 'round');
+    leaderLine.setAttribute('stroke-dasharray', '3,3');
+    leaderLine.style.display = 'none';
+    svgLayer.appendChild(leaderLine);
+
+    // 3. กล่องคอมเมนต์สีแดง (Draggable Red Callout Bubble)
+    const calloutBubble = document.createElement('div');
+    calloutBubble.className = 'shape-callout-bubble';
+    calloutBubble.style.display = 'none';
+    calloutBubble.style.setProperty('--shape-color', initialColor);
+    calloutBubble.innerHTML = `
+        <span class="callout-text"></span>
+        <i class="fa-solid fa-pen callout-edit-icon" title="ดับเบิลคลิกเพื่อแก้คำ"></i>
+    `;
+    layer.appendChild(calloutBubble);
+
     let currentColor = initialColor;
     let noteText = '';
     const noteInput = toolbar.querySelector('.shape-note-input');
+
+    // ข้อมูลสถานะของ Callout
+    let calloutX = left + 10;
+    let calloutY = Math.max(10, top - 36);
 
     const shapeData = {
         type: type,
@@ -501,9 +530,61 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         width: width,
         height: height,
         color: currentColor,
-        note: noteText,
-        nodeRef: shapeNode
+        callout: null
     };
+
+    function updateLeaderLine() {
+        if (!noteText || calloutBubble.style.display === 'none') {
+            leaderLine.style.display = 'none';
+            return;
+        }
+
+        const sL = parseFloat(shapeNode.style.left) || 0;
+        const sT = parseFloat(shapeNode.style.top) || 0;
+        const sW = parseFloat(shapeNode.style.width) || 0;
+        const sH = parseFloat(shapeNode.style.height) || 0;
+
+        const bL = parseFloat(calloutBubble.style.left) || 0;
+        const bT = parseFloat(calloutBubble.style.top) || 0;
+        const bW = calloutBubble.offsetWidth || 70;
+        const bH = calloutBubble.offsetHeight || 24;
+
+        // จุดยึดรูปทรง (ขอบที่ใกล้กับกล่องคอมเมนต์ที่สุด)
+        const shapeCenterX = sL + (sW / 2);
+        const shapeCenterY = sT + (sH / 2);
+
+        // จุดยึดของกล่องคอมเมนต์ (กึ่งกลางกล่อง)
+        const bubbleCenterX = bL + (bW / 2);
+        const bubbleCenterY = bT + (bH / 2);
+
+        let anchorX = shapeCenterX;
+        let anchorY = shapeCenterY;
+
+        if (bubbleCenterY < sT) anchorY = sT; // กล่องอยู่ข้างบน
+        else if (bubbleCenterY > sT + sH) anchorY = sT + sH; // กล่องอยู่ข้างล่าง
+
+        if (bubbleCenterX < sL) anchorX = sL; // กล่องอยู่ทางซ้าย
+        else if (bubbleCenterX > sL + sW) anchorX = sL + sW; // กล่องอยู่ทางขวา
+
+        leaderLine.setAttribute('x1', anchorX);
+        leaderLine.setAttribute('y1', anchorY);
+        leaderLine.setAttribute('x2', bubbleCenterX);
+        leaderLine.setAttribute('y2', bubbleCenterY);
+        leaderLine.setAttribute('stroke', currentColor);
+        leaderLine.style.display = 'block';
+
+        const wH = parseFloat(wrapper.style.height) || 0;
+        shapeData.callout = {
+            text: noteText,
+            x: bL,
+            y: wH - (bT + bH), // แปลงเป็นระบบพิกัด PDF จากมุมล่างซ้าย
+            width: bW,
+            height: bH,
+            anchorX: anchorX,
+            anchorY: wH - anchorY,
+            color: currentColor
+        };
+    }
 
     function syncShapeToData() {
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
@@ -520,7 +601,8 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         shapeData.width = curW;
         shapeData.height = curH;
         shapeData.color = currentColor;
-        shapeData.note = noteText;
+
+        updateLeaderLine();
 
         if (!documentPatches[pageNum].shapes.includes(shapeData)) {
             documentPatches[pageNum].shapes.push(shapeData);
@@ -532,6 +614,7 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
             e.stopPropagation();
             currentColor = dot.dataset.c;
             shapeNode.style.setProperty('--shape-color', currentColor);
+            calloutBubble.style.setProperty('--shape-color', currentColor);
             syncShapeToData();
         };
     });
@@ -539,32 +622,60 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     toolbar.querySelector('.shape-del-btn').onclick = (e) => {
         e.stopPropagation();
         shapeNode.remove();
+        calloutBubble.remove();
+        leaderLine.remove();
         if (documentPatches[pageNum] && documentPatches[pageNum].shapes) {
             documentPatches[pageNum].shapes = documentPatches[pageNum].shapes.filter(s => s !== shapeData);
         }
         showToast("ลบรูปทรงแล้วค่ะ");
     };
 
-    let isMoving = false, startX = 0, startY = 0, origL = left, origT = top;
+    // ลากรูปทรงหลัก (Move Shape)
+    let isMovingShape = false, startSX = 0, startSY = 0, origSL = left, origST = top;
     shapeNode.addEventListener('pointerdown', (e) => {
         if (e.target.closest('.shape-handle') || e.target.closest('.shape-quick-toolbar')) return;
-        isMoving = true;
-        startX = e.clientX; startY = e.clientY;
-        origL = parseFloat(shapeNode.style.left);
-        origT = parseFloat(shapeNode.style.top);
+        isMovingShape = true;
+        startSX = e.clientX; startSY = e.clientY;
+        origSL = parseFloat(shapeNode.style.left);
+        origST = parseFloat(shapeNode.style.top);
         shapeNode.setPointerCapture(e.pointerId);
     });
     shapeNode.addEventListener('pointermove', (e) => {
-        if (!isMoving) return;
-        const dx = (e.clientX - startX) / currentScale;
-        const dy = (e.clientY - startY) / currentScale;
-        shapeNode.style.left = (origL + dx) + 'px';
-        shapeNode.style.top = (origT + dy) + 'px';
+        if (!isMovingShape) return;
+        const dx = (e.clientX - startSX) / currentScale;
+        const dy = (e.clientY - startSY) / currentScale;
+        shapeNode.style.left = (origSL + dx) + 'px';
+        shapeNode.style.top = (origST + dy) + 'px';
         syncShapeToData();
     });
     shapeNode.addEventListener('pointerup', () => {
-        if (isMoving) {
-            isMoving = false;
+        if (isMovingShape) {
+            isMovingShape = false;
+            syncShapeToData();
+        }
+    });
+
+    // 🎯 ลากกล่องคอมเมนต์สีแดง (Move Callout Bubble อิสระไปทั่วหน้าจอ)
+    let isMovingCallout = false, startBX = 0, startBY = 0, origBL = 0, origBT = 0;
+    calloutBubble.addEventListener('pointerdown', (e) => {
+        isMovingCallout = true;
+        startBX = e.clientX; startBY = e.clientY;
+        origBL = parseFloat(calloutBubble.style.left) || 0;
+        origBT = parseFloat(calloutBubble.style.top) || 0;
+        calloutBubble.setPointerCapture(e.pointerId);
+        e.stopPropagation();
+    });
+    calloutBubble.addEventListener('pointermove', (e) => {
+        if (!isMovingCallout) return;
+        const dx = (e.clientX - startBX) / currentScale;
+        const dy = (e.clientY - startBY) / currentScale;
+        calloutBubble.style.left = (origBL + dx) + 'px';
+        calloutBubble.style.top = (origBT + dy) + 'px';
+        updateLeaderLine();
+    });
+    calloutBubble.addEventListener('pointerup', () => {
+        if (isMovingCallout) {
+            isMovingCallout = false;
             syncShapeToData();
         }
     });
@@ -572,16 +683,21 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     function confirmShape() {
         noteText = noteInput.value.trim();
         if (noteText) {
-            attachedTag.innerText = noteText;
-            attachedTag.style.display = 'block';
+            calloutBubble.querySelector('.callout-text').innerText = noteText;
+            calloutBubble.style.display = 'flex';
+            if (!calloutBubble.style.left) {
+                calloutBubble.style.left = calloutX + 'px';
+                calloutBubble.style.top = calloutY + 'px';
+            }
         } else {
-            attachedTag.style.display = 'none';
+            calloutBubble.style.display = 'none';
+            shapeData.callout = null;
         }
 
         toolbar.style.display = 'none';
         handles.forEach(h => h.style.display = 'none');
         syncShapeToData();
-        showToast("ยืนยันรูปทรงเรียบร้อย");
+        showToast("ยืนยันรูปทรงและข้อความชี้เป้าเรียบร้อย (ลากกล่องแดงไปวางตำแหน่งที่ต้องการได้เลย)");
     }
 
     toolbar.querySelector('.shape-confirm-btn').onclick = (e) => {
@@ -596,7 +712,14 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         }
     });
 
+    // ดับเบิลคลิกเพื่อแก้ไขข้อความ
     shapeNode.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        toolbar.style.display = 'flex';
+        handles.forEach(h => h.style.display = 'block');
+        noteInput.focus();
+    });
+    calloutBubble.addEventListener('dblclick', (e) => {
         e.stopPropagation();
         toolbar.style.display = 'flex';
         handles.forEach(h => h.style.display = 'block');
@@ -604,24 +727,30 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     });
 
     layer.appendChild(shapeNode);
-    syncShapeToData(); // ซิงก์ค่าทันทีที่สร้าง
+    syncShapeToData();
 
     recordAction({
         undo: () => { 
-            shapeNode.style.display = 'none'; 
+            shapeNode.style.display = 'none';
+            calloutBubble.style.display = 'none';
+            leaderLine.style.display = 'none';
             if (documentPatches[pageNum] && documentPatches[pageNum].shapes) {
                 documentPatches[pageNum].shapes = documentPatches[pageNum].shapes.filter(s => s !== shapeData);
             }
         },
         redo: () => { 
             shapeNode.style.display = 'block'; 
+            if (noteText) {
+                calloutBubble.style.display = 'flex';
+                leaderLine.style.display = 'block';
+            }
             syncShapeToData();
         }
     });
 }
 
 // -------------------------------------------------------------
-// กล่อง Input: ล็อกพิกัดตรงจุด ไม่กระโดด ไม่แลบกินขอบตาราง
+// กล่อง Input แก้คำ: ล็อกพิกัดตรงจุด ไม่กระโดด ไม่แลบกินขอบตาราง
 // -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
@@ -632,7 +761,6 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     const insetLeft = left;
     const insetTop = top;
     let insetWidth = Math.max(16, width);
-    // บีบความสูงกล่องไม่ให้แลบขึ้นไปกินขอบแถบสีด้านบน
     const insetHeight = Math.max(fontSize + 2, Math.round(height));
 
     const node = document.createElement('div');
@@ -821,13 +949,11 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         ctx.fillStyle = colors.bg.hex;
         ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
 
-        let drawX;
+        let drawX = (insetLeft + currentOffsetX) * ratioX;
         if (currentAlign === 'right') {
             drawX = (insetLeft * ratioX) + clearWidth - textWidthOnCanvas - (2 * ratioX);
         } else if (currentAlign === 'center') {
             drawX = (insetLeft * ratioX) + ((clearWidth - textWidthOnCanvas) / 2);
-        } else {
-            drawX = (insetLeft + currentOffsetX) * ratioX;
         }
 
         const drawBaselineY = (insetTop + (fontSize * 0.88)) * ratioY;
@@ -837,7 +963,6 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         ctx.fillText(text, drawX, drawBaselineY);
 
         const wrapperHeight = parseFloat(wrapper.style.height);
-        // 🎯 ล็อกพิกัด PDF จากตำแหน่งจริงของกล่อง ไม่พึ่งพาพิกัดของคำข้างเคียง ป้องกันการกระโดดข้ามจุด
         const finalPdfX = drawX / ratioX;
         const finalPdfY = wrapperHeight - insetTop - (fontSize * 0.88);
         const finalBoxY = wrapperHeight - (insetTop + insetHeight);
@@ -1057,7 +1182,7 @@ function placeSignatureOnDoc() {
 }
 
 // -------------------------------------------------------------
-// ส่งออก Vector PDF (ครอบคลุม Shape และ Patch สมบูรณ์ 100%)
+// ส่งออก Vector PDF (เรนเดอร์ Shape, เส้นโยง และกล่องคอมเมนต์สีแดงคมชัด)
 // -------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; }
@@ -1083,45 +1208,13 @@ async function exportVectorPDF() {
 
         const pages = loadedPdf.getPages();
 
-        // 🎯 สแกน Shape จาก DOM อีกรอบเพื่อรับประกันว่าไม่มีรูปทรงไหนตกหล่น
-        document.querySelectorAll('.page-wrapper').forEach(wrap => {
-            const pNum = parseInt(wrap.dataset.pageNumber);
-            const wH = parseFloat(wrap.style.height);
-            if (!documentPatches[pNum]) documentPatches[pNum] = { patches: [], images: [], shapes: [] };
-            
-            const liveShapes = [];
-            wrap.querySelectorAll('.shape-interactive-node').forEach(node => {
-                const isRect = node.classList.contains('shape-rect');
-                const isCircle = node.classList.contains('shape-circle');
-                const curL = parseFloat(node.style.left) || 0;
-                const curT = parseFloat(node.style.top) || 0;
-                const curW = parseFloat(node.style.width) || 0;
-                const curH = parseFloat(node.style.height) || 0;
-                const col = node.style.getPropertyValue('--shape-color') || '#ef4444';
-                const tagEl = node.querySelector('.shape-attached-tag');
-                const tag = tagEl && tagEl.style.display !== 'none' ? tagEl.innerText : '';
-
-                liveShapes.push({
-                    type: isRect ? 'rect' : (isCircle ? 'circle' : 'rect'),
-                    x: curL,
-                    y: wH - (curT + curH),
-                    width: curW,
-                    height: curH,
-                    color: col,
-                    note: tag
-                });
-            });
-            if (liveShapes.length > 0) {
-                documentPatches[pNum].shapes = liveShapes;
-            }
-        });
-
         for (let pageNum in documentPatches) {
             const pIdx = parseInt(pageNum) - 1;
             if (pIdx < 0 || pIdx >= pages.length) continue;
             const targetPage = pages[pIdx];
             const pData = documentPatches[pageNum];
 
+            // 1. เรนเดอร์การแก้ไขคำในตาราง (Patches)
             if (pData.patches) {
                 pData.patches.forEach(pt => {
                     const safeBgR = Math.min(1.0, Math.max(0.0, pt.bgColor.r));
@@ -1132,7 +1225,6 @@ async function exportVectorPDF() {
                     const safeTxtG = Math.min(1.0, Math.max(0.0, pt.textColor.g));
                     const safeTxtB = Math.min(1.0, Math.max(0.0, pt.textColor.b));
 
-                    // วาดกล่องถมสีพื้น
                     targetPage.drawRectangle({
                         x: pt.boxLeft,
                         y: pt.patchBoxY,
@@ -1141,7 +1233,6 @@ async function exportVectorPDF() {
                         color: rgb(safeBgR, safeBgG, safeBgB),
                     });
 
-                    // วาดตัวหนังสือลงตำแหน่งจริง
                     targetPage.drawText(pt.text, {
                         x: pt.x,
                         y: pt.y,
@@ -1152,6 +1243,7 @@ async function exportVectorPDF() {
                 });
             }
 
+            // 2. เรนเดอร์รูปทรง + เส้นโยง + กล่องคอมเมนต์สีแดง (Shapes & Callouts)
             if (pData.shapes) {
                 pData.shapes.forEach(sh => {
                     const hexToRgb = (hex) => {
@@ -1164,6 +1256,7 @@ async function exportVectorPDF() {
                     };
                     const shapeColor = hexToRgb(sh.color);
 
+                    // วาดกรอบสี่เหลี่ยมหรือวงกลม
                     if (sh.type === 'rect') {
                         targetPage.drawRectangle({
                             x: sh.x,
@@ -1184,18 +1277,42 @@ async function exportVectorPDF() {
                         });
                     }
 
-                    if (sh.note && sh.note.trim() !== '') {
-                        targetPage.drawText(sh.note, {
-                            x: sh.x + 4,
-                            y: sh.y + sh.height + 3,
-                            size: 10,
+                    // วาดเส้นโยงและกล่องคอมเมนต์สีแดง (ถ้ามีข้อความ)
+                    if (sh.callout && sh.callout.text && sh.callout.text.trim() !== '') {
+                        const callout = sh.callout;
+                        const calloutColor = hexToRgb(callout.color || sh.color);
+
+                        // ลากเส้นโยง (Leader Line)
+                        targetPage.drawLine({
+                            start: { x: callout.anchorX, y: callout.anchorY },
+                            end: { x: callout.x + (callout.width / 2), y: callout.y + (callout.height / 2) },
+                            thickness: 1.5,
+                            color: calloutColor,
+                            dashArray: [3, 3]
+                        });
+
+                        // วาดพื้นหลังกล่องคอมเมนต์สีแดง
+                        targetPage.drawRectangle({
+                            x: callout.x,
+                            y: callout.y,
+                            width: callout.width,
+                            height: callout.height,
+                            color: calloutColor,
+                        });
+
+                        // พิมพ์ข้อความสีขาวลงในกล่องคอมเมนต์
+                        targetPage.drawText(callout.text, {
+                            x: callout.x + 8,
+                            y: callout.y + (callout.height * 0.28),
+                            size: 11,
                             font: thaiFont,
-                            color: shapeColor
+                            color: rgb(1, 1, 1),
                         });
                     }
                 });
             }
 
+            // 3. เรนเดอร์ลายเซ็น/ตราประทับ
             if (pData.images) {
                 for (let img of pData.images) {
                     try {
@@ -1209,6 +1326,7 @@ async function exportVectorPDF() {
             }
         }
 
+        // 4. เรนเดอร์เลเยอร์วาดเขียนไฮไลต์จาก Canvas
         const wrappers = document.querySelectorAll('.page-wrapper');
         for (let idx = 0; idx < wrappers.length; idx++) {
             const c = wrappers[idx].querySelector('.annotation-canvas');
