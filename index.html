@@ -3,82 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nawee PDF & Word Pro Studio</title>
+    <title>Nawee PDF Pro Studio</title>
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
-    <!-- PDF Rendering & Font Engine -->
+    <!-- Core PDF Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://unpkg.com/@pdf-lib/fontkit@0.0.4/dist/fontkit.umd.min.js"></script>
     
-    <!-- Legacy Export Fallbacks & Icons -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body class="mode-pdf"> 
+<body class="mode-pdf tool-edit-text"> 
     <!-- TOP BAR -->
     <header class="top-bar">
         <div class="brand">
             <i class="fa-solid fa-file-invoice text-glow"></i>
-            <span id="app-title">PDF Pro <small class="badge">PDF MODE</small></span>
+            <span id="app-title">PDF Pro <small class="badge">STUDIO</small></span>
         </div>
         <div class="action-group">
-            <button onclick="resetApp()" title="ล้างหน้าจอเพื่อเริ่มงานใหม่" style="background: rgba(239, 68, 68, 0.08); color: #f87171;">
+            <button onclick="resetApp()" title="ล้างหน้าจอเพื่อเริ่มงานใหม่" style="background: rgba(239, 68, 68, 0.1); color: #f87171;">
                 <i class="fa-solid fa-square-plus"></i> <span class="lbl">งานใหม่</span>
             </button>
             <button onclick="document.getElementById('upload').click()" title="เปิดไฟล์ PDF">
                 <i class="fa-solid fa-folder-open"></i> <span class="lbl">เปิดไฟล์</span>
             </button>
-            <button onclick="saveToDatabase()" title="บันทึกลงฐานข้อมูลตรงๆ ไม่ดาวน์โหลด">
-                <i class="fa-solid fa-floppy-disk"></i> <span class="lbl">เซฟไฟล์</span>
+            <button onclick="saveToDatabase()" title="บันทึกลงเครื่อง">
+                <i class="fa-solid fa-floppy-disk"></i> <span class="lbl">เซฟงาน</span>
             </button>
-            <button onclick="shareToLine()" title="แชร์ผ่าน LINE" class="btn-line">
-                <i class="fa-brands fa-line"></i> <span class="lbl">แชร์ LINE</span>
-            </button>
-            
-            <div class="dropdown-wrapper">
-                <button onclick="toggleDropdown('convert-menu')" class="btn-premium" title="เมนูแปลงและส่งออกไฟล์">
-                    <i class="fa-solid fa-arrows-rotate"></i> <span class="lbl">ส่งออก</span>
-                </button>
-                <div id="convert-menu" class="dropdown-popup">
-                    <button onclick="exportToPDFFile()"><i class="fa-solid fa-file-pdf" style="color: #22d3ee;"></i> บันทึก PDF เวกเตอร์แท้ (คมชัด 100%)</button>
-                    <button onclick="triggerPdfToWord()"><i class="fa-solid fa-file-word" style="color: #2b579a;"></i> สลับไปโหมด Word</button>
-                    <button onclick="triggerWordToPdf()"><i class="fa-solid fa-eye" style="color: #e44d26;"></i> สลับกลับโหมด PDF</button>
-                </div>
-            </div>
-
-            <button onclick="toggleAiSidebar()" class="btn-ai" title="เปิดผู้ช่วย AI อัจฉริยะ">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> 
-                <span class="lbl">ผู้ช่วย AI</span>
+            <button onclick="exportToPDFFile()" class="btn-premium" title="บันทึกและส่งออกไฟล์ PDF คมชัด 100%">
+                <i class="fa-solid fa-file-arrow-down"></i> <span class="lbl">ส่งออก PDF</span>
             </button>
         </div>
     </header>
-
-    <!-- WORD FORMATTING BAR (สำหรับโหมดแก้แบบเดิม) -->
-    <div class="word-formatting-bar">
-        <div class="format-group">
-            <button onclick="formatWord('bold')" title="ตัวหนา"><i class="fa-solid fa-bold"></i></button>
-            <button onclick="formatWord('italic')" title="ตัวเอียง"><i class="fa-solid fa-italic"></i></button>
-            <button onclick="formatWord('underline')" title="ขีดเส้นใต้"><i class="fa-solid fa-underline"></i></button>
-        </div>
-        <div class="divider"></div>
-        <div class="format-group text-size-selector">
-            <label>ขนาดฟอนต์แก้ไขหลัก:</label>
-            <select onchange="formatWord('fontSize', this.value)">
-                <option value="3">ปกติ</option>
-                <option value="1">เล็กสุด</option>
-                <option value="2">เล็ก</option>
-                <option value="4">กลาง</option>
-                <option value="5">ใหญ่</option>
-                <option value="6">ใหญ่พิเศษ</option>
-            </select>
-        </div>
-    </div>
 
     <input type="file" id="upload" accept="application/pdf" style="display:none;">
 
@@ -87,7 +47,8 @@
         <div id="pdf-container">
             <div class="initial-notice">
                 <p><i class="fa-solid fa-cloud-arrow-up" style="font-size: 48px; color: var(--accent-color); margin-bottom: 15px;"></i></p>
-                <p>ยินดีต้อนรับสู่ระบบ กรุณากดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มต้นทำงานค่ะ</p>
+                <p>ยินดีต้อนรับสู่ Nawee PDF Studio</p>
+                <p style="font-size: 13px; color: #64748b; margin-top: 8px;">กดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มแก้ไขเอกสารแบบแนบเนียนค่ะ</p>
             </div>
         </div>
     </main>
@@ -115,25 +76,6 @@
         <button onclick="toggleEraserShape()" id="btn-toggle-shape">สลับทรงยางลบ</button>
     </div>
 
-    <!-- FLOATING TEXT SUB-PANEL -->
-    <div id="text-settings-panel" class="pen-sub-panel">
-        <div class="panel-item">
-            <label><i class="fa-solid fa-palette"></i> สีข้อความลอย:</label>
-            <input type="color" id="text-color-picker" value="#f59e0b">
-            <div class="quick-color-palette">
-                <div class="color-palette-dot text-palette-dot" data-color="#000000" style="background: #000000;" title="สีดำ"></div>
-                <div class="color-palette-dot text-palette-dot" data-color="#ff0000" style="background: #ff0000;" title="สีแดง"></div>
-                <div class="color-palette-dot text-palette-dot" data-color="#0000ff" style="background: #0000ff;" title="สีน้ำเงิน"></div>
-                <div class="color-palette-dot text-palette-dot" data-color="#00ff00" style="background: #00ff00;" title="สีเขียว"></div>
-                <div class="color-palette-dot text-palette-dot" data-color="#ffff00" style="background: #ffff00;" title="สีเหลือง"></div>
-            </div>
-        </div>
-        <div class="panel-item">
-            <label><i class="fa-solid fa-text-height"></i> ขนาดฟอนต์: <span id="text-size-val">24px</span></label>
-            <input type="range" id="text-size-slider" min="12" max="72" value="24">
-        </div>
-    </div>
-
     <!-- MAIN RESPONSIVE BOTTOM TOOLBAR -->
     <nav class="toolbar">
         <button onclick="scrollWorkspace('prev')" id="tool-prev" class="nav-btn" title="เลื่อนขึ้นหน้าบน"><i class="fa-solid fa-circle-chevron-left"></i></button>
@@ -144,55 +86,20 @@
         <button onclick="clearCurrentDrawings()" id="tool-clear" class="nav-btn-action" title="ล้างหน้าวาดนี้" style="color: #ef4444;"><i class="fa-solid fa-trash-can"></i></button>
         <div class="divider"></div>
         
-        <!-- โหมดพื้นฐาน -->
-        <button onclick="setTool('pan')" id="tool-pan" class="tool-btn active" title="โหมดเลื่อนดูงาน"><i class="fa-solid fa-hand"></i></button>
-        <button onclick="setTool('pen')" id="tool-pen" class="tool-btn" title="ปากกาวาดเขียน"><i class="fa-solid fa-pen-fancy"></i></button>
-        <button onclick="setTool('text')" id="tool-text" class="tool-btn" title="พิมพ์ข้อความลอย"><i class="fa-solid fa-font"></i></button>
-        <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn" title="ยางลบ"><i class="fa-solid fa-eraser"></i></button>
-        <div class="divider"></div>
-
-        <!-- โหมดงานแก้เอกสารแบบแนบเนียน (Vector Engine) -->
-        <button onclick="setTool('edit-text')" id="tool-edit-text" class="tool-btn" title="แตะแก้ไขข้อความเดิมของ PDF"><i class="fa-solid fa-i-cursor"></i></button>
+        <!-- โหมดแก้ไขข้อความเดิมแบบ Acrobat / Word -->
+        <button onclick="setTool('edit-text')" id="tool-edit-text" class="tool-btn active" title="ดับเบิ้ลคลิกแก้ไขข้อความเดิมได้ทันที"><i class="fa-solid fa-i-cursor"></i></button>
         <button onclick="setTool('whiteout')" id="tool-whiteout" class="tool-btn" title="ลากบล็อกสีทับลบคำเดิม"><i class="fa-solid fa-vector-square"></i></button>
+        <button onclick="setTool('pan')" id="tool-pan" class="tool-btn" title="โหมดมือเลื่อนดูงาน"><i class="fa-solid fa-hand"></i></button>
+        <button onclick="setTool('pen')" id="tool-pen" class="tool-btn" title="ปากกาวาดเขียน"><i class="fa-solid fa-pen-fancy"></i></button>
+        <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn" title="ยางลบ"><i class="fa-solid fa-eraser"></i></button>
         <button onclick="openSignatureModal()" id="tool-signature" class="tool-btn" title="เซ็นลายเซ็น / แปะรูปตราประทับ"><i class="fa-solid fa-signature"></i></button>
-        <div class="divider"></div>
         
+        <div class="divider"></div>
         <button onclick="zoomIn()" title="ขยาย"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
         <button onclick="zoomOut()" title="ย่อ"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
         <div class="divider"></div>
         <button onclick="scrollWorkspace('next')" id="tool-next" class="nav-btn" title="เลื่อนลงหน้าล่าง"><i class="fa-solid fa-circle-chevron-right"></i></button>
     </nav>
-
-    <!-- MODAL: แตะแก้ไขข้อความเดิมของ PDF -->
-    <div id="text-edit-modal" class="custom-modal" style="display: none;">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h4><i class="fa-solid fa-i-cursor text-glow"></i> แก้ไขข้อความในเอกสาร</h4>
-                <button onclick="closeTextEditModal()" class="close-modal-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <label>ข้อความเดิม:</label>
-                <div id="modal-old-text" class="text-preview-box"></div>
-                <label style="margin-top: 10px;">ข้อความใหม่ที่จะใส่แทนที่:</label>
-                <input type="text" id="modal-new-text" placeholder="พิมพ์ข้อความใหม่ที่นี่...">
-                
-                <div class="modal-options-row">
-                    <div>
-                        <label>ขนาดตัวอักษร:</label>
-                        <input type="number" id="modal-font-size" min="6" max="72" value="14"> px
-                    </div>
-                    <div>
-                        <label>สีตัวหนังสือ:</label>
-                        <input type="color" id="modal-text-color" value="#000000">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button onclick="closeTextEditModal()" class="btn-cancel">ยกเลิก</button>
-                <button onclick="confirmTextPatch()" class="btn-primary">บันทึกข้อความแนบเนียน</button>
-            </div>
-        </div>
-    </div>
 
     <!-- MODAL: ลายเซ็นดิจิทัล & อัปโหลดรูปภาพ -->
     <div id="signature-modal" class="custom-modal" style="display: none;">
@@ -221,7 +128,7 @@
                 <div id="sig-upload-pane" style="display: none;">
                     <div class="upload-dropzone" onclick="document.getElementById('sig-file-input').click()">
                         <i class="fa-solid fa-file-image" style="font-size: 32px; color: var(--accent-color);"></i>
-                        <p>แตะเพื่อเลือกรูปภาพ PNG/JPG โปร่งใส</p>
+                        <p>แตะเพื่อเลือกรูปภาพ PNG/JPG</p>
                         <input type="file" id="sig-file-input" accept="image/*" style="display:none;" onchange="handleSigFileUpload(event)">
                     </div>
                     <div id="sig-upload-preview" style="display:none; text-align:center; margin-top:10px;">
@@ -232,84 +139,6 @@
             <div class="modal-footer">
                 <button onclick="closeSignatureModal()" class="btn-cancel">ยกเลิก</button>
                 <button onclick="insertSignatureToDoc()" class="btn-primary">วางลงบนหน้าเอกสาร</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- AI SIDEBAR -->
-    <div id="ai-sidebar" class="ai-sidebar">
-        <div class="ai-sidebar-header">
-            <h3><i class="fa-solid fa-wand-magic-sparkles" style="color: #22d3ee;"></i> Studio AI Assistant</h3>
-            <button onclick="toggleAiSidebar()" class="close-sidebar-btn">&times;</button>
-        </div>
-        <div class="ai-sidebar-body">
-            <div class="api-key-container">
-                <label for="ai-api-key"><i class="fa-solid fa-key" style="color: #f59e0b;"></i> Gemini API Key ของคุณนาวี:</label>
-                <input type="password" id="ai-api-key" placeholder="วาง API Key จาก AI Studio ที่นี่...">
-            </div>
-            <hr class="ai-divider">
-            <div class="ai-quick-actions">
-                <button onclick="askAiToSummary()" class="btn-ai-action"><i class="fa-solid fa-file-invoice"></i> ⚡ สรุปตาราง/เนื้อหาหน้านี้</button>
-            </div>
-            <div class="ai-chat-box" id="ai-chat-box">
-                <div class="ai-message system-msg">สวัสดีค่ะคุณนาวี! ให้หนูช่วยสรุปรายงาน วิเคราะห์ตาราง หรือแปลความหมายข้อมูลในหน้าเอกสารปัจจุบัน พิมพ์บอกได้เลยนะคะ 📝</div>
-            </div>
-        </div>
-
-        <div id="file-preview-container" style="display: none;"></div>
-
-        <div class="ai-sidebar-footer">
-            <input type="file" id="ai-document-input" accept=".pdf, .txt, .csv, .doc, .docx" style="display: none;" onchange="handleFileSelect('document')">
-            <button type="button" class="ai-chat-btn btn-attach-doc" onclick="document.getElementById('ai-document-input').click()" title="แนบไฟล์เอกสาร"><i class="fa-solid fa-paperclip"></i></button>
-
-            <div class="media-menu-container">
-                <button type="button" id="btn-media-plus" class="ai-chat-btn btn-media-plus" onclick="toggleMediaPopup()" title="เพิ่มรูปภาพหรือวิดีโอ">+</button>
-                
-                <div id="media-popup" class="media-popup" style="display: none;">
-                    <button type="button" onclick="triggerMediaInput('image')"><i class="fa-solid fa-image" style="color: #38bdf8;"></i> อัปโหลดรูปภาพ</button>
-                    <button type="button" onclick="triggerMediaInput('video')"><i class="fa-solid fa-video" style="color: #c084fc;"></i> อัปโหลดวิดีโอ</button>
-                </div>
-            </div>
-
-            <input type="file" id="ai-image-input" accept="image/*" style="display: none;" onchange="handleFileSelect('image')">
-            <input type="file" id="ai-video-input" accept="video/*" style="display: none;" onchange="handleFileSelect('video')">
-
-            <input type="text" id="ai-input" placeholder="พิมพ์ถาม AI เกี่ยวกับเอกสารนี้..." onkeydown="if(event.key === 'Enter') sendAiQuestion()">
-            <button onclick="sendAiQuestion()" title="ส่งคำสั่ง"><i class="fa-solid fa-paper-plane"></i></button>
-        </div>
-    </div>
-
-    <!-- FLOATING TEXT BOTTOM BAR -->
-    <div id="text-node-bottom-bar" class="text-node-floating-bar">
-        <div class="floating-bar-content">
-            <div class="floating-bar-header">
-                <span class="bar-title"><i class="fa-solid fa-font text-glow"></i> ปรับแต่งข้อความลอย</span>
-                <button onclick="closeTextSheet()" class="btn-confirm-node">
-                    <i class="fa-solid fa-circle-check"></i> ยืนยันตำแหน่ง
-                </button>
-            </div>
-            <div class="text-node-controls">
-                <input type="color" id="floating-text-color" title="เปลี่ยนสีตัวอักษร">
-                
-                <div class="quick-color-palette-wrapper">
-                    <div class="color-palette-dot text-palette-dot" data-color="#000000" style="background: #000000;" title="สีดำ"></div>
-                    <div class="color-palette-dot text-palette-dot" data-color="#ff0000" style="background: #ff0000;" title="สีแดง"></div>
-                    <div class="color-palette-dot text-palette-dot" data-color="#0000ff" style="background: #0000ff;" title="สีน้ำเงิน"></div>
-                    <div class="color-palette-dot text-palette-dot" data-color="#00ff00" style="background: #00ff00;" title="สีเขียว"></div>
-                    <div class="color-palette-dot text-palette-dot" data-color="#ffff00" style="background: #ffff00;" title="สีเหลือง"></div>
-                </div>
-
-                <div class="bar-separator"></div>
-                <button onclick="formatFloatingText('bold')" title="ตัวหนา" class="btn-format-node"><i class="fa-solid fa-bold"></i></button>
-                <button onclick="formatFloatingText('italic')" title="ตัวเอียง" class="btn-format-node"><i class="fa-solid fa-italic"></i></button>
-                <button onclick="formatFloatingText('underline')" title="ขีดเส้นใต้" class="btn-format-node"><i class="fa-solid fa-underline"></i></button>
-                
-                <div class="bar-separator"></div>
-                <button onclick="changeActiveNodeSize(2)" title="ขยายขนาดฟอนต์" class="btn-size-node"><i class="fa-solid fa-square-plus"></i></button>
-                <button onclick="changeActiveNodeSize(-2)" title="ย่อขนาดฟอนต์" class="btn-size-node"><i class="fa-solid fa-square-minus"></i></button>
-                
-                <div class="bar-separator"></div>
-                <button onclick="deleteActiveTextNode()" class="btn-delete-node" title="ลบข้อความชิ้นนี้"><i class="fa-solid fa-trash-can"></i></button>
             </div>
         </div>
     </div>
