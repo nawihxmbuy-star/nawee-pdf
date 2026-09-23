@@ -13,20 +13,15 @@
 
 body { 
     background: var(--bg-color); 
-    height: 100dvh; /* Dynamic Viewport ป้องกันแถบ URL มือถือดัน */
+    height: 100dvh;
     overflow: hidden; 
     font-family: 'Sarabun', sans-serif; 
 }
 
-/* 📱 ป้องกันการกดคลุมดำโดน UI หลัก */
-.top-bar, .toolbar, .word-formatting-bar, .pen-sub-panel, .ai-sidebar, .text-node-floating-bar, .custom-modal {
+.top-bar, .toolbar, .pen-sub-panel, .custom-modal {
     user-select: none;
     -webkit-user-select: none;
 }
-
-/* --- ระบบเปิด-ปิดส่วนควบคุม UI ตามสถานะโหมดการทำงาน --- */
-body.mode-pdf .word-formatting-bar { display: none; }
-body.mode-word .word-formatting-bar { display: flex; }
 
 /* ==========================================================================
    HEADER / TOP BAR
@@ -36,7 +31,7 @@ body.mode-word .word-formatting-bar { display: flex; }
     top: 0; 
     left: 0; 
     width: 100%; 
-    height: 65px;
+    height: 60px;
     background: var(--toolbar-bg); 
     border-bottom: 2px solid var(--accent-color);
     display: flex; 
@@ -60,27 +55,23 @@ body.mode-word .word-formatting-bar { display: flex; }
 }
 .badge { 
     font-size: 10px; 
-    background: #ff0055; 
+    background: #0ea5e9; 
     padding: 2px 6px; 
     border-radius: 4px; 
     margin-left: 4px; 
 }
-body.mode-word .badge { background: #2b579a; }
 
 .action-group { 
     display: flex; 
     gap: 8px; 
     align-items: center; 
-    overflow-x: auto;
-    scrollbar-width: none;
 }
-.action-group::-webkit-scrollbar { display: none; }
 
 .action-group button {
     background: rgba(255, 255, 255, 0.05); 
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #fff; 
-    padding: 8px 12px; 
+    padding: 8px 14px; 
     border-radius: 8px; 
     cursor: pointer; 
     display: flex; 
@@ -88,77 +79,29 @@ body.mode-word .badge { background: #2b579a; }
     gap: 6px;
     font-size: 13px;
     white-space: nowrap;
-    flex-shrink: 0;
+    transition: all 0.15s ease;
 }
-.btn-premium { background: linear-gradient(135deg, #0077ff, var(--accent-color)) !important; border: none !important; }
-.btn-line { background: #06C755 !important; border: none !important; color: #fff !important; }
-.btn-ai { background: rgba(34, 211, 238, 0.15) !important; border: 1px solid var(--accent-color) !important; color: #fff !important; }
+.action-group button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.btn-premium { 
+    background: linear-gradient(135deg, #0284c7, var(--accent-color)) !important; 
+    border: none !important; 
+    color: #0f172a !important;
+    font-weight: bold;
+}
+.btn-premium:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(34, 211, 238, 0.4);
+}
 
-/* จอเล็ก ซ่อนข้อความปุ่มเหลือแต่ไอคอน */
 @media (max-width: 600px) {
     .action-group .lbl { display: none; }
     .action-group button { padding: 8px 10px; }
 }
 
-/* เมนูแปลงไฟล์ Dropdown */
-.dropdown-wrapper { position: relative; display: inline-block; flex-shrink: 0; }
-.dropdown-popup {
-    display: none; 
-    position: absolute; 
-    top: 100%; 
-    right: 0; 
-    margin-top: 8px;
-    background: #1e293b; 
-    border: 1px solid var(--accent-color); 
-    border-radius: 10px;
-    padding: 6px; 
-    min-width: 250px; 
-    z-index: 1010; 
-    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-}
-.dropdown-popup.show { display: block; }
-.dropdown-popup button {
-    width: 100%; 
-    background: transparent !important; 
-    border: none !important;
-    padding: 12px 14px !important; 
-    text-align: left; 
-    color: #fff; 
-    border-radius: 6px !important;
-}
-.dropdown-popup button:hover { background: rgba(255,255,255,0.08) !important; }
-
-/* แถบฟอร์แมตฟอนต์ Word */
-.word-formatting-bar {
-    position: fixed; 
-    top: 65px; 
-    left: 0; 
-    width: 100%; 
-    height: 45px;
-    background: #1e293b; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    z-index: 998; 
-    display: none; 
-    align-items: center; 
-    padding: 0 20px; 
-    gap: 12px;
-}
-.format-group { display: flex; gap: 4px; align-items: center; }
-.format-group button {
-    background: transparent; 
-    border: none; 
-    color: #94a3b8; 
-    width: 32px; 
-    height: 32px; 
-    border-radius: 6px; 
-    cursor: pointer;
-}
-.format-group button:hover { color: #fff; background: rgba(255,255,255,0.1); }
-.text-size-selector { color: #94a3b8; font-size: 13px; display: flex; align-items: center; gap: 6px;}
-.text-size-selector select { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 4px; outline: none;}
-
 /* ==========================================================================
-   WORKSPACE / CANVA AREA
+   WORKSPACE & PDF CANVASES
    ========================================================================== */
 .workspace {
     height: 100vh; 
@@ -166,19 +109,9 @@ body.mode-word .badge { background: #2b579a; }
     overflow: auto;
     display: flex;
     flex-direction: column;
-    align-items: flex-start; 
-    padding: 85px 20px 180px 20px; 
+    align-items: center; 
+    padding: 75px 20px 100px 20px; 
     -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
-}
-body.mode-word .workspace { padding-top: 130px; }
-
-@media (min-width: 768px) {
-    .workspace {
-        align-items: center;
-        padding-left: 50px;
-        padding-right: 50px;
-    }
 }
 
 .initial-notice { 
@@ -206,71 +139,82 @@ body.mode-word .workspace { padding-top: 130px; }
     background: #ffffff; 
 }
 .pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: block; }
-.drawing-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
-
-/* เลเยอร์ควบคุมข้อความและ Patch */
-.text-overlay-layer { 
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; 
-    overflow: hidden; pointer-events: none; 
-}
-body.mode-pdf .drawing-page-canvas { pointer-events: auto; }
-body.mode-word .drawing-page-canvas { pointer-events: none; }
-
-.word-text-node {
-    position: absolute; background: transparent; color: #000000; border: 1px solid transparent; outline: none;
-    white-space: nowrap; overflow: visible; padding: 0; margin: 0; transform-origin: left top;
-    user-select: text; -webkit-user-select: text; font-family: 'Sarabun', sans-serif; line-height: 1.0;
-    text-rendering: optimizeLegibility !important; -webkit-font-smoothing: antialiased !important;
-}
-body.mode-pdf .word-text-node { display: none; }
-body.mode-pdf .word-text-node.is-edited { display: block; background: #ffffff; color: #000000; pointer-events: none; }
-
-body.mode-word .word-text-node { 
-    display: block; background: rgba(255, 255, 255, 0.85); color: #000000;
-    border: 1px dashed rgba(34, 211, 238, 0.3); cursor: text; pointer-events: auto;
-}
-body.mode-word .word-text-node:hover { border: 1px dashed var(--accent-color); background: #f0fdfa; }
-body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); background: #ffffff !important; color: #000000 !important; z-index: 999; }
-
-/* สไตล์กล่องพิมพ์ข้อความลอยอิสระ */
-.custom-draggable-text-node {
-    position: absolute; white-space: pre-wrap; cursor: move; user-select: none; touch-action: none;
-    padding: 4px 8px; border-radius: 4px; display: inline-block; transform: translate(-50%, -50%);
-    background: transparent !important; z-index: 5000; pointer-events: auto !important;
-}
+.drawing-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+body.tool-pen .drawing-page-canvas, body.tool-eraser .drawing-page-canvas { pointer-events: auto; }
 
 /* ==========================================================================
-   VECTOR EDITING TOOLS (EDIT-TEXT & WHITEOUT & SIGNATURE)
+   TEXT OVERLAY LAYER (แก้ปัญหาตัวหนังสือซ้อนเละ 100%)
    ========================================================================== */
-/* เมื่อเปิดโหมดแตะแก้ข้อความเดิม */
-body.tool-edit-text .text-overlay-layer { pointer-events: auto !important; }
-body.tool-edit-text .word-text-node.editable-target {
-    display: block !important;
-    pointer-events: auto !important;
-    cursor: pointer;
-    background: rgba(34, 211, 238, 0.08);
-    border: 1px dashed rgba(34, 211, 238, 0.4);
-    border-radius: 2px;
-}
-body.tool-edit-text .word-text-node.editable-target:hover {
-    background: rgba(34, 211, 238, 0.25);
-    border-color: #22d3ee;
+.text-overlay-layer { 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    z-index: 3; 
+    overflow: hidden; 
 }
 
-/* บล็อกสี่เหลี่ยมลบคำเดิม (Whiteout) */
+/* 🎯 จุดตายที่แก้ปัญหา: ตัวหนังสือปกติจะต้องโปร่งใส ไม่แสดงสีดำซ้อนทับภาพ PDF เดิม */
+.word-text-node {
+    position: absolute; 
+    background: transparent; 
+    color: transparent !important; 
+    border: 1px solid transparent; 
+    outline: none;
+    white-space: nowrap; 
+    overflow: visible; 
+    padding: 0; 
+    margin: 0; 
+    transform-origin: left top;
+    user-select: text; 
+    -webkit-user-select: text; 
+    font-family: 'Sarabun', sans-serif; 
+    line-height: 1.0;
+    cursor: default;
+}
+
+/* เมื่ออยู่ในโหมดแก้ไขข้อความ (tool-edit-text) */
+body.tool-edit-text .word-text-node {
+    cursor: pointer;
+}
+body.tool-edit-text .word-text-node:hover {
+    background: rgba(34, 211, 238, 0.15) !important;
+    border: 1px dashed #22d3ee !important;
+    border-radius: 2px;
+}
+
+/* ขณะดับเบิ้ลคลิกแก้ไขข้อความนั้น (In-place Editing) */
+.word-text-node.is-actively-editing {
+    color: #000000 !important;
+    background: #ffffff !important;
+    border: 1.5px solid #22d3ee !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    border-radius: 2px;
+    z-index: 1000 !important;
+    cursor: text !important;
+}
+
+/* บันทึกคำใหม่ทับคำเดิมเรียบร้อยแล้ว */
+.word-text-node.is-patched {
+    color: #000000 !important;
+    background: #ffffff !important;
+    border: 1px solid transparent;
+}
+
+/* บล็อกลบคำเดิม (Whiteout Box) */
 .whiteout-box {
     position: absolute;
     background: #ffffff;
     border: 1px dashed #cbd5e1;
     cursor: move;
     z-index: 10;
-    pointer-events: auto !important;
 }
 .whiteout-box:hover {
     border-color: #ef4444;
 }
 
-/* กล่องภาพลายเซ็นลากวางบนหน้าเอกสาร */
+/* กล่องภาพลายเซ็น / รูปภาพ */
 .custom-draggable-sig-node {
     position: absolute;
     cursor: move;
@@ -279,7 +223,6 @@ body.tool-edit-text .word-text-node.editable-target:hover {
     border: 1px dashed var(--accent-color);
     border-radius: 4px;
     z-index: 5005;
-    pointer-events: auto !important;
     transform: translate(-50%, -50%);
 }
 .custom-draggable-sig-node img {
@@ -295,8 +238,8 @@ body.tool-edit-text .word-text-node.editable-target:hover {
     right: -8px;
     background: #ef4444;
     color: white;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -307,21 +250,21 @@ body.tool-edit-text .word-text-node.editable-target:hover {
 }
 
 /* ==========================================================================
-   MAIN TOOLBAR (BOTTOM) & SUB PANELS - TOUCH RESPONSIVE
+   TOOLBAR (BOTTOM) & SUB PANELS
    ========================================================================== */
 .toolbar {
     position: fixed; 
     bottom: 0; 
     left: 0; 
     width: 100%; 
-    height: 70px;
+    height: 65px;
     display: flex; 
     align-items: center; 
     gap: 8px;
     background: var(--toolbar-bg); 
     border-top: 2px solid var(--accent-color); 
     z-index: 9999; 
-    padding: 0 12px;
+    padding: 0 16px;
     overflow-x: auto;
     overflow-y: hidden;
     white-space: nowrap;
@@ -334,18 +277,17 @@ body.tool-edit-text .word-text-node.editable-target:hover {
     .toolbar {
         justify-content: center;
         gap: 12px;
-        padding: 0 20px;
     }
 }
 
 .toolbar button { 
     color: var(--accent-color); 
-    font-size: 20px; 
+    font-size: 19px; 
     cursor: pointer; 
     background: none; 
     border: none; 
-    min-width: 44px; 
-    height: 44px; 
+    min-width: 42px; 
+    height: 42px; 
     border-radius: 8px; 
     display: flex; 
     align-items: center; 
@@ -354,16 +296,16 @@ body.tool-edit-text .word-text-node.editable-target:hover {
     touch-action: manipulation;
 }
 .toolbar button.active { background: var(--accent-color); color: #0f172a; }
-.toolbar button.nav-btn { color: #f8fafc; font-size: 24px; }
+.toolbar button.nav-btn { color: #f8fafc; font-size: 22px; }
 .toolbar button.nav-btn:hover { color: var(--accent-color); }
-.toolbar button.nav-btn-action { color: #94a3b8; font-size: 18px; }
+.toolbar button.nav-btn-action { color: #94a3b8; font-size: 17px; }
 .toolbar button.nav-btn-action:hover { color: #fff; }
 .divider { width: 1px; height: 24px; background: rgba(255,255,255,0.15); flex-shrink: 0; margin: 0 4px; }
 
-/* แผงควบคุมขนาดปากกา/สี */
+/* แผงควบคุมปากกา */
 .pen-sub-panel { 
     position: fixed; 
-    bottom: 80px; 
+    bottom: 75px; 
     left: 50%; 
     transform: translateX(-50%); 
     background: #1e293b; 
@@ -376,11 +318,10 @@ body.tool-edit-text .word-text-node.editable-target:hover {
     z-index: 10000; 
     box-shadow: 0 8px 24px rgba(0,0,0,0.5); 
     max-width: 90vw;
-    overflow-x: auto;
 }
 .panel-item { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 13px; white-space: nowrap; }
 .panel-item input[type="range"] { accent-color: var(--accent-color); cursor: pointer; }
-.brush-preview-box { width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
+.brush-preview-box { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
 #brush-preview { border-radius: 50%; }
 
 #btn-toggle-shape {
@@ -394,63 +335,21 @@ body.tool-edit-text .word-text-node.editable-target:hover {
     white-space: nowrap;
 }
 
-/* 🎨 ระบบจานสีสำเร็จรูปด่วน */
 .quick-color-palette { display: flex; gap: 6px; align-items: center; margin: 0 4px; }
 .color-palette-dot {
-    width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
-    border: 2px solid rgba(255,255,255,0.3); transition: transform 0.1s, border-color 0.1s;
+    width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.3); transition: transform 0.1s;
 }
-.color-palette-dot:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.7); }
-.color-palette-dot.active {
-    transform: scale(1.25); border-color: #ffffff !important;
-    box-shadow: 0 0 8px rgba(255,255,255,0.6);
-}
+.color-palette-dot:hover { transform: scale(1.15); }
+.color-palette-dot.active { transform: scale(1.25); border-color: #fff !important; }
 
-/* พรีวิววงกลมยางลบใต้เมาส์ */
 #eraser-cursor-preview {
     position: fixed; pointer-events: none; border: 2px dashed var(--accent-color);
     background: rgba(34, 211, 238, 0.15); z-index: 9998; display: none;
 }
 
 /* ==========================================================================
-   FLOATING TEXT NODE BOTTOM BAR
-   ========================================================================== */
-.text-node-floating-bar {
-    position: fixed; bottom: -320px; left: 0; width: 100%;
-    background: var(--toolbar-bg); padding: 18px; z-index: 9990;
-    transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    border-top: 2px solid var(--accent-color); border-radius: 20px 20px 0 0;
-    box-shadow: 0 -5px 25px rgba(0,0,0,0.6);
-}
-.text-node-floating-bar.active { bottom: 0; }
-.text-node-floating-bar .floating-bar-content { display: flex; flex-direction: column; gap: 10px; }
-.text-node-floating-bar .floating-bar-header { display: flex; justify-content: space-between; align-items: center; }
-.text-node-floating-bar .bar-title { color: #fff; font-size: 15px; font-weight: bold; }
-.text-node-floating-bar .btn-confirm-node {
-    background: var(--accent-color); color: #0f172a; width: auto; 
-    padding: 6px 14px; font-size: 13px; font-weight: bold; gap: 4px; 
-    display: flex; align-items: center; border-radius: 10px; border: none; cursor: pointer;
-}
-.text-node-floating-bar .text-node-controls {
-    background: rgba(255, 255, 255, 0.02); padding: 10px; border-radius: 12px; width: 100%; 
-    display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
-}
-.text-node-floating-bar #floating-text-color {
-    width: 34px; height: 34px; border: none; background: transparent; cursor: pointer; padding: 0; flex-shrink: 0;
-}
-.text-node-floating-bar .quick-color-palette-wrapper { margin-right: 4px; }
-.text-node-floating-bar .bar-separator { width: 1px; height: 30px; background: rgba(255, 255, 255, 0.15); }
-.text-node-floating-bar .btn-format-node,
-.text-node-floating-bar .btn-size-node,
-.text-node-floating-bar .btn-delete-node {
-    width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer;
-}
-.text-node-floating-bar .btn-format-node { background: rgba(255, 255, 255, 0.05); color: #fff; }
-.text-node-floating-bar .btn-size-node { background: rgba(34, 211, 238, 0.1); color: var(--accent-color); }
-.text-node-floating-bar .btn-delete-node { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-
-/* ==========================================================================
-   CUSTOM MODALS (TEXT EDIT & SIGNATURE PAD)
+   MODAL SIGNATURE & UPLOAD
    ========================================================================== */
 .custom-modal {
     position: fixed; 
@@ -465,14 +364,13 @@ body.tool-edit-text .word-text-node.editable-target:hover {
     align-items: center; 
     justify-content: center; 
     padding: 16px;
-    animation: fadeIn 0.2s ease-out;
 }
 .modal-card {
     background: #1e293b; 
     border: 1px solid var(--accent-color); 
     border-radius: 14px; 
     width: 100%; 
-    max-width: 440px; 
+    max-width: 420px; 
     box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
     overflow: hidden;
 }
@@ -487,56 +385,8 @@ body.tool-edit-text .word-text-node.editable-target:hover {
 }
 .modal-header h4 { font-size: 15px; font-weight: bold; }
 .close-modal-btn { background: none; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; }
-.modal-body { padding: 18px; color: #e2e8f0; font-size: 13px; }
-.modal-body label { display: block; margin-bottom: 6px; font-weight: 500; }
-.text-preview-box {
-    background: #0f172a; 
-    padding: 10px 14px; 
-    border-radius: 8px; 
-    color: #94a3b8; 
-    border: 1px solid rgba(255,255,255,0.1); 
-    font-size: 13px;
-    max-height: 80px; 
-    overflow-y: auto;
-}
-.modal-body input[type="text"] {
-    width: 100%; 
-    background: #0f172a; 
-    border: 1px solid var(--accent-color); 
-    padding: 10px 14px; 
-    border-radius: 8px; 
-    color: #fff; 
-    outline: none; 
-    font-size: 14px;
-}
-.modal-options-row {
-    display: flex; 
-    gap: 16px; 
-    align-items: center; 
-    margin-top: 14px;
-}
-.modal-options-row input[type="number"] {
-    background: #0f172a; border: 1px solid rgba(255,255,255,0.2); color: #fff;
-    padding: 6px 8px; border-radius: 6px; width: 65px; outline: none;
-}
-.modal-options-row input[type="color"] {
-    width: 32px; height: 32px; border: none; background: transparent; cursor: pointer; vertical-align: middle;
-}
-.modal-footer {
-    padding: 12px 18px; 
-    background: #0f172a; 
-    border-top: 1px solid rgba(255,255,255,0.1); 
-    display: flex; 
-    justify-content: flex-end; 
-    gap: 10px;
-}
-.modal-footer button {
-    padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: bold;
-}
-.btn-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #94a3b8; }
-.btn-primary { background: var(--accent-color); border: none; color: #0f172a; }
+.modal-body { padding: 16px; color: #e2e8f0; font-size: 13px; }
 
-/* แท็บสลับหน้าจอเซ็นชื่อ vs อัปโหลดรูป */
 .sig-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
 .sig-tabs button {
     flex: 1; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
@@ -569,130 +419,25 @@ body.tool-edit-text .word-text-node.editable-target:hover {
 }
 .upload-dropzone:hover { border-color: var(--accent-color); background: rgba(34,211,238,0.05); }
 
-/* ==========================================================================
-   AI SIDEBAR CHAT & SYSTEM INTERFACE
-   ========================================================================== */
-.ai-sidebar { 
-    position: fixed; 
-    top: 0; 
-    right: -380px; 
-    width: 380px; 
-    height: 100dvh; 
-    background: #1e293b; 
-    border-left: 2px solid var(--accent-color); 
-    z-index: 10005; 
-    display: flex; 
-    flex-direction: column; 
-    transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
-    box-shadow: -10px 0 30px rgba(0,0,0,0.5); 
-}
-@media (max-width: 480px) {
-    .ai-sidebar { width: 100%; right: -100%; }
-}
-.ai-sidebar.open { right: 0; }
-.ai-sidebar-header { padding: 18px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; color: #fff; }
-.close-sidebar-btn { background: none; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; }
-.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-.api-key-container { display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 13px; }
-.api-key-container input { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 6px; color: #fff; outline: none; }
-.ai-quick-actions { width: 100%; }
-.btn-ai-action { width: 100%; background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05)); border: 1px solid var(--accent-color); color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
-.ai-chat-box { flex: 1; background: #0f172a; border-radius: 10px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 200px; border: 1px solid rgba(255,255,255,0.05); }
-.ai-message { padding: 10px 14px; border-radius: 8px; font-size: 13px; max-width: 85%; line-height: 1.4; word-wrap: break-word; }
-.system-msg { background: rgba(255,255,255,0.05); color: #94a3b8; align-self: center; text-align: center; max-width: 100%; }
-.user-msg { background: var(--accent-color); color: #0f172a; align-self: flex-end; font-weight: 500; }
-.ai-msg { background: #1e293b; color: #fff; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
-
-.ai-sidebar-footer { 
-    padding: 10px; 
-    background: #1e293b; 
-    display: flex; 
-    gap: 6px; 
-    border-top: 1px solid rgba(255,255,255,0.1); 
-    align-items: center; 
-    position: relative;
-}
-.ai-sidebar-footer input[type="text"] { 
-    flex: 1; 
+.modal-footer {
+    padding: 12px 18px; 
     background: #0f172a; 
-    border: 1px solid rgba(255,255,255,0.1); 
-    padding: 10px 14px; 
-    border-radius: 8px; 
-    color: #fff; 
-    outline: none; 
-    font-size: 13px; 
-}
-.ai-sidebar-footer button { 
-    background: var(--accent-color); 
-    border: none; 
-    width: 40px; 
-    height: 40px; 
-    border-radius: 8px; 
-    color: #0f172a; 
-    cursor: pointer; 
-    font-size: 16px; 
+    border-top: 1px solid rgba(255,255,255,0.1); 
     display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    flex-shrink: 0; 
+    justify-content: flex-end; 
+    gap: 10px;
 }
+.modal-footer button {
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: bold;
+}
+.btn-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #94a3b8; }
+.btn-primary { background: var(--accent-color); border: none; color: #0f172a; }
 
-.ai-chat-btn {
-    width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;
-}
-.btn-attach-doc { background: rgba(255, 255, 255, 0.05); color: #94a3b8; }
-.btn-media-plus { background: #22d3ee; color: #0f172a; font-size: 20px; font-weight: bold; }
-
-.media-menu-container { position: relative; display: inline-block; }
-.media-popup {
-    position: absolute; bottom: 55px; left: 10px; background: #1e293b;
-    border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    display: flex; flex-direction: column; padding: 6px; z-index: 10010; min-width: 155px;
-    animation: popSlideUp 0.15s ease-out;
-}
-.media-popup button {
-    background: transparent; color: #e2e8f0; border: none; padding: 8px 12px;
-    text-align: left; cursor: pointer; border-radius: 6px; font-size: 13px;
-    display: flex; align-items: center; gap: 8px; width: 100%;
-}
-.media-popup button:hover { background: rgba(255, 255, 255, 0.05); color: #22d3ee; }
-
-.chat-media-render {
-    max-width: 100%; max-height: 220px; border-radius: 6px; display: block;
-    margin: 6px 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); object-fit: contain; background: #0b0f19;
-}
-
-#file-preview-container {
-    padding: 8px 12px; display: flex; gap: 10px; background: rgba(15, 23, 42, 0.6);
-    border-top: 1px solid rgba(255,255,255,0.05);
-}
-.ai-preview-item { position: relative; display: inline-flex; align-items: center; }
-.ai-preview-item .remove-preview-btn {
-    position: absolute; top: -6px; right: -6px; background: #ef4444; color: white;
-    border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center;
-    justify-content: center; font-size: 11px; cursor: pointer; font-weight: bold; border: 1px solid #1e293b;
-}
-
-/* ==========================================================================
-   NOTIFICATIONS & ANIMATIONS
-   ========================================================================== */
+/* Notifications */
 .custom-notification {
     position: fixed; top: 20px; right: 20px; background: #1e293b; color: #fff;
-    padding: 14px 20px; border-radius: 10px; z-index: 99999;
-    border-left: 5px solid var(--accent-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    padding: 12px 18px; border-radius: 8px; z-index: 99999;
+    border-left: 4px solid var(--accent-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     font-size: 13px; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-@keyframes slideIn { 
-    from { transform: translateX(100%); opacity: 0; } 
-    to { transform: translateX(0); opacity: 1; } 
-}
-@keyframes popSlideUp {
-    from { transform: translateY(6px); }
-    to { transform: translateY(0); }
-}
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
