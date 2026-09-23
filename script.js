@@ -44,7 +44,7 @@ function resetApp() {
             <div class="welcome-box">
                 <div class="welcome-icon"><i class="fa-solid fa-file-pdf"></i></div>
                 <h2>ยินดีต้อนรับสู่ Nawee PDF Studio</h2>
-                <p>โปรแกรมแก้ไขเอกสาร PDF แบบแนบเนียน ลากคลุมลบคำผิด เซ็นลายเซ็น และส่งออกไฟล์คมกริบ</p>
+                <p>แก้ไขเอกสารแบบแนบเนียน ลบคำผิด ดูดสีพื้นหลังอัตโนมัติ ไม่บังเส้นตาราง และส่งออกไฟล์คมชัดระดับเวกเตอร์</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
@@ -165,8 +165,8 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas) {
         selectionBox.remove();
         selectionBox = null;
 
-        // ถ้าลากพื้นที่เล็กเกินไป (เผลอแตะ) ไม่ต้องสร้าง
-        if (boxWidth < 15 || boxHeight < 10) return;
+        // ถ้าลากพื้นที่เล็กเกินไป ไม่สร้าง
+        if (boxWidth < 12 || boxHeight < 8) return;
 
         // 🎯 ดูดสีพื้นหลังตรงจุดที่ลากคลุมจาก PDF Canvas จริง
         const sampleColor = getCanvasPixelColor(pdfCanvas, boxLeft, boxTop);
@@ -192,20 +192,28 @@ function getCanvasPixelColor(canvas, x, y) {
     }
 }
 
+// สร้างกล่องแก้ไขข้อความ: มี Inset ไม่กินเส้นตาราง และคำใหม่หดพอดีเนื้อหา
 function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor) {
     const layer = wrapper.querySelector('.patch-layer');
 
-    // ตรวจสอบความมืด/สว่างของพื้นหลัง
     const isDark = (bgColor.r * 299 + bgColor.g * 587 + bgColor.b * 114) / 1000 < 0.5;
     const textColor = isDark ? '#ffffff' : '#000000';
-    const fontSize = Math.max(12, Math.round(height * 0.72));
+    
+    // คำนวณขนาดฟอนต์ให้สมส่วนกับความสูงของบรรทัด
+    const fontSize = Math.max(11, Math.min(22, Math.round(height * 0.72)));
+
+    // 🎯 หดขอบเข้าด้านใน 1.5px เพื่อไม่ให้ทับเส้นขอบตารางเดิม
+    const insetLeft = left + 1.5;
+    const insetTop = top + 1;
+    const insetWidth = Math.max(10, width - 3);
+    const insetHeight = Math.max(10, height - 2);
 
     const node = document.createElement('div');
     node.className = 'active-patch-node';
-    node.style.left = left + 'px';
-    node.style.top = top + 'px';
-    node.style.width = width + 'px';
-    node.style.height = height + 'px';
+    node.style.left = insetLeft + 'px';
+    node.style.top = insetTop + 'px';
+    node.style.width = insetWidth + 'px';
+    node.style.height = insetHeight + 'px';
     node.style.background = bgColor.hex;
 
     const input = document.createElement('input');
@@ -214,11 +222,10 @@ function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor) {
     input.className = 'patch-input-inline';
     input.style.color = textColor;
     input.style.fontSize = fontSize + 'px';
-    input.style.lineHeight = height + 'px';
     node.appendChild(input);
 
     layer.appendChild(node);
-    setTimeout(() => input.focus(), 60);
+    setTimeout(() => input.focus(), 50);
 
     function commit() {
         const text = input.value.trim();
@@ -227,31 +234,33 @@ function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor) {
             return;
         }
 
+        // 🎯 หดกล่องให้พอดีกับคำที่พิมพ์จริง (ไม่ล้นเป็นแถบยาว)
         node.className = 'committed-patch-node';
         node.style.color = textColor;
         node.style.fontSize = fontSize + 'px';
-        node.style.lineHeight = height + 'px';
-        node.style.padding = '0 3px';
+        node.style.width = 'auto'; 
+        node.style.minWidth = insetWidth + 'px'; 
         node.innerText = text;
 
-        // คำนวณพิกัดสำหรับ Vector PDF (แกน Y คว่ำขึ้น)
+        const finalWidth = node.offsetWidth;
         const wrapperHeight = parseFloat(wrapper.style.height);
-        const pdfY = wrapperHeight - (top + height) + (height * 0.15);
+        const baselineOffset = (insetHeight - fontSize) / 2;
+        const pdfY = wrapperHeight - (insetTop + insetHeight) + baselineOffset;
 
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [] };
 
         documentPatches[pageNum].patches.push({
-            x: left,
+            x: insetLeft,
             y: pdfY,
-            width: width,
-            height: height,
+            width: finalWidth + 2,
+            height: insetHeight,
             text: text,
             fontSize: fontSize,
             bgColor: bgColor,
             textColor: textColor
         });
 
-        // ดับเบิ้ลคลิกเพื่อแก้คำเดิม
+        // ดับเบิ้ลคลิกแก้ไขคำเดิมได้ทันที
         node.addEventListener('dblclick', () => {
             node.remove();
             createPatchBox(wrapper, pageNum, left, top, width, height, bgColor);
@@ -529,6 +538,10 @@ function setTool(tool) {
     document.querySelectorAll('.dock-btn').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById(`tool-${tool}`);
     if (btn) btn.classList.add('active');
+
+    // อัปเดตคลาส body เพื่อควบคุม pointer-events ของแคนวาสวาดเขียน
+    document.body.className = document.body.className.replace(/tool-\S+/g, '').trim();
+    document.body.classList.add(`tool-${tool}`);
 
     const ws = document.querySelector('.workspace');
     if (tool === 'pan') ws.style.cursor = 'grab';
