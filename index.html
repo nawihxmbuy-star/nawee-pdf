@@ -3,142 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nawee PDF Pro Studio</title>
+    <title>Nawee PDF Studio</title>
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
-    <!-- Core PDF Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://unpkg.com/@pdf-lib/fontkit@0.0.4/dist/fontkit.umd.min.js"></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body class="mode-pdf tool-edit-text"> 
-    <!-- TOP BAR -->
+<body>
     <header class="top-bar">
         <div class="brand">
-            <i class="fa-solid fa-file-invoice text-glow"></i>
-            <span id="app-title">PDF Pro <small class="badge">STUDIO</small></span>
+            <i class="fa-solid fa-file-signature text-glow"></i>
+            <span>Nawee PDF <small class="pro-badge">PRO</small></span>
         </div>
-        <div class="action-group">
-            <button onclick="resetApp()" title="ล้างหน้าจอเพื่อเริ่มงานใหม่" style="background: rgba(239, 68, 68, 0.1); color: #f87171;">
-                <i class="fa-solid fa-square-plus"></i> <span class="lbl">งานใหม่</span>
+        <div class="action-buttons">
+            <button onclick="resetApp()" class="btn-secondary" title="เริ่มเอกสารใหม่">
+                <i class="fa-solid fa-rotate-left"></i> <span class="btn-text">เริ่มใหม่</span>
             </button>
-            <button onclick="document.getElementById('upload').click()" title="เปิดไฟล์ PDF">
-                <i class="fa-solid fa-folder-open"></i> <span class="lbl">เปิดไฟล์</span>
+            <button onclick="document.getElementById('upload-pdf').click()" class="btn-secondary" title="เปิดไฟล์ PDF">
+                <i class="fa-solid fa-folder-open"></i> <span class="btn-text">เปิดไฟล์</span>
             </button>
-            <button onclick="saveToDatabase()" title="บันทึกลงเครื่อง">
-                <i class="fa-solid fa-floppy-disk"></i> <span class="lbl">เซฟงาน</span>
-            </button>
-            <button onclick="exportToPDFFile()" class="btn-premium" title="บันทึกและส่งออกไฟล์ PDF คมชัด 100%">
-                <i class="fa-solid fa-file-arrow-down"></i> <span class="lbl">ส่งออก PDF</span>
+            <button onclick="exportVectorPDF()" class="btn-primary" title="บันทึก PDF เวกเตอร์แท้ คมชัด 100%">
+                <i class="fa-solid fa-arrow-down-to-bracket"></i> <span class="btn-text">ส่งออก PDF</span>
             </button>
         </div>
     </header>
 
-    <input type="file" id="upload" accept="application/pdf" style="display:none;">
+    <input type="file" id="upload-pdf" accept="application/pdf" style="display:none;">
 
-    <!-- WORKSPACE -->
     <main class="workspace">
-        <div id="pdf-container">
-            <div class="initial-notice">
-                <p><i class="fa-solid fa-cloud-arrow-up" style="font-size: 48px; color: var(--accent-color); margin-bottom: 15px;"></i></p>
-                <p>ยินดีต้อนรับสู่ Nawee PDF Studio</p>
-                <p style="font-size: 13px; color: #64748b; margin-top: 8px;">กดปุ่ม <b>"เปิดไฟล์"</b> ด้านบนเพื่อเริ่มแก้ไขเอกสารแบบแนบเนียนค่ะ</p>
+        <div id="document-container">
+            <div class="welcome-box">
+                <div class="welcome-icon"><i class="fa-solid fa-file-pdf"></i></div>
+                <h2>ยินดีต้อนรับสู่ Nawee PDF Studio</h2>
+                <p>โปรแกรมแก้ไขเอกสาร PDF แบบแนบเนียน ลากคลุมลบคำผิด เซ็นลายเซ็น และส่งออกไฟล์คมกริบ</p>
+                <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
+                    <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
+                </button>
             </div>
         </div>
     </main>
 
-    <!-- PEN & ERASER SUB-PANEL -->
-    <div id="pen-settings-panel" class="pen-sub-panel">
-        <div id="pen-color-group" class="panel-item">
-            <label><i class="fa-solid fa-palette"></i> สีปากกา:</label>
-            <input type="color" id="color-picker" value="#22d3ee">
-            <div class="quick-color-palette">
-                <div class="color-palette-dot pen-palette-dot" data-color="#000000" style="background: #000000;" title="สีดำ"></div>
-                <div class="color-palette-dot pen-palette-dot" data-color="#ff0000" style="background: #ff0000;" title="สีแดง"></div>
-                <div class="color-palette-dot pen-palette-dot" data-color="#0000ff" style="background: #0000ff;" title="สีน้ำเงิน"></div>
-                <div class="color-palette-dot pen-palette-dot" data-color="#00ff00" style="background: #00ff00;" title="สีเขียว"></div>
-                <div class="color-palette-dot pen-palette-dot" data-color="#ffff00" style="background: #ffff00;" title="สีเหลือง"></div>
-            </div>
-        </div>
-        <div class="panel-item">
-            <label><i class="fa-solid fa-paint-brush"></i> ขนาดปลาย: <span id="brush-size-val">6px</span></label>
-            <input type="range" id="brush-size-slider" min="2" max="30" value="6">
-            <div class="brush-preview-box">
-                <div id="brush-preview"></div>
-            </div>
-        </div>
-        <button onclick="toggleEraserShape()" id="btn-toggle-shape">สลับทรงยางลบ</button>
-    </div>
+    <nav class="floating-dock">
+        <button onclick="setTool('pan')" id="tool-pan" class="dock-btn" title="เลื่อนดูเอกสาร">
+            <i class="fa-solid fa-hand"></i>
+        </button>
+        <div class="dock-divider"></div>
 
-    <!-- MAIN RESPONSIVE BOTTOM TOOLBAR -->
-    <nav class="toolbar">
-        <button onclick="scrollWorkspace('prev')" id="tool-prev" class="nav-btn" title="เลื่อนขึ้นหน้าบน"><i class="fa-solid fa-circle-chevron-left"></i></button>
-        <div class="divider"></div>
-        
-        <button onclick="undoAction()" id="tool-undo" class="nav-btn-action" title="ย้อนกลับ (Undo)"><i class="fa-solid fa-rotate-left"></i></button>
-        <button onclick="redoAction()" id="tool-redo" class="nav-btn-action" title="ทำซ้ำ (Redo)"><i class="fa-solid fa-rotate-right"></i></button>
-        <button onclick="clearCurrentDrawings()" id="tool-clear" class="nav-btn-action" title="ล้างหน้าวาดนี้" style="color: #ef4444;"><i class="fa-solid fa-trash-can"></i></button>
-        <div class="divider"></div>
-        
-        <!-- โหมดแก้ไขข้อความเดิมแบบ Acrobat / Word -->
-        <button onclick="setTool('edit-text')" id="tool-edit-text" class="tool-btn active" title="ดับเบิ้ลคลิกแก้ไขข้อความเดิมได้ทันที"><i class="fa-solid fa-i-cursor"></i></button>
-        <button onclick="setTool('whiteout')" id="tool-whiteout" class="tool-btn" title="ลากบล็อกสีทับลบคำเดิม"><i class="fa-solid fa-vector-square"></i></button>
-        <button onclick="setTool('pan')" id="tool-pan" class="tool-btn" title="โหมดมือเลื่อนดูงาน"><i class="fa-solid fa-hand"></i></button>
-        <button onclick="setTool('pen')" id="tool-pen" class="tool-btn" title="ปากกาวาดเขียน"><i class="fa-solid fa-pen-fancy"></i></button>
-        <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn" title="ยางลบ"><i class="fa-solid fa-eraser"></i></button>
-        <button onclick="openSignatureModal()" id="tool-signature" class="tool-btn" title="เซ็นลายเซ็น / แปะรูปตราประทับ"><i class="fa-solid fa-signature"></i></button>
-        
-        <div class="divider"></div>
-        <button onclick="zoomIn()" title="ขยาย"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-        <button onclick="zoomOut()" title="ย่อ"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
-        <div class="divider"></div>
-        <button onclick="scrollWorkspace('next')" id="tool-next" class="nav-btn" title="เลื่อนลงหน้าล่าง"><i class="fa-solid fa-circle-chevron-right"></i></button>
+        <button onclick="setTool('patch')" id="tool-patch" class="dock-btn active" title="ลากคลุมลบคำผิดและพิมพ์ทับ (ดูดสีพื้นหลังอัตโนมัติ)">
+            <i class="fa-solid fa-i-cursor"></i>
+            <span class="tool-dot"></span>
+        </button>
+
+        <button onclick="setTool('pen')" id="tool-pen" class="dock-btn" title="ปากกาเซ็นชื่อ/เขียนโน้ต">
+            <i class="fa-solid fa-pen-nib"></i>
+        </button>
+
+        <button onclick="setTool('highlighter')" id="tool-highlighter" class="dock-btn" title="ปากกาไฮไลต์เรืองแสง">
+            <i class="fa-solid fa-highlighter"></i>
+        </button>
+
+        <button onclick="setTool('eraser')" id="tool-eraser" class="dock-btn" title="ยางลบเส้นวาด">
+            <i class="fa-solid fa-eraser"></i>
+        </button>
+
+        <button onclick="openSignatureModal()" id="tool-signature" class="dock-btn" title="เซ็นลายเซ็นสด / แปะรูปตราประทับ">
+            <i class="fa-solid fa-signature"></i>
+        </button>
+
+        <div class="dock-divider"></div>
+
+        <div class="color-dock-group">
+            <div class="color-circle active" data-color="#0033aa" style="background: #0033aa;" title="สีน้ำเงินเซ็นต์เอกสาร" onclick="selectInkColor('#0033aa', this)"></div>
+            <div class="color-circle" data-color="#111827" style="background: #111827;" title="สีดำทางการ" onclick="selectInkColor('#111827', this)"></div>
+            <div class="color-circle" data-color="#ef4444" style="background: #ef4444;" title="สีแดงตรวจแก้" onclick="selectInkColor('#ef4444', this)"></div>
+            <div class="color-circle" data-color="#facc15" style="background: #facc15;" title="สีเหลืองไฮไลต์" onclick="selectInkColor('#facc15', this)"></div>
+        </div>
+
+        <div class="dock-divider"></div>
+
+        <button onclick="undoLastAction()" class="dock-btn" title="ย้อนกลับ (Undo)">
+            <i class="fa-solid fa-rotate-left"></i>
+        </button>
+        <button onclick="zoomDoc(0.15)" class="dock-btn" title="ขยาย">
+            <i class="fa-solid fa-magnifying-glass-plus"></i>
+        </button>
+        <button onclick="zoomDoc(-0.15)" class="dock-btn" title="ย่อ">
+            <i class="fa-solid fa-magnifying-glass-minus"></i>
+        </button>
     </nav>
 
-    <!-- MODAL: ลายเซ็นดิจิทัล & อัปโหลดรูปภาพ -->
-    <div id="signature-modal" class="custom-modal" style="display: none;">
-        <div class="modal-card">
+    <div id="sig-modal" class="modal-backdrop" style="display: none;">
+        <div class="modal-box">
             <div class="modal-header">
-                <h4><i class="fa-solid fa-signature text-glow"></i> เซ็นลายเซ็น / แปะรูปตราประทับ</h4>
-                <button onclick="closeSignatureModal()" class="close-modal-btn">&times;</button>
+                <h3><i class="fa-solid fa-signature text-glow"></i> แปะลายเซ็นหรือตราประทับ</h3>
+                <button onclick="closeSignatureModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-tabs">
+                <button id="tab-draw" class="active" onclick="switchSigTab('draw')">วาดลายเซ็นสด</button>
+                <button id="tab-upload" onclick="switchSigTab('upload')">อัปโหลดรูปภาพ PNG</button>
             </div>
             <div class="modal-body">
-                <div class="sig-tabs">
-                    <button id="tab-draw-sig" class="active" onclick="switchSigTab('draw')">วาดลายเซ็นสด</button>
-                    <button id="tab-upload-sig" onclick="switchSigTab('upload')">อัปโหลดไฟล์รูป / ตราประทับ</button>
-                </div>
-                
-                <div id="sig-draw-pane">
-                    <canvas id="signature-pad" width="360" height="160"></canvas>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-                        <button onclick="clearSignaturePad()" class="btn-mini"><i class="fa-solid fa-eraser"></i> ล้างลายเซ็น</button>
-                        <div class="color-select-mini">
-                            <span class="dot-mini" style="background:#000000" onclick="setSigColor('#000000')"></span>
-                            <span class="dot-mini" style="background:#0000ff" onclick="setSigColor('#0000ff')"></span>
+                <div id="pane-draw">
+                    <canvas id="sig-canvas" width="400" height="180"></canvas>
+                    <div class="sig-tools">
+                        <button onclick="clearSigCanvas()" class="btn-mini"><i class="fa-solid fa-trash-can"></i> ล้าง</button>
+                        <div class="sig-color-pick">
+                            <span class="dot-pick" style="background:#0033aa" onclick="setSigInkColor('#0033aa')"></span>
+                            <span class="dot-pick" style="background:#000000" onclick="setSigInkColor('#000000')"></span>
                         </div>
                     </div>
                 </div>
-
-                <div id="sig-upload-pane" style="display: none;">
-                    <div class="upload-dropzone" onclick="document.getElementById('sig-file-input').click()">
-                        <i class="fa-solid fa-file-image" style="font-size: 32px; color: var(--accent-color);"></i>
-                        <p>แตะเพื่อเลือกรูปภาพ PNG/JPG</p>
-                        <input type="file" id="sig-file-input" accept="image/*" style="display:none;" onchange="handleSigFileUpload(event)">
+                <div id="pane-upload" style="display: none;">
+                    <div class="drop-zone" onclick="document.getElementById('sig-image-file').click()">
+                        <i class="fa-solid fa-image" style="font-size: 32px; color: var(--accent);"></i>
+                        <p>แตะเพื่อเลือกไฟล์รูปภาพโปร่งใส PNG / JPG</p>
+                        <input type="file" id="sig-image-file" accept="image/*" style="display:none;" onchange="handleSigUpload(event)">
                     </div>
-                    <div id="sig-upload-preview" style="display:none; text-align:center; margin-top:10px;">
-                        <img id="sig-img-preview" style="max-height: 120px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">
+                    <div id="preview-upload-box" style="display:none; text-align:center; margin-top: 10px;">
+                        <img id="img-preview" style="max-height: 120px; border-radius: 6px;">
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button onclick="closeSignatureModal()" class="btn-cancel">ยกเลิก</button>
-                <button onclick="insertSignatureToDoc()" class="btn-primary">วางลงบนหน้าเอกสาร</button>
+                <button onclick="placeSignatureOnDoc()" class="btn-primary">วางลงบนเอกสาร</button>
             </div>
         </div>
     </div>
