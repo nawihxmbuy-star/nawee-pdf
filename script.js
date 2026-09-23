@@ -153,15 +153,18 @@ async function renderPage(pageNum, container) {
     const textContent = await page.getTextContent();
     const displayViewport = page.getViewport({ scale: 1.0 });
 
+    // 🎯 แก้ไข: แปลงขนาดฟอนต์ให้สอดคล้องกับพิกัดหน้าจอ 1:1 อย่างแม่นยำ
     const pageTextMetadata = textContent.items.map(item => {
+        const tx = pdfjsLib.Util.transform(displayViewport.transform, item.transform);
+        const fontHeight = Math.hypot(tx[2], tx[3]);
         const [left, top] = displayViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
-        const fontSize = Math.hypot(item.transform[0], item.transform[1]);
+
         return {
             x: left,
-            y: top - fontSize,
+            y: top - fontHeight,
             width: item.width,
-            height: fontSize,
-            fontSize: fontSize,
+            height: fontHeight,
+            fontSize: fontHeight, // ขนาดบนหน้าจอจริง
             text: item.str,
             fontName: item.fontName || '',
             pdfX: item.transform[4],
@@ -236,7 +239,6 @@ function analyzeBoxColors(canvas, x, y, width, height) {
         const imgData = ctx.getImageData(safeLeft, safeTop, safeWidth, safeHeight).data;
         const colorCounts = {};
 
-        // 1. ตรวจหาสีพื้นหลัง (Background)
         for (let i = 0; i < imgData.length; i += 4) {
             if (imgData[i + 3] < 150) continue;
             const r = Math.round(imgData[i] / 6) * 6;
@@ -251,7 +253,6 @@ function analyzeBoxColors(canvas, x, y, width, height) {
         const [bgR, bgG, bgB] = bgKey.split(',').map(Number);
         const bgLuma = (bgR * 299 + bgG * 587 + bgB * 114) / 1000;
 
-        // 2. ตรวจหาสีหมึกตัวหนังสือจริง โดยกรองตัดขอบฟุ้ง Anti-Aliasing ออก
         const textCandidateCounts = {};
         for (let i = 0; i < imgData.length; i += 4) {
             if (imgData[i + 3] < 200) continue;
@@ -296,7 +297,7 @@ function analyzeBoxColors(canvas, x, y, width, height) {
 }
 
 // -------------------------------------------------------------
-// ดึงขนาดฟอนต์จริง น้ำหนักตัวหนา และพิกัดจากคำที่แตะ
+// 🎯 ดึงขนาดฟอนต์จริง น้ำหนักตัวหนา และพิกัดจากคำที่แตะ (ไม่มีบวม)
 // -------------------------------------------------------------
 function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
     if (!textMetadata || textMetadata.length === 0) return null;
@@ -304,24 +305,29 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
     const centerX = boxLeft + (boxWidth / 2);
     const centerY = boxTop + (boxHeight / 2);
 
-    const overlaps = textMetadata.filter(item => {
-        return (
-            centerX >= item.x - 6 &&
-            centerX <= item.x + item.width + 6 &&
-            centerY >= item.y - 8 &&
-            centerY <= item.y + item.height + 8 &&
+    let target = textMetadata.find(item => 
+        centerX >= item.x - 4 && centerX <= item.x + item.width + 4 &&
+        centerY >= item.y - 6 && centerY <= item.y + item.height + 6 &&
+        item.text && item.text.trim() !== ''
+    );
+
+    if (!target) {
+        const overlaps = textMetadata.filter(item => 
+            item.x < boxLeft + boxWidth &&
+            item.x + item.width > boxLeft &&
+            item.y < boxTop + boxHeight &&
+            item.y + item.height > boxTop &&
             item.text && item.text.trim() !== ''
         );
-    });
-
-    const target = overlaps.length > 0 ? overlaps[0] : null;
+        if (overlaps.length > 0) target = overlaps[0];
+    }
 
     if (target) {
         const isBold = target.fontName ? (/bold|black|heavy|medium|semibold/i.test(target.fontName)) : false;
-        const realFontSize = Math.round(target.fontSize || target.height);
+        const realFontSize = Math.round(target.fontSize);
 
         return {
-            fontSize: Math.max(10, Math.min(36, realFontSize)),
+            fontSize: Math.max(8, Math.min(36, realFontSize)),
             origX: target.x,
             origY: target.y,
             viewportY: target.viewportY,
@@ -333,7 +339,7 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
     }
 
     return {
-        fontSize: Math.max(11, Math.min(28, Math.round(boxHeight * 0.75))),
+        fontSize: 9, // ขนาดมาตรฐานสำหรับตาราง
         fontWeight: '400',
         text: ''
     };
@@ -394,7 +400,6 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
         const touchDuration = Date.now() - touchStartTime;
 
-        // ตรรกะตรวจจับคำ: จับเฉพาะคำที่ติดกัน แตะโดนคำไหนเกาะคำนั้น แตะที่ว่างสร้างกล่องทันที
         if (boxWidth < 18 && boxHeight < 18 && touchDuration < 450 && currentTool === 'patch') {
             const hit = textMetadata.find(item => 
                 startX >= item.x - 8 && startX <= item.x + item.width + 8 &&
@@ -408,7 +413,6 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
                 const hitIdx = lineItems.findIndex(item => item === hit);
 
-                // ขยายซ้าย: หยุดเมื่อเจอเว้นวรรคชัดเจน หรือห่างเกิน 6px
                 let startWord = hit;
                 for (let i = hitIdx - 1; i >= 0; i--) {
                     const prev = lineItems[i];
@@ -419,7 +423,6 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
                     startWord = prev;
                 }
 
-                // ขยายขวา: หยุดเมื่อเจอเว้นวรรคชัดเจน หรือห่างเกิน 6px
                 let endWord = hit;
                 for (let i = hitIdx + 1; i < lineItems.length; i++) {
                     const next = lineItems[i];
@@ -432,14 +435,13 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
                 boxLeft = startWord.x - 1;
                 boxTop = Math.min(hit.y, startWord.y, endWord.y);
-                boxWidth = Math.max(20, (endWord.x + endWord.width) - startWord.x + 4);
-                boxHeight = Math.max(hit.height, startWord.height, endWord.height) + 4;
+                boxWidth = Math.max(16, (endWord.x + endWord.width) - startWord.x + 3);
+                boxHeight = Math.max(hit.height, startWord.height, endWord.height) + 2;
             } else {
-                // หากแตะในช่องว่าง ให้สร้างกล่องเริ่มต้นตรงจุดนั้นทันที
                 boxLeft = Math.max(0, startX - 30);
-                boxTop = Math.max(0, startY - 11);
-                boxWidth = 80;
-                boxHeight = 22;
+                boxTop = Math.max(0, startY - 8);
+                boxWidth = 70;
+                boxHeight = 18;
             }
         }
 
@@ -624,18 +626,18 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
 }
 
 // -------------------------------------------------------------
-// กล่อง Input: ปรับฟอนต์และสีตามต้นฉบับอัตโนมัติ
+// 🎯 กล่อง Input: ปรับฟอนต์และสีตามต้นฉบับอัตโนมัติ (ไม่ล้น ไม่บวม)
 // -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
-    const fontSize = matchedOrig && matchedOrig.fontSize ? matchedOrig.fontSize : Math.max(12, Math.round(height * 0.72));
+    const fontSize = matchedOrig && matchedOrig.fontSize ? matchedOrig.fontSize : 9;
     let currentWeight = matchedOrig && matchedOrig.fontWeight ? matchedOrig.fontWeight : '400';
     
     const insetLeft = left;
     const insetTop = top;
-    let insetWidth = Math.max(20, width);
-    const insetHeight = Math.max(14, height);
+    let insetWidth = Math.max(16, width);
+    const insetHeight = Math.max(fontSize + 3, Math.round(height));
 
     const node = document.createElement('div');
     node.className = 'active-patch-node';
@@ -665,7 +667,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     input.style.color = colors.text.hex;
     input.style.fontSize = fontSize + 'px';
     input.style.fontWeight = currentWeight;
-    input.style.lineHeight = insetHeight + 'px';
+    input.style.lineHeight = '1';
     node.appendChild(input);
 
     const textPreview = document.createElement('div');
@@ -695,7 +697,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         tempSpan.style.position = 'absolute';
         tempSpan.innerText = input.value || input.placeholder;
         document.body.appendChild(tempSpan);
-        const textW = tempSpan.offsetWidth + 14;
+        const textW = tempSpan.offsetWidth + 12;
         tempSpan.remove();
 
         if (textW > insetWidth) {
