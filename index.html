@@ -19,12 +19,84 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-    <!-- TOP NAVIGATION BAR -->
+    <!-- TOP NAVIGATION BAR (ความสูง 56px คงเดิม ผสานบาร์เครื่องมือตรงกลาง) -->
     <header class="top-bar">
         <div class="brand">
-            <img src="cat-avatar.png" alt="Cat Logo" class="brand-avatar" onerror="this.style.display='none'">
+            <img src="cat-avatar.png" alt="Cat Logo" class="brand-avatar" onerror="this.parentElement.innerHTML='<div class=\'brand-fallback\'><i class=\'fa-solid fa-cat\'></i></div>'">
             <span>Sunita PDF <small class="pro-badge">PRO</small></span>
         </div>
+
+        <!-- บาร์เครื่องมือฝังตัวใน Top Bar -->
+        <div class="top-dock-bar">
+            <!-- เลื่อนดูเอกสาร -->
+            <button onclick="setTool('pan')" id="tool-pan" class="dock-btn" title="เลื่อนดูเอกสาร">
+                <i class="fa-solid fa-hand"></i>
+            </button>
+            <div class="dock-divider"></div>
+
+            <!-- แก้ไขคำแนบเนียน -->
+            <button onclick="setTool('patch')" id="tool-patch" class="dock-btn active" title="ลบคำผิดและพิมพ์ทับ">
+                <i class="fa-solid fa-i-cursor"></i>
+            </button>
+
+            <!-- กรอบสี่เหลี่ยม -->
+            <button onclick="setTool('rect')" id="tool-rect" class="dock-btn" title="วาดกรอบสี่เหลี่ยมชี้เป้า">
+                <i class="fa-regular fa-square"></i>
+            </button>
+
+            <!-- วงกลม/วงรี -->
+            <button onclick="setTool('circle')" id="tool-circle" class="dock-btn" title="วาดวงกลม/วงรีชี้เป้า">
+                <i class="fa-regular fa-circle"></i>
+            </button>
+
+            <!-- ปากกาฟรีแฮนด์ -->
+            <button onclick="setTool('pen')" id="tool-pen" class="dock-btn" title="ปากกาเซ็นชื่อ/เขียนโน้ต">
+                <i class="fa-solid fa-pen-nib"></i>
+            </button>
+
+            <!-- ไฮไลต์ -->
+            <button onclick="setTool('highlighter')" id="tool-highlighter" class="dock-btn" title="ปากกาไฮไลต์เรืองแสง">
+                <i class="fa-solid fa-highlighter"></i>
+            </button>
+
+            <!-- ยางลบ -->
+            <button onclick="setTool('eraser')" id="tool-eraser" class="dock-btn" title="ยางลบเส้นวาด">
+                <i class="fa-solid fa-eraser"></i>
+            </button>
+
+            <!-- ตรายาง / ลายเซ็น -->
+            <button onclick="openSignatureModal()" id="tool-signature" class="dock-btn" title="เซ็นลายเซ็น / แปะรูปตราประทับ">
+                <i class="fa-solid fa-signature"></i>
+            </button>
+
+            <div class="dock-divider"></div>
+
+            <!-- จานสี -->
+            <div class="color-dock-group">
+                <div class="color-circle active" data-color="#ef4444" style="background: #ef4444;" title="สีแดง" onclick="selectInkColor('#ef4444', this)"></div>
+                <div class="color-circle" data-color="#0033aa" style="background: #0033aa;" title="สีน้ำเงิน" onclick="selectInkColor('#0033aa', this)"></div>
+                <div class="color-circle" data-color="#111827" style="background: #111827;" title="สีดำ" onclick="selectInkColor('#111827', this)"></div>
+                <div class="color-circle" data-color="#10b981" style="background: #10b981;" title="สีเขียว" onclick="selectInkColor('#10b981', this)"></div>
+            </div>
+
+            <div class="dock-divider"></div>
+
+            <!-- Undo, Redo, Zoom -->
+            <button onclick="undoAction()" class="dock-btn" title="ย้อนกลับ (Ctrl+Z)">
+                <i class="fa-solid fa-rotate-left"></i>
+            </button>
+            <button onclick="redoAction()" class="dock-btn" title="ทำซ้ำ (Ctrl+Y)">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+            <button onclick="zoomDoc(0.15)" class="dock-btn" title="ขยาย">
+                <i class="fa-solid fa-magnifying-glass-plus"></i>
+            </button>
+            <button onclick="zoomDoc(-0.15)" class="dock-btn" title="ย่อ">
+                <i class="fa-solid fa-magnifying-glass-minus"></i>
+            </button>
+        </div>
+
+        <!-- กลุ่มปุ่มเปิดและส่งออกไฟล์ -->
         <div class="action-buttons">
             <button onclick="resetApp()" class="btn-secondary" title="เริ่มเอกสารใหม่">
                 <i class="fa-solid fa-rotate-left"></i> <span class="btn-text">เริ่มใหม่</span>
@@ -45,86 +117,16 @@
         <div id="document-container">
             <div class="welcome-box">
                 <div class="welcome-avatar-wrap">
-                    <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\\'welcome-icon\\'><i class=\\'fa-solid fa-file-pdf\\'></i></div>'">
+                    <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\'welcome-icon\'><i class=\'fa-solid fa-file-pdf\'></i></div>'">
                 </div>
                 <h2>ยินดีต้อนรับสู่ Sunita PDF Studio</h2>
-                <p>เครื่องมือตรวจแก้เอกสารและใบเสนอราคาฉบับพิเศษสำหรับ Sunita ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี และส่งออกคมชัดระดับเวกเตอร์</p>
+                <p>เครื่องมือตรวจแก้เอกสารและใบเสนอราคาฉบับพิเศษสำหรับ Sunita ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี ชี้เป้าแก้ไข และส่งออกคมชัดระดับเวกเตอร์</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
             </div>
         </div>
     </main>
-
-    <!-- FLOATING DOCK TOOLBAR -->
-    <nav class="floating-dock">
-        <!-- เลื่อนดูเอกสาร -->
-        <button onclick="setTool('pan')" id="tool-pan" class="dock-btn" title="เลื่อนดูเอกสาร">
-            <i class="fa-solid fa-hand"></i>
-        </button>
-        <div class="dock-divider"></div>
-
-        <!-- แก้ไขคำแนบเนียน -->
-        <button onclick="setTool('patch')" id="tool-patch" class="dock-btn active" title="ลบคำผิดและพิมพ์ทับ">
-            <i class="fa-solid fa-i-cursor"></i>
-        </button>
-
-        <!-- กรอบสี่เหลี่ยม -->
-        <button onclick="setTool('rect')" id="tool-rect" class="dock-btn" title="วาดกรอบสี่เหลี่ยม">
-            <i class="fa-regular fa-square"></i>
-        </button>
-
-        <!-- วงกลม/วงรี -->
-        <button onclick="setTool('circle')" id="tool-circle" class="dock-btn" title="วาดวงกลม/วงรีเน้นข้อความ">
-            <i class="fa-regular fa-circle"></i>
-        </button>
-
-        <!-- ปากกาฟรีแฮนด์ -->
-        <button onclick="setTool('pen')" id="tool-pen" class="dock-btn" title="ปากกาเซ็นชื่อ/เขียนโน้ต">
-            <i class="fa-solid fa-pen-nib"></i>
-        </button>
-
-        <!-- ไฮไลต์ -->
-        <button onclick="setTool('highlighter')" id="tool-highlighter" class="dock-btn" title="ปากกาไฮไลต์เรืองแสง">
-            <i class="fa-solid fa-highlighter"></i>
-        </button>
-
-        <!-- ยางลบ -->
-        <button onclick="setTool('eraser')" id="tool-eraser" class="dock-btn" title="ยางลบเส้นวาด">
-            <i class="fa-solid fa-eraser"></i>
-        </button>
-
-        <!-- ตรายาง / ลายเซ็น -->
-        <button onclick="openSignatureModal()" id="tool-signature" class="dock-btn" title="เซ็นลายเซ็น / แปะรูปตราประทับ">
-            <i class="fa-solid fa-signature"></i>
-        </button>
-
-        <div class="dock-divider"></div>
-
-        <!-- จานสีมาตรฐาน -->
-        <div class="color-dock-group">
-            <div class="color-circle active" data-color="#0033aa" style="background: #0033aa;" title="สีน้ำเงิน" onclick="selectInkColor('#0033aa', this)"></div>
-            <div class="color-circle" data-color="#ef4444" style="background: #ef4444;" title="สีแดง" onclick="selectInkColor('#ef4444', this)"></div>
-            <div class="color-circle" data-color="#111827" style="background: #111827;" title="สีดำ" onclick="selectInkColor('#111827', this)"></div>
-            <div class="color-circle" data-color="#10b981" style="background: #10b981;" title="สีเขียว" onclick="selectInkColor('#10b981', this)"></div>
-        </div>
-
-        <div class="dock-divider"></div>
-
-        <!-- Undo, Redo, Zoom -->
-        <button onclick="undoAction()" class="dock-btn" title="ย้อนกลับ (Ctrl+Z)">
-            <i class="fa-solid fa-rotate-left"></i>
-        </button>
-        <button onclick="redoAction()" class="dock-btn" title="ทำซ้ำ (Ctrl+Y)">
-            <i class="fa-solid fa-rotate-right"></i>
-        </button>
-        <button onclick="zoomDoc(0.15)" class="dock-btn" title="ขยาย">
-            <i class="fa-solid fa-magnifying-glass-plus"></i>
-        </button>
-        <button onclick="zoomDoc(-0.15)" class="dock-btn" title="ย่อ">
-            <i class="fa-solid fa-magnifying-glass-minus"></i>
-        </button>
-    </nav>
 
     <!-- SIGNATURE MODAL -->
     <div id="sig-modal" class="modal-backdrop" style="display: none;">
