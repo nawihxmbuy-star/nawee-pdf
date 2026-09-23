@@ -1,8 +1,8 @@
 :root {
-    --bg-color: #0f172a;       
-    --toolbar-bg: #1e293b;     
-    --accent-color: #22d3ee;   
-    --text-color: #f8fafc;     
+    --bg-color: #0f172a;        
+    --toolbar-bg: #1e293b;      
+    --accent-color: #22d3ee;    
+    --text-color: #f8fafc;      
 }
 
 * { 
@@ -13,13 +13,13 @@
 
 body { 
     background: var(--bg-color); 
-    height: 100dvh; /* ปรับเป็น 100dvh เพื่อรองรับขนาดจอสมาร์ตโฟนให้พอดี */
+    height: 100dvh; /* Dynamic Viewport ป้องกันแถบ URL มือถือดัน */
     overflow: hidden; 
     font-family: 'Sarabun', sans-serif; 
 }
 
 /* 📱 ป้องกันการกดคลุมดำโดน UI หลัก */
-.top-bar, .toolbar, .word-formatting-bar, .pen-sub-panel, .ai-sidebar, .text-node-floating-bar {
+.top-bar, .toolbar, .word-formatting-bar, .pen-sub-panel, .ai-sidebar, .text-node-floating-bar, .custom-modal {
     user-select: none;
     -webkit-user-select: none;
 }
@@ -42,16 +42,17 @@ body.mode-word .word-formatting-bar { display: flex; }
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
-    padding: 0 20px; 
+    padding: 0 16px; 
     z-index: 1000;
 }
 .brand { 
     display: flex; 
     align-items: center; 
-    gap: 10px; 
+    gap: 8px; 
     color: #fff; 
     font-weight: bold; 
-    font-size: 18px; 
+    font-size: 17px; 
+    white-space: nowrap;
 }
 .text-glow { 
     color: var(--accent-color); 
@@ -62,31 +63,45 @@ body.mode-word .word-formatting-bar { display: flex; }
     background: #ff0055; 
     padding: 2px 6px; 
     border-radius: 4px; 
-    margin-left: 5px; 
+    margin-left: 4px; 
 }
 body.mode-word .badge { background: #2b579a; }
 
 .action-group { 
     display: flex; 
-    gap: 10px; 
+    gap: 8px; 
     align-items: center; 
+    overflow-x: auto;
+    scrollbar-width: none;
 }
+.action-group::-webkit-scrollbar { display: none; }
+
 .action-group button {
     background: rgba(255, 255, 255, 0.05); 
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #fff; 
-    padding: 8px 14px; 
+    padding: 8px 12px; 
     border-radius: 8px; 
     cursor: pointer; 
     display: flex; 
     align-items: center; 
     gap: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 .btn-premium { background: linear-gradient(135deg, #0077ff, var(--accent-color)) !important; border: none !important; }
 .btn-line { background: #06C755 !important; border: none !important; color: #fff !important; }
+.btn-ai { background: rgba(34, 211, 238, 0.15) !important; border: 1px solid var(--accent-color) !important; color: #fff !important; }
+
+/* จอเล็ก ซ่อนข้อความปุ่มเหลือแต่ไอคอน */
+@media (max-width: 600px) {
+    .action-group .lbl { display: none; }
+    .action-group button { padding: 8px 10px; }
+}
 
 /* เมนูแปลงไฟล์ Dropdown */
-.dropdown-wrapper { position: relative; display: inline-block; }
+.dropdown-wrapper { position: relative; display: inline-block; flex-shrink: 0; }
 .dropdown-popup {
     display: none; 
     position: absolute; 
@@ -152,26 +167,48 @@ body.mode-word .badge { background: #2b579a; }
     display: flex;
     flex-direction: column;
     align-items: flex-start; 
-    padding: 95px 50px 180px 50px; 
+    padding: 85px 20px 180px 20px; 
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
 }
-body.mode-word .workspace { padding-top: 140px; }
+body.mode-word .workspace { padding-top: 130px; }
 
-.initial-notice { background: #1e293b; border: 1px dashed rgba(255,255,255,0.1); padding: 50px; max-width: 500px; margin: 50px auto; border-radius: 12px; text-align: center; color: #94a3b8; }
+@media (min-width: 768px) {
+    .workspace {
+        align-items: center;
+        padding-left: 50px;
+        padding-right: 50px;
+    }
+}
+
+.initial-notice { 
+    background: #1e293b; 
+    border: 1px dashed rgba(255,255,255,0.1); 
+    padding: 40px 25px; 
+    max-width: 480px; 
+    margin: 50px auto; 
+    border-radius: 12px; 
+    text-align: center; 
+    color: #94a3b8; 
+}
 
 #pdf-container { 
     margin: 0 auto; 
     min-width: fit-content; 
     width: fit-content; 
-    transform-origin: top left; 
+    transform-origin: top center; 
     transition: transform 0.05s ease-out; 
 }
-.page-wrapper { position: relative; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); background: #ffffff; }
+.page-wrapper { 
+    position: relative; 
+    margin-bottom: 25px; 
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6); 
+    background: #ffffff; 
+}
 .pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: block; }
 .drawing-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
 
-/* เลเยอร์ควบคุมกล่องข้อความ */
+/* เลเยอร์ควบคุมข้อความและ Patch */
 .text-overlay-layer { 
     position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; 
     overflow: hidden; pointer-events: none; 
@@ -194,42 +231,171 @@ body.mode-word .word-text-node {
 }
 body.mode-word .word-text-node:hover { border: 1px dashed var(--accent-color); background: #f0fdfa; }
 body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); background: #ffffff !important; color: #000000 !important; z-index: 999; }
-.word-text-node.is-edited { background: #ffffff !important; color: #000000 !important; }
 
-/* สไตล์กล่องพิมพ์ข้อความลอยอิสระ (Draggable) */
+/* สไตล์กล่องพิมพ์ข้อความลอยอิสระ */
 .custom-draggable-text-node {
     position: absolute; white-space: pre-wrap; cursor: move; user-select: none; touch-action: none;
-    padding: 6px 10px; border-radius: 6px; display: inline-block; transform: translate(-50%, -50%);
+    padding: 4px 8px; border-radius: 4px; display: inline-block; transform: translate(-50%, -50%);
     background: transparent !important; z-index: 5000; pointer-events: auto !important;
 }
 
 /* ==========================================================================
-   MAIN TOOLBAR (BOTTOM) & SUB PANELS
+   VECTOR EDITING TOOLS (EDIT-TEXT & WHITEOUT & SIGNATURE)
+   ========================================================================== */
+/* เมื่อเปิดโหมดแตะแก้ข้อความเดิม */
+body.tool-edit-text .text-overlay-layer { pointer-events: auto !important; }
+body.tool-edit-text .word-text-node.editable-target {
+    display: block !important;
+    pointer-events: auto !important;
+    cursor: pointer;
+    background: rgba(34, 211, 238, 0.08);
+    border: 1px dashed rgba(34, 211, 238, 0.4);
+    border-radius: 2px;
+}
+body.tool-edit-text .word-text-node.editable-target:hover {
+    background: rgba(34, 211, 238, 0.25);
+    border-color: #22d3ee;
+}
+
+/* บล็อกสี่เหลี่ยมลบคำเดิม (Whiteout) */
+.whiteout-box {
+    position: absolute;
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    cursor: move;
+    z-index: 10;
+    pointer-events: auto !important;
+}
+.whiteout-box:hover {
+    border-color: #ef4444;
+}
+
+/* กล่องภาพลายเซ็นลากวางบนหน้าเอกสาร */
+.custom-draggable-sig-node {
+    position: absolute;
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+    border: 1px dashed var(--accent-color);
+    border-radius: 4px;
+    z-index: 5005;
+    pointer-events: auto !important;
+    transform: translate(-50%, -50%);
+}
+.custom-draggable-sig-node img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    pointer-events: none;
+}
+.sig-remove-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ef4444;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid #fff;
+}
+
+/* ==========================================================================
+   MAIN TOOLBAR (BOTTOM) & SUB PANELS - TOUCH RESPONSIVE
    ========================================================================== */
 .toolbar {
-    position: fixed; bottom: 0; left: 0; width: 100%; height: 70px;
-    display: flex; justify-content: center; gap: 12px; align-items: center;
-    background: var(--toolbar-bg); border-top: 2px solid var(--accent-color); z-index: 9999; padding: 0 15px;
+    position: fixed; 
+    bottom: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 70px;
+    display: flex; 
+    align-items: center; 
+    gap: 8px;
+    background: var(--toolbar-bg); 
+    border-top: 2px solid var(--accent-color); 
+    z-index: 9999; 
+    padding: 0 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
 }
-.toolbar button { color: var(--accent-color); font-size: 22px; cursor: pointer; background: none; border: none; width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center;}
+.toolbar::-webkit-scrollbar { display: none; }
+
+@media (min-width: 900px) {
+    .toolbar {
+        justify-content: center;
+        gap: 12px;
+        padding: 0 20px;
+    }
+}
+
+.toolbar button { 
+    color: var(--accent-color); 
+    font-size: 20px; 
+    cursor: pointer; 
+    background: none; 
+    border: none; 
+    min-width: 44px; 
+    height: 44px; 
+    border-radius: 8px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    flex-shrink: 0;
+    touch-action: manipulation;
+}
 .toolbar button.active { background: var(--accent-color); color: #0f172a; }
-.toolbar button.nav-btn { color: #f8fafc; font-size: 26px; }
+.toolbar button.nav-btn { color: #f8fafc; font-size: 24px; }
 .toolbar button.nav-btn:hover { color: var(--accent-color); }
-.toolbar button.nav-btn-action { color: #94a3b8; font-size: 20px; }
+.toolbar button.nav-btn-action { color: #94a3b8; font-size: 18px; }
 .toolbar button.nav-btn-action:hover { color: #fff; }
-.divider { width: 1px; height: 24px; background: rgba(255,255,255,0.15); }
+.divider { width: 1px; height: 24px; background: rgba(255,255,255,0.15); flex-shrink: 0; margin: 0 4px; }
 
 /* แผงควบคุมขนาดปากกา/สี */
-.pen-sub-panel { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid var(--accent-color); padding: 10px 16px; border-radius: 12px; display: none; align-items: center; gap: 15px; z-index: 10000; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-.panel-item { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 13px; }
+.pen-sub-panel { 
+    position: fixed; 
+    bottom: 80px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+    background: #1e293b; 
+    border: 1px solid var(--accent-color); 
+    padding: 10px 16px; 
+    border-radius: 12px; 
+    display: none; 
+    align-items: center; 
+    gap: 15px; 
+    z-index: 10000; 
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5); 
+    max-width: 90vw;
+    overflow-x: auto;
+}
+.panel-item { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 13px; white-space: nowrap; }
 .panel-item input[type="range"] { accent-color: var(--accent-color); cursor: pointer; }
 .brush-preview-box { width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
 #brush-preview { border-radius: 50%; }
 
-/* 🎨 ระบบจานสีสำเร็จรูปด่วน (Quick Color Palette UI) */
-.quick-color-palette {
-    display: flex; gap: 6px; align-items: center; margin: 0 4px;
+#btn-toggle-shape {
+    background: rgba(255,255,255,0.1); 
+    border: 1px solid rgba(255,255,255,0.2); 
+    color: #fff; 
+    padding: 6px 10px; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-size: 11px; 
+    white-space: nowrap;
 }
+
+/* 🎨 ระบบจานสีสำเร็จรูปด่วน */
+.quick-color-palette { display: flex; gap: 6px; align-items: center; margin: 0 4px; }
 .color-palette-dot {
     width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
     border: 2px solid rgba(255,255,255,0.3); transition: transform 0.1s, border-color 0.1s;
@@ -247,126 +413,186 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 }
 
 /* ==========================================================================
-   FLOATING TEXT NODE BOTTOM BAR (FIXED: Moved styles from HTML cleanly)
+   FLOATING TEXT NODE BOTTOM BAR
    ========================================================================== */
 .text-node-floating-bar {
     position: fixed; bottom: -320px; left: 0; width: 100%;
-    background: var(--toolbar-bg); padding: 20px; z-index: 9990;
+    background: var(--toolbar-bg); padding: 18px; z-index: 9990;
     transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     border-top: 2px solid var(--accent-color); border-radius: 20px 20px 0 0;
     box-shadow: 0 -5px 25px rgba(0,0,0,0.6);
 }
 .text-node-floating-bar.active { bottom: 0; }
-
-.text-node-floating-bar .floating-bar-content {
-    display: flex; 
-    flex-direction: column; 
-    gap: 10px;
-}
-.text-node-floating-bar .floating-bar-header {
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center;
-}
-.text-node-floating-bar .bar-title {
-    color: #fff;
-    font-size: 15px;
-    font-weight: bold;
-}
+.text-node-floating-bar .floating-bar-content { display: flex; flex-direction: column; gap: 10px; }
+.text-node-floating-bar .floating-bar-header { display: flex; justify-content: space-between; align-items: center; }
+.text-node-floating-bar .bar-title { color: #fff; font-size: 15px; font-weight: bold; }
 .text-node-floating-bar .btn-confirm-node {
-    background: var(--accent-color); 
-    color: #0f172a; 
-    width: auto; 
-    padding: 6px 14px; 
-    font-size: 13px; 
-    font-weight: bold; 
-    gap: 4px; 
-    display: flex; 
-    align-items: center; 
-    border-radius: 10px; 
-    border: none; 
-    cursor: pointer;
+    background: var(--accent-color); color: #0f172a; width: auto; 
+    padding: 6px 14px; font-size: 13px; font-weight: bold; gap: 4px; 
+    display: flex; align-items: center; border-radius: 10px; border: none; cursor: pointer;
 }
 .text-node-floating-bar .text-node-controls {
-    background: rgba(255, 255, 255, 0.02); 
-    padding: 10px; 
-    border-radius: 12px; 
-    width: 100%; 
+    background: rgba(255, 255, 255, 0.02); padding: 10px; border-radius: 12px; width: 100%; 
+    display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+}
+.text-node-floating-bar #floating-text-color {
+    width: 34px; height: 34px; border: none; background: transparent; cursor: pointer; padding: 0; flex-shrink: 0;
+}
+.text-node-floating-bar .quick-color-palette-wrapper { margin-right: 4px; }
+.text-node-floating-bar .bar-separator { width: 1px; height: 30px; background: rgba(255, 255, 255, 0.15); }
+.text-node-floating-bar .btn-format-node,
+.text-node-floating-bar .btn-size-node,
+.text-node-floating-bar .btn-delete-node {
+    width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer;
+}
+.text-node-floating-bar .btn-format-node { background: rgba(255, 255, 255, 0.05); color: #fff; }
+.text-node-floating-bar .btn-size-node { background: rgba(34, 211, 238, 0.1); color: var(--accent-color); }
+.text-node-floating-bar .btn-delete-node { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+/* ==========================================================================
+   CUSTOM MODALS (TEXT EDIT & SIGNATURE PAD)
+   ========================================================================== */
+.custom-modal {
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100vw; 
+    height: 100dvh; 
+    background: rgba(0, 0, 0, 0.65); 
+    backdrop-filter: blur(4px);
+    z-index: 10050; 
     display: flex; 
     align-items: center; 
     justify-content: center; 
-    gap: 12px; 
-    flex-wrap: wrap;
+    padding: 16px;
+    animation: fadeIn 0.2s ease-out;
 }
-.text-node-floating-bar #floating-text-color {
-    width: 34px; 
-    height: 34px; 
-    border: none; 
-    background: transparent; 
-    cursor: pointer; 
-    padding: 0; 
-    flex-shrink: 0;
+.modal-card {
+    background: #1e293b; 
+    border: 1px solid var(--accent-color); 
+    border-radius: 14px; 
+    width: 100%; 
+    max-width: 440px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
+    overflow: hidden;
 }
-.text-node-floating-bar .quick-color-palette-wrapper {
-    margin-right: 4px;
+.modal-header {
+    background: #0f172a; 
+    padding: 14px 18px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
 }
-.text-node-floating-bar .bar-separator {
-    width: 1px; 
-    height: 30px; 
-    background: rgba(255, 255, 255, 0.15);
+.modal-header h4 { font-size: 15px; font-weight: bold; }
+.close-modal-btn { background: none; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; }
+.modal-body { padding: 18px; color: #e2e8f0; font-size: 13px; }
+.modal-body label { display: block; margin-bottom: 6px; font-weight: 500; }
+.text-preview-box {
+    background: #0f172a; 
+    padding: 10px 14px; 
+    border-radius: 8px; 
+    color: #94a3b8; 
+    border: 1px solid rgba(255,255,255,0.1); 
+    font-size: 13px;
+    max-height: 80px; 
+    overflow-y: auto;
 }
-.text-node-floating-bar .btn-format-node {
-    background: rgba(255, 255, 255, 0.05); 
+.modal-body input[type="text"] {
+    width: 100%; 
+    background: #0f172a; 
+    border: 1px solid var(--accent-color); 
+    padding: 10px 14px; 
+    border-radius: 8px; 
     color: #fff; 
-    width: 36px; 
-    height: 36px; 
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
+    outline: none; 
+    font-size: 14px;
 }
-.text-node-floating-bar .btn-size-node {
-    background: rgba(34, 211, 238, 0.1); 
-    color: var(--accent-color); 
-    width: 36px; 
-    height: 36px; 
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
+.modal-options-row {
+    display: flex; 
+    gap: 16px; 
+    align-items: center; 
+    margin-top: 14px;
 }
-.text-node-floating-bar .btn-delete-node {
-    background: rgba(239, 68, 68, 0.1); 
-    color: #ef4444; 
-    width: 36px; 
-    height: 36px; 
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
+.modal-options-row input[type="number"] {
+    background: #0f172a; border: 1px solid rgba(255,255,255,0.2); color: #fff;
+    padding: 6px 8px; border-radius: 6px; width: 65px; outline: none;
 }
-.text-node-controls button:active {
-    transform: scale(0.92);
+.modal-options-row input[type="color"] {
+    width: 32px; height: 32px; border: none; background: transparent; cursor: pointer; vertical-align: middle;
 }
+.modal-footer {
+    padding: 12px 18px; 
+    background: #0f172a; 
+    border-top: 1px solid rgba(255,255,255,0.1); 
+    display: flex; 
+    justify-content: flex-end; 
+    gap: 10px;
+}
+.modal-footer button {
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: bold;
+}
+.btn-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #94a3b8; }
+.btn-primary { background: var(--accent-color); border: none; color: #0f172a; }
+
+/* แท็บสลับหน้าจอเซ็นชื่อ vs อัปโหลดรูป */
+.sig-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.sig-tabs button {
+    flex: 1; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    color: #94a3b8; border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+.sig-tabs button.active { background: var(--accent-color); color: #0f172a; font-weight: bold; border-color: var(--accent-color); }
+
+#signature-pad {
+    width: 100%; 
+    height: 160px; 
+    background: #ffffff; 
+    border-radius: 8px; 
+    cursor: crosshair; 
+    touch-action: none;
+}
+.btn-mini {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #e2e8f0;
+    padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;
+}
+.color-select-mini { display: flex; gap: 6px; }
+.dot-mini { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid #fff; }
+
+.upload-dropzone {
+    border: 2px dashed rgba(34, 211, 238, 0.4); 
+    padding: 30px 15px; 
+    border-radius: 8px; 
+    text-align: center; 
+    cursor: pointer; 
+    background: rgba(0,0,0,0.2);
+}
+.upload-dropzone:hover { border-color: var(--accent-color); background: rgba(34,211,238,0.05); }
 
 /* ==========================================================================
-   AI SIDEBAR CHAT & SYSTEM INTERFACE (FIXED: Height and Layer conflicts)
+   AI SIDEBAR CHAT & SYSTEM INTERFACE
    ========================================================================== */
 .ai-sidebar { 
     position: fixed; 
     top: 0; 
     right: -380px; 
     width: 380px; 
-    height: 100dvh; /* อัปเดตเป็น Dynamic Viewport ป้องกันขอบจอมือถือตัด */
+    height: 100dvh; 
     background: #1e293b; 
     border-left: 2px solid var(--accent-color); 
-    z-index: 10005; /* ขยับให้สูงกว่าตัว .toolbar ด้านล่าง */
+    z-index: 10005; 
     display: flex; 
     flex-direction: column; 
     transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
     box-shadow: -10px 0 30px rgba(0,0,0,0.5); 
 }
+@media (max-width: 480px) {
+    .ai-sidebar { width: 100%; right: -100%; }
+}
 .ai-sidebar.open { right: 0; }
-.ai-sidebar-header { padding: 20px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; color: #fff; }
+.ai-sidebar-header { padding: 18px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; color: #fff; }
 .close-sidebar-btn { background: none; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; }
-.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+.ai-sidebar-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .api-key-container { display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 13px; }
 .api-key-container input { background: #0f172a; border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 6px; color: #fff; outline: none; }
 .ai-quick-actions { width: 100%; }
@@ -377,7 +603,6 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
 .user-msg { background: var(--accent-color); color: #0f172a; align-self: flex-end; font-weight: 500; }
 .ai-msg { background: #1e293b; color: #fff; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
 
-/* สไตล์กล่อง Footer ท้ายแชท AI */
 .ai-sidebar-footer { 
     padding: 10px; 
     background: #1e293b; 
@@ -412,125 +637,41 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
     flex-shrink: 0; 
 }
 
-/* ปุ่มกลมจัดมีเดียและแนบไฟล์ */
 .ai-chat-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
+    width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;
 }
-.btn-attach-doc {
-    background: rgba(255, 255, 255, 0.05);
-    color: #94a3b8;
-}
-.btn-attach-doc:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #f1f5f9;
-}
-.btn-media-plus {
-    background: #22d3ee;
-    color: #0f172a;
-    font-size: 20px;
-    font-weight: bold;
-    line-height: 1;
-}
-.btn-media-plus:hover {
-    background: #06b6d4;
-    transform: scale(1.05);
-}
+.btn-attach-doc { background: rgba(255, 255, 255, 0.05); color: #94a3b8; }
+.btn-media-plus { background: #22d3ee; color: #0f172a; font-size: 20px; font-weight: bold; }
 
-/* หน้าต่างป๊อปอัปย่อยเลือกชนิดสื่อเพื่อส่งแชท */
-.media-menu-container {
-    position: relative; 
-    display: inline-block;
-}
+.media-menu-container { position: relative; display: inline-block; }
 .media-popup {
-    position: absolute;
-    bottom: 55px;
-    left: 10px;
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    display: flex;
-    flex-direction: column;
-    padding: 6px;
-    z-index: 10010; /* ลอยเด่นเหนือพื้นหลังบาร์แชทแน่นอน */
-    min-width: 155px;
+    position: absolute; bottom: 55px; left: 10px; background: #1e293b;
+    border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    display: flex; flex-direction: column; padding: 6px; z-index: 10010; min-width: 155px;
     animation: popSlideUp 0.15s ease-out;
 }
 .media-popup button {
-    background: transparent;
-    color: #e2e8f0;
-    border: none;
-    padding: 8px 12px;
-    text-align: left;
-    cursor: pointer;
-    border-radius: 6px;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: background 0.15s;
-    width: 100%;
+    background: transparent; color: #e2e8f0; border: none; padding: 8px 12px;
+    text-align: left; cursor: pointer; border-radius: 6px; font-size: 13px;
+    display: flex; align-items: center; gap: 8px; width: 100%;
 }
-.media-popup button:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #22d3ee;
-}
+.media-popup button:hover { background: rgba(255, 255, 255, 0.05); color: #22d3ee; }
 
-/* 🌟 ระบบแสดงผลรูปภาพ/วิดีโอ ภายในห้องแชทผู้ช่วย AI 🌟 */
 .chat-media-render {
-    max-width: 100%;
-    max-height: 220px;
-    border-radius: 6px;
-    display: block;
-    margin: 6px 0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    object-fit: contain;
-    background: #0b0f19;
-}
-.user-msg .chat-media-render {
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    max-width: 100%; max-height: 220px; border-radius: 6px; display: block;
+    margin: 6px 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); object-fit: contain; background: #0b0f19;
 }
 
-/* การจัดเลย์เอาต์วัตถุพรีวิวก่อนสั่งส่งข้อมูล */
 #file-preview-container {
-    padding: 8px 12px; 
-    display: flex; 
-    gap: 10px; 
-    background: rgba(15, 23, 42, 0.6); 
+    padding: 8px 12px; display: flex; gap: 10px; background: rgba(15, 23, 42, 0.6);
     border-top: 1px solid rgba(255,255,255,0.05);
 }
-.ai-preview-item {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    animation: popSlideUp 0.15s ease-out;
-}
+.ai-preview-item { position: relative; display: inline-flex; align-items: center; }
 .ai-preview-item .remove-preview-btn {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: #ef4444;
-    color: white;
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    cursor: pointer;
-    font-weight: bold;
-    border: 1px solid #1e293b;
+    position: absolute; top: -6px; right: -6px; background: #ef4444; color: white;
+    border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center;
+    justify-content: center; font-size: 11px; cursor: pointer; font-weight: bold; border: 1px solid #1e293b;
 }
 
 /* ==========================================================================
@@ -538,9 +679,9 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
    ========================================================================== */
 .custom-notification {
     position: fixed; top: 20px; right: 20px; background: #1e293b; color: #fff;
-    padding: 14px 22px; border-radius: 10px; z-index: 99999;
+    padding: 14px 20px; border-radius: 10px; z-index: 99999;
     border-left: 5px solid var(--accent-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    font-size: 14px; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    font-size: 13px; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes slideIn { 
@@ -548,6 +689,10 @@ body.mode-word .word-text-node:focus { border: 1px solid var(--accent-color); ba
     to { transform: translateX(0); opacity: 1; } 
 }
 @keyframes popSlideUp {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { transform: translateY(6px); }
+    to { transform: translateY(0); }
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
