@@ -1,7 +1,7 @@
 // 🎯 service-worker.js (v18.0 - Sunita PDF Studio & Offline Engine)
 const CACHE_NAME = 'sunita-pdf-v18.0';
 
-// ไฟล์หลักของโปรเจกต์ภายในเครื่อง (เพิ่ม cat-avatar.png เรียบร้อย)
+// ไฟล์หลักของโปรเจกต์ภายในเครื่อง
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -25,10 +25,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // แคช Core Assets ให้สำเร็จแน่นอนเป็นอันดับแรก
       await cache.addAll(CORE_ASSETS);
-
-      // แคช CDN ภายนอกแบบแยกจับข้อผิดพลาด ป้องกันการล้มเหลวทั้งชุดหากเน็ตช้า
       try {
         await cache.addAll(EXTERNAL_LIBS);
       } catch (err) {
@@ -54,7 +51,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. ดักจับ Request แบบ Network-First สำหรับไฟล์ในเครื่องเพื่อป้องกันแคชค้าง
+// 3. ดักจับ Request แบบ Network-First ป้องกันแคชค้าง
 self.addEventListener('fetch', (event) => {
   if (!event.request.url.startsWith('http')) return;
 
@@ -67,7 +64,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    // ดึงจากเน็ตก่อนเพื่อให้ได้เวอร์ชันล่าสุดเสมอ ถ้าไม่มีเน็ตจะดึงจาก Cache ให้
     fetch(event.request)
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type !== 'opaque') {
