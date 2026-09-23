@@ -4,8 +4,8 @@ if (pdfjsLib) {
 }
 
 // Global States
-let currentTool = 'patch'; // 'patch', 'rect', 'circle', 'pen', 'highlighter', 'eraser', 'pan'
-let currentInkColor = '#0033aa';
+let currentTool = 'patch';
+let currentInkColor = '#ef4444'; // ตั้งสีเริ่มต้นเป็นสีแดง
 let currentScale = 1.0;
 let pdfDoc = null;
 let originalPdfBytes = null;
@@ -15,7 +15,6 @@ let documentPatches = {};
 let undoStack = [];
 let redoStack = [];
 
-// ฟอนต์ภาษาไทย Sarabun Binary แท้
 const THAI_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
 let cachedFontBytes = null;
 
@@ -29,9 +28,6 @@ function showToast(msg) {
     setTimeout(() => toast.remove(), 2600);
 }
 
-// -------------------------------------------------------------
-// ระบบ Undo / Redo
-// -------------------------------------------------------------
 function recordAction(action) {
     undoStack.push(action);
     redoStack = [];
@@ -86,7 +82,7 @@ function resetApp() {
                     <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\\'welcome-icon\\'><i class=\\'fa-solid fa-file-pdf\\'></i></div>'">
                 </div>
                 <h2>ยินดีต้อนรับสู่ Sunita PDF Studio</h2>
-                <p>เครื่องมือตรวจแก้เอกสารและใบเสนอราคาฉบับพิเศษสำหรับ Sunita ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี และส่งออกคมชัดระดับเวกเตอร์</p>
+                <p>เครื่องมือตรวจแก้เอกสาร ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี และส่งออกคมชัดระดับเวกเตอร์</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
@@ -238,9 +234,6 @@ function getPageAccurateCoords(e, wrapper) {
     };
 }
 
-// -------------------------------------------------------------
-// ระบบดูดสี (พร้อม Clamp ป้องกันค่าสีเกิน 1.0)
-// -------------------------------------------------------------
 function analyzeBoxColors(canvas, x, y, width, height) {
     const ctx = canvas.getContext('2d');
     const scaleFactorX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
@@ -324,28 +317,17 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
     const centerY = boxTop + (boxHeight / 2);
 
     let target = textMetadata.find(item => 
-        centerX >= item.x - 4 && centerX <= item.x + item.width + 4 &&
-        centerY >= item.y - 6 && centerY <= item.y + item.height + 6 &&
+        centerX >= item.x - 3 && centerX <= item.x + item.width + 3 &&
+        centerY >= item.y - 4 && centerY <= item.y + item.height + 4 &&
         item.text && item.text.trim() !== ''
     );
-
-    if (!target) {
-        const overlaps = textMetadata.filter(item => 
-            item.x < boxLeft + boxWidth &&
-            item.x + item.width > boxLeft &&
-            item.y < boxTop + boxHeight &&
-            item.y + item.height > boxTop &&
-            item.text && item.text.trim() !== ''
-        );
-        if (overlaps.length > 0) target = overlaps[0];
-    }
 
     if (target) {
         const isBold = target.fontName ? (/bold|black|heavy|medium|semibold/i.test(target.fontName)) : false;
         const realFontSize = Math.round(target.fontSize);
 
         return {
-            fontSize: Math.max(8, Math.min(36, realFontSize)),
+            fontSize: Math.max(8, Math.min(32, realFontSize)),
             origX: target.x,
             origY: target.y,
             viewportY: target.viewportY,
@@ -415,13 +397,13 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
         if (boxWidth < 18 && boxHeight < 18 && touchDuration < 450 && currentTool === 'patch') {
             const hit = textMetadata.find(item => 
-                startX >= item.x - 8 && startX <= item.x + item.width + 8 &&
-                startY >= item.y - 8 && startY <= item.y + item.height + 8
+                startX >= item.x - 6 && startX <= item.x + item.width + 6 &&
+                startY >= item.y - 6 && startY <= item.y + item.height + 6
             );
 
             if (hit) {
                 const lineItems = textMetadata
-                    .filter(item => Math.abs(item.y - hit.y) <= 6 && item.text && item.text.trim() !== '')
+                    .filter(item => Math.abs(item.y - hit.y) <= 4 && item.text && item.text.trim() !== '')
                     .sort((a, b) => a.x - b.x);
 
                 const hitIdx = lineItems.findIndex(item => item === hit);
@@ -442,15 +424,15 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
                     endWord = next;
                 }
 
-                boxLeft = startWord.x - 1;
+                boxLeft = startWord.x;
                 boxTop = Math.min(hit.y, startWord.y, endWord.y);
-                boxWidth = Math.max(16, (endWord.x + endWord.width) - startWord.x + 3);
-                boxHeight = Math.max(hit.height, startWord.height, endWord.height) + 2;
+                boxWidth = Math.max(16, (endWord.x + endWord.width) - startWord.x + 2);
+                boxHeight = Math.max(hit.height, startWord.height, endWord.height);
             } else {
                 boxLeft = Math.max(0, startX - 30);
                 boxTop = Math.max(0, startY - 8);
                 boxWidth = 70;
-                boxHeight = 18;
+                boxHeight = 16;
             }
         }
 
@@ -468,6 +450,9 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     });
 }
 
+// -------------------------------------------------------------
+// Interactive Shape Engine (บันทึกกรอบลง PDF 100% แน่นอน)
+// -------------------------------------------------------------
 function createInteractiveShape(wrapper, pageNum, left, top, width, height, type, initialColor) {
     const layer = wrapper.querySelector('.patch-layer');
 
@@ -487,8 +472,8 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     const toolbar = document.createElement('div');
     toolbar.className = 'shape-quick-toolbar';
     toolbar.innerHTML = `
-        <span class="shape-color-dot" style="background:#0033aa" data-c="#0033aa"></span>
         <span class="shape-color-dot" style="background:#ef4444" data-c="#ef4444"></span>
+        <span class="shape-color-dot" style="background:#0033aa" data-c="#0033aa"></span>
         <span class="shape-color-dot" style="background:#111827" data-c="#111827"></span>
         <span class="shape-color-dot" style="background:#10b981" data-c="#10b981"></span>
         <input type="text" class="shape-note-input" placeholder="พิมพ์แท็ก...">
@@ -509,6 +494,39 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     let noteText = '';
     const noteInput = toolbar.querySelector('.shape-note-input');
 
+    const shapeData = {
+        type: type,
+        x: left,
+        y: 0,
+        width: width,
+        height: height,
+        color: currentColor,
+        note: noteText,
+        nodeRef: shapeNode
+    };
+
+    function syncShapeToData() {
+        if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
+        if (!documentPatches[pageNum].shapes) documentPatches[pageNum].shapes = [];
+
+        const curL = parseFloat(shapeNode.style.left) || 0;
+        const curT = parseFloat(shapeNode.style.top) || 0;
+        const curW = parseFloat(shapeNode.style.width) || 0;
+        const curH = parseFloat(shapeNode.style.height) || 0;
+        const wH = parseFloat(wrapper.style.height) || 0;
+
+        shapeData.x = curL;
+        shapeData.y = wH - (curT + curH);
+        shapeData.width = curW;
+        shapeData.height = curH;
+        shapeData.color = currentColor;
+        shapeData.note = noteText;
+
+        if (!documentPatches[pageNum].shapes.includes(shapeData)) {
+            documentPatches[pageNum].shapes.push(shapeData);
+        }
+    }
+
     toolbar.querySelectorAll('.shape-color-dot').forEach(dot => {
         dot.onclick = (e) => {
             e.stopPropagation();
@@ -521,7 +539,9 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     toolbar.querySelector('.shape-del-btn').onclick = (e) => {
         e.stopPropagation();
         shapeNode.remove();
-        removeShapeFromData();
+        if (documentPatches[pageNum] && documentPatches[pageNum].shapes) {
+            documentPatches[pageNum].shapes = documentPatches[pageNum].shapes.filter(s => s !== shapeData);
+        }
         showToast("ลบรูปทรงแล้วค่ะ");
     };
 
@@ -540,6 +560,7 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         const dy = (e.clientY - startY) / currentScale;
         shapeNode.style.left = (origL + dx) + 'px';
         shapeNode.style.top = (origT + dy) + 'px';
+        syncShapeToData();
     });
     shapeNode.addEventListener('pointerup', () => {
         if (isMoving) {
@@ -560,7 +581,7 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         toolbar.style.display = 'none';
         handles.forEach(h => h.style.display = 'none');
         syncShapeToData();
-        showToast("ยืนยันรูปทรงเรียบร้อย (แตะ 2 ครั้งเพื่อแก้ไขใหม่)");
+        showToast("ยืนยันรูปทรงเรียบร้อย");
     }
 
     toolbar.querySelector('.shape-confirm-btn').onclick = (e) => {
@@ -583,54 +604,25 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     });
 
     layer.appendChild(shapeNode);
-
-    const wrapperH = parseFloat(wrapper.style.height);
-    const shapeData = {
-        type: type,
-        x: left,
-        y: wrapperH - (top + height),
-        width: width,
-        height: height,
-        color: currentColor,
-        note: noteText
-    };
-
-    function syncShapeToData() {
-        if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
-        if (!documentPatches[pageNum].shapes) documentPatches[pageNum].shapes = [];
-
-        const curL = parseFloat(shapeNode.style.left);
-        const curT = parseFloat(shapeNode.style.top);
-        const curW = parseFloat(shapeNode.style.width);
-        const curH = parseFloat(shapeNode.style.height);
-        const wH = parseFloat(wrapper.style.height);
-
-        shapeData.x = curL;
-        shapeData.y = wH - (curT + curH);
-        shapeData.width = curW;
-        shapeData.height = curH;
-        shapeData.color = currentColor;
-        shapeData.note = noteText;
-    }
-
-    function removeShapeFromData() {
-        if (documentPatches[pageNum] && documentPatches[pageNum].shapes) {
-            documentPatches[pageNum].shapes = documentPatches[pageNum].shapes.filter(s => s !== shapeData);
-        }
-    }
-
-    if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
-    if (!documentPatches[pageNum].shapes) documentPatches[pageNum].shapes = [];
-    documentPatches[pageNum].shapes.push(shapeData);
+    syncShapeToData(); // ซิงก์ค่าทันทีที่สร้าง
 
     recordAction({
-        undo: () => { shapeNode.style.display = 'none'; removeShapeFromData(); },
-        redo: () => { shapeNode.style.display = 'block'; documentPatches[pageNum].shapes.push(shapeData); }
+        undo: () => { 
+            shapeNode.style.display = 'none'; 
+            if (documentPatches[pageNum] && documentPatches[pageNum].shapes) {
+                documentPatches[pageNum].shapes = documentPatches[pageNum].shapes.filter(s => s !== shapeData);
+            }
+        },
+        redo: () => { 
+            shapeNode.style.display = 'block'; 
+            syncShapeToData();
+        }
     });
-
-    setTimeout(() => noteInput.focus(), 60);
 }
 
+// -------------------------------------------------------------
+// กล่อง Input: ล็อกพิกัดตรงจุด ไม่กระโดด ไม่แลบกินขอบตาราง
+// -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
@@ -640,7 +632,8 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     const insetLeft = left;
     const insetTop = top;
     let insetWidth = Math.max(16, width);
-    const insetHeight = Math.max(fontSize + 3, Math.round(height));
+    // บีบความสูงกล่องไม่ให้แลบขึ้นไปกินขอบแถบสีด้านบน
+    const insetHeight = Math.max(fontSize + 2, Math.round(height));
 
     const node = document.createElement('div');
     node.className = 'active-patch-node';
@@ -682,16 +675,8 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     node.appendChild(textPreview);
 
     let currentOffsetX = 0;
-    let currentAlign = (matchedOrig && /^[\d,.\s+-]+$/.test(matchedOrig.text.trim())) ? 'right' : 'left';
+    let currentAlign = 'left';
     let isAdjustMode = false;
-
-    if (currentAlign === 'right') {
-        input.style.textAlign = 'right';
-        input.style.paddingRight = '3px';
-    } else if (matchedOrig && matchedOrig.origX > insetLeft) {
-        currentOffsetX = Math.max(0, matchedOrig.origX - insetLeft);
-        input.style.paddingLeft = currentOffsetX + 'px';
-    }
 
     input.addEventListener('input', () => {
         const tempSpan = document.createElement('span');
@@ -700,7 +685,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         tempSpan.style.position = 'absolute';
         tempSpan.innerText = input.value || input.placeholder;
         document.body.appendChild(tempSpan);
-        const textW = tempSpan.offsetWidth + 12;
+        const textW = tempSpan.offsetWidth + 8;
         tempSpan.remove();
 
         if (textW > insetWidth) {
@@ -711,7 +696,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     function updatePreviewPosition() {
         textPreview.style.textAlign = currentAlign;
         if (currentAlign === 'right') {
-            textPreview.style.paddingRight = '3px';
+            textPreview.style.paddingRight = '2px';
             textPreview.style.paddingLeft = '0px';
         } else if (currentAlign === 'center') {
             textPreview.style.paddingLeft = '0px';
@@ -746,8 +731,6 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         e.stopPropagation();
         currentAlign = 'center';
         input.style.textAlign = 'center';
-        input.style.paddingLeft = '0px';
-        input.style.paddingRight = '0px';
         updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-left').onclick = (e) => {
@@ -760,8 +743,6 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         e.stopPropagation();
         currentAlign = 'right';
         input.style.textAlign = 'right';
-        input.style.paddingRight = '3px';
-        input.style.paddingLeft = '0px';
         updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-done').onclick = (e) => {
@@ -835,48 +816,39 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         const textWidthOnCanvas = metrics.width;
         
         const finalBoxW = parseFloat(node.style.width) || insetWidth;
-        const clearWidth = Math.max(finalBoxW * ratioX, textWidthOnCanvas + (10 * ratioX));
+        const clearWidth = Math.max(finalBoxW * ratioX, textWidthOnCanvas + (4 * ratioX));
 
         ctx.fillStyle = colors.bg.hex;
         ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
 
         let drawX;
         if (currentAlign === 'right') {
-            drawX = (insetLeft * ratioX) + clearWidth - textWidthOnCanvas - (3 * ratioX);
+            drawX = (insetLeft * ratioX) + clearWidth - textWidthOnCanvas - (2 * ratioX);
         } else if (currentAlign === 'center') {
             drawX = (insetLeft * ratioX) + ((clearWidth - textWidthOnCanvas) / 2);
         } else {
             drawX = (insetLeft + currentOffsetX) * ratioX;
         }
 
-        let drawBaselineY;
-        if (matchedOrig && matchedOrig.viewportY) {
-            drawBaselineY = matchedOrig.viewportY * ratioY;
-        } else {
-            drawBaselineY = (insetTop + (insetHeight * 0.74)) * ratioY;
-        }
+        const drawBaselineY = (insetTop + (fontSize * 0.88)) * ratioY;
 
         ctx.fillStyle = colors.text.hex;
         ctx.textBaseline = 'alphabetic';
         ctx.fillText(text, drawX, drawBaselineY);
 
         const wrapperHeight = parseFloat(wrapper.style.height);
-        let pdfY;
-        if (matchedOrig && matchedOrig.origPdfY) {
-            pdfY = matchedOrig.origPdfY;
-        } else {
-            pdfY = wrapperHeight - (insetTop + insetHeight) + ((insetHeight - fontSize) / 2);
-        }
-
-        const finalVectorX = (drawX / ratioX);
+        // 🎯 ล็อกพิกัด PDF จากตำแหน่งจริงของกล่อง ไม่พึ่งพาพิกัดของคำข้างเคียง ป้องกันการกระโดดข้ามจุด
+        const finalPdfX = drawX / ratioX;
+        const finalPdfY = wrapperHeight - insetTop - (fontSize * 0.88);
+        const finalBoxY = wrapperHeight - (insetTop + insetHeight);
 
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
         
         const patchData = {
-            x: finalVectorX,
+            x: finalPdfX,
             boxLeft: insetLeft,
-            y: pdfY,
-            patchBoxY: wrapperHeight - (insetTop + insetHeight),
+            y: finalPdfY,
+            patchBoxY: finalBoxY,
             width: (clearWidth / ratioX),
             height: insetHeight,
             text: text,
@@ -1085,7 +1057,7 @@ function placeSignatureOnDoc() {
 }
 
 // -------------------------------------------------------------
-// ส่งออก Vector PDF (พร้อม Clamp ค่าสีป้องกัน Error 0.0 - 1.0)
+// ส่งออก Vector PDF (ครอบคลุม Shape และ Patch สมบูรณ์ 100%)
 // -------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; }
@@ -1111,6 +1083,39 @@ async function exportVectorPDF() {
 
         const pages = loadedPdf.getPages();
 
+        // 🎯 สแกน Shape จาก DOM อีกรอบเพื่อรับประกันว่าไม่มีรูปทรงไหนตกหล่น
+        document.querySelectorAll('.page-wrapper').forEach(wrap => {
+            const pNum = parseInt(wrap.dataset.pageNumber);
+            const wH = parseFloat(wrap.style.height);
+            if (!documentPatches[pNum]) documentPatches[pNum] = { patches: [], images: [], shapes: [] };
+            
+            const liveShapes = [];
+            wrap.querySelectorAll('.shape-interactive-node').forEach(node => {
+                const isRect = node.classList.contains('shape-rect');
+                const isCircle = node.classList.contains('shape-circle');
+                const curL = parseFloat(node.style.left) || 0;
+                const curT = parseFloat(node.style.top) || 0;
+                const curW = parseFloat(node.style.width) || 0;
+                const curH = parseFloat(node.style.height) || 0;
+                const col = node.style.getPropertyValue('--shape-color') || '#ef4444';
+                const tagEl = node.querySelector('.shape-attached-tag');
+                const tag = tagEl && tagEl.style.display !== 'none' ? tagEl.innerText : '';
+
+                liveShapes.push({
+                    type: isRect ? 'rect' : (isCircle ? 'circle' : 'rect'),
+                    x: curL,
+                    y: wH - (curT + curH),
+                    width: curW,
+                    height: curH,
+                    color: col,
+                    note: tag
+                });
+            });
+            if (liveShapes.length > 0) {
+                documentPatches[pNum].shapes = liveShapes;
+            }
+        });
+
         for (let pageNum in documentPatches) {
             const pIdx = parseInt(pageNum) - 1;
             if (pIdx < 0 || pIdx >= pages.length) continue;
@@ -1119,9 +1124,6 @@ async function exportVectorPDF() {
 
             if (pData.patches) {
                 pData.patches.forEach(pt => {
-                    const boxX = pt.boxLeft !== undefined ? pt.boxLeft : pt.x;
-                    const boxY = pt.patchBoxY !== undefined ? pt.patchBoxY : (pt.y - (pt.height * 0.1));
-                    
                     const safeBgR = Math.min(1.0, Math.max(0.0, pt.bgColor.r));
                     const safeBgG = Math.min(1.0, Math.max(0.0, pt.bgColor.g));
                     const safeBgB = Math.min(1.0, Math.max(0.0, pt.bgColor.b));
@@ -1130,14 +1132,16 @@ async function exportVectorPDF() {
                     const safeTxtG = Math.min(1.0, Math.max(0.0, pt.textColor.g));
                     const safeTxtB = Math.min(1.0, Math.max(0.0, pt.textColor.b));
 
+                    // วาดกล่องถมสีพื้น
                     targetPage.drawRectangle({
-                        x: boxX,
-                        y: boxY,
+                        x: pt.boxLeft,
+                        y: pt.patchBoxY,
                         width: pt.width,
                         height: pt.height,
                         color: rgb(safeBgR, safeBgG, safeBgB),
                     });
 
+                    // วาดตัวหนังสือลงตำแหน่งจริง
                     targetPage.drawText(pt.text, {
                         x: pt.x,
                         y: pt.y,
@@ -1167,7 +1171,7 @@ async function exportVectorPDF() {
                             width: sh.width,
                             height: sh.height,
                             borderColor: shapeColor,
-                            borderWidth: 2.5,
+                            borderWidth: 2.0,
                         });
                     } else if (sh.type === 'circle') {
                         targetPage.drawEllipse({
@@ -1176,7 +1180,7 @@ async function exportVectorPDF() {
                             xScale: sh.width / 2,
                             yScale: sh.height / 2,
                             borderColor: shapeColor,
-                            borderWidth: 2.5,
+                            borderWidth: 2.0,
                         });
                     }
 
