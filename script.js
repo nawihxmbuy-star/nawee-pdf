@@ -4,18 +4,17 @@ if (pdfjsLib) {
 }
 
 // Global States
-let currentTool = 'patch'; // 'patch', 'pen', 'highlighter', 'eraser', 'pan'
+let currentTool = 'patch';
 let currentInkColor = '#0033aa';
 let currentScale = 1.0;
 let pdfDoc = null;
 let originalPdfBytes = null;
 let originalFileName = 'Nawee_Document';
 
-// เก็บข้อมูล Object รายหน้า { [pageNum]: { patches: [], images: [] } }
 let documentPatches = {};
 
-// Font สำหรับ Vector PDF
-const THAI_FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/sarabun/Sarabun-Regular.ttf';
+// ลิงก์ฟอนต์ภาษาไทย Sarabun Binary แท้
+const THAI_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
 let cachedFontBytes = null;
 
 // Modal & Signature
@@ -26,12 +25,9 @@ function showToast(msg) {
     toast.className = 'custom-toast';
     toast.innerText = msg;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2400);
+    setTimeout(() => toast.remove(), 2600);
 }
 
-// -------------------------------------------------------------
-// เริ่มงานใหม่
-// -------------------------------------------------------------
 function resetApp() {
     if (confirm("ต้องการเริ่มงานใหม่และล้างเอกสารปัจจุบันหรือไม่คะ?")) {
         pdfDoc = null;
@@ -54,9 +50,6 @@ function resetApp() {
     }
 }
 
-// -------------------------------------------------------------
-// โหลดและเรนเดอร์เอกสาร
-// -------------------------------------------------------------
 async function handleFileOpen(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -109,7 +102,6 @@ async function renderPage(pageNum, container) {
 
     await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
 
-    // สกัด Metadata ข้อความเดิมเพื่อนำมาสแน็ป Baseline & Column Alignment
     const textContent = await page.getTextContent();
     const displayViewport = page.getViewport({ scale: 1.0 });
 
@@ -133,15 +125,11 @@ async function renderPage(pageNum, container) {
     bindDrawingEngine(annotCanvas, pageNum);
 }
 
-// -------------------------------------------------------------
-// ระบบดูดสี Edge-Guard (กันขอบตาราง 3px และตัดสีดำทึบทิ้ง)
-// -------------------------------------------------------------
 function analyzeBoxColors(canvas, x, y, width, height) {
     const ctx = canvas.getContext('2d');
     const ratioX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
     const ratioY = canvas.height / parseFloat(canvas.style.height || (canvas.height / 2));
 
-    // เว้นขอบเข้ามา 3px ป้องกันการดูดติดเส้นตารางหรือขอบคำ
     const safeLeft = Math.floor((x + 3) * ratioX);
     const safeTop = Math.floor((y + 2.5) * ratioY);
     const safeWidth = Math.max(1, Math.floor((width - 6) * ratioX));
@@ -160,16 +148,12 @@ function analyzeBoxColors(canvas, x, y, width, height) {
         }
 
         const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
-
         const bgKey = sortedColors[0] || '255,255,255';
         const [bgR, bgG, bgB] = bgKey.split(',').map(Number);
         const bgBrightness = (bgR * 299 + bgG * 587 + bgB * 114) / 1000;
 
-        // ถ้าพื้นสว่าง ให้ใช้หมึกสี Slate-700 (#334155) เนียนนุ่ม ไม่ดำแข็งกระด้าง
         let textR = 51, textG = 65, textB = 85, textHex = '#334155';
-
         if (bgBrightness < 128) {
-            // พื้นเข้ม ใช้ตัวหนังสือสีขาว
             textR = 255; textG = 255; textB = 255; textHex = '#ffffff';
         }
 
@@ -191,9 +175,6 @@ function analyzeBoxColors(canvas, x, y, width, height) {
     }
 }
 
-// -------------------------------------------------------------
-// อัลกอริทึมค้นหาข้อความเดิม (Snap X คอลัมน์เดิม + Baseline)
-// -------------------------------------------------------------
 function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
     if (!textMetadata || textMetadata.length === 0) return null;
 
@@ -211,7 +192,7 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
         const orig = overlaps[0];
         return {
             fontSize: Math.round(orig.fontSize),
-            origX: orig.x,        // พิกัดชิดซ้ายเดิมของคอลัมน์
+            origX: orig.x,
             origY: orig.y,
             viewportY: orig.viewportY,
             origPdfY: orig.pdfY,
@@ -221,9 +202,6 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
     return null;
 }
 
-// -------------------------------------------------------------
-// Smart Patch + In-Place Canvas Engine พร้อม Micro-Nudge Toolbar
-// -------------------------------------------------------------
 function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     let startX = 0, startY = 0;
     let isDragging = false;
@@ -284,7 +262,6 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
 
     const fontSize = matchedOrig ? matchedOrig.fontSize : Math.max(11, Math.min(24, Math.round(height * 0.72)));
     
-    // Inset ขอบ 1.5px ไม่บังเส้นตาราง
     const insetLeft = left + 1.5;
     const insetTop = top + 1;
     const insetWidth = Math.max(10, width - 3);
@@ -298,14 +275,14 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     node.style.height = insetHeight + 'px';
     node.style.background = colors.bg.hex;
 
-    // แถบปรับขยับตำแหน่งและจัดกึ่งกลาง
     const nudgeBar = document.createElement('div');
     nudgeBar.className = 'nudge-toolbar';
     nudgeBar.innerHTML = `
-        <button type="button" class="nudge-btn" id="nb-left" title="ชิดซ้ายคอลัมน์"><i class="fa-solid fa-align-left"></i></button>
-        <button type="button" class="nudge-btn" id="nb-center" title="กึ่งกลางช่อง"><i class="fa-solid fa-align-center"></i></button>
-        <button type="button" class="nudge-btn" id="nb-step-left" title="ขยับซ้าย 1.5px">◀</button>
-        <button type="button" class="nudge-btn" id="nb-step-right" title="ขยับขวา 1.5px">▶</button>
+        <button type="button" class="nudge-btn" id="nb-left" title="ชิดซ้าย"><i class="fa-solid fa-align-left"></i></button>
+        <button type="button" class="nudge-btn" id="nb-center" title="กึ่งกลาง"><i class="fa-solid fa-align-center"></i></button>
+        <button type="button" class="nudge-btn" id="nb-step-left" title="ขยับซ้าย 1px (หรือกดปุ่ม ◄ บนคีย์บอร์ด)">◀</button>
+        <button type="button" class="nudge-btn" id="nb-step-right" title="ขยับขวา 1px (หรือกดปุ่ม ► บนคีย์บอร์ด)">▶</button>
+        <button type="button" class="nudge-btn btn-done" id="nb-done" title="ตกลง ประทับลงเอกสาร"><i class="fa-solid fa-check"></i> เสร็จ</button>
     `;
     node.appendChild(nudgeBar);
 
@@ -317,27 +294,43 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     input.style.fontSize = fontSize + 'px';
     node.appendChild(input);
 
+    const textPreview = document.createElement('div');
+    textPreview.className = 'patch-text-preview';
+    textPreview.style.color = colors.text.hex;
+    textPreview.style.fontSize = fontSize + 'px';
+    textPreview.style.display = 'none';
+    node.appendChild(textPreview);
+
     let currentOffsetX = 0;
     let isCentered = false;
+    let isAdjustMode = false;
 
-    // ถ้าเจอพิกัดข้อความเดิม ให้ขยับ input ไปเกาะแนวเดิมตั้งแต่แรก
     if (matchedOrig && matchedOrig.origX > insetLeft) {
         currentOffsetX = matchedOrig.origX - insetLeft;
         input.style.paddingLeft = currentOffsetX + 'px';
     }
 
-    // ฟังก์ชันปุ่มปรับใน Toolbar
+    function updatePreviewPosition() {
+        if (isCentered) {
+            textPreview.style.textAlign = 'center';
+            textPreview.style.paddingLeft = '0px';
+        } else {
+            textPreview.style.textAlign = 'left';
+            textPreview.style.paddingLeft = currentOffsetX + 'px';
+        }
+    }
+
     nudgeBar.querySelector('#nb-step-left').onclick = (e) => {
         e.stopPropagation();
-        currentOffsetX -= 1.5;
+        currentOffsetX -= 1;
         input.style.paddingLeft = Math.max(0, currentOffsetX) + 'px';
-        input.focus();
+        updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-step-right').onclick = (e) => {
         e.stopPropagation();
-        currentOffsetX += 1.5;
+        currentOffsetX += 1;
         input.style.paddingLeft = currentOffsetX + 'px';
-        input.focus();
+        updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-center').onclick = (e) => {
         e.stopPropagation();
@@ -345,27 +338,75 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         input.style.textAlign = 'center';
         input.style.paddingLeft = '0px';
         currentOffsetX = 0;
-        input.focus();
+        updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-left').onclick = (e) => {
         e.stopPropagation();
         isCentered = false;
         input.style.textAlign = 'left';
-        currentOffsetX = matchedOrig && matchedOrig.origX > insetLeft ? (matchedOrig.origX - insetLeft) : 2;
-        input.style.paddingLeft = currentOffsetX + 'px';
-        input.focus();
+        updatePreviewPosition();
+    };
+    nudgeBar.querySelector('#nb-done').onclick = (e) => {
+        e.stopPropagation();
+        commitFinalToCanvas();
     };
 
     layer.appendChild(node);
     setTimeout(() => input.focus(), 50);
 
-    function commitToCanvas() {
+    function enterAdjustMode() {
+        const text = input.value.trim();
+        if (!text) {
+            node.remove();
+            return;
+        }
+
+        isAdjustMode = true;
+        input.style.display = 'none';
+        node.style.border = '1px dashed var(--accent)';
+
+        textPreview.innerText = text;
+        textPreview.style.display = 'block';
+        updatePreviewPosition();
+
+        showToast("กดลูกศร ◄ ► เพื่อเลื่อนจัดตำแหน่ง แล้วกด Enter หรือแตะ 'เสร็จ'");
+    }
+
+    function handleKeyNudge(e) {
+        if (!isAdjustMode) return;
+
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            currentOffsetX -= 1;
+            updatePreviewPosition();
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            currentOffsetX += 1;
+            updatePreviewPosition();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            commitFinalToCanvas();
+        }
+    }
+
+    window.addEventListener('keydown', handleKeyNudge);
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            enterAdjustMode();
+        } else if (e.key === 'Escape') {
+            window.removeEventListener('keydown', handleKeyNudge);
+            node.remove();
+        }
+    });
+
+    function commitFinalToCanvas() {
+        window.removeEventListener('keydown', handleKeyNudge);
         const text = input.value.trim();
         node.remove();
 
         if (!text) return;
 
-        // วาดลงบนผืนผ้าใบ Canvas Buffer ระดับ 2x โดยตรง
         const ctx = pdfCanvas.getContext('2d');
         const ratioX = pdfCanvas.width / parseFloat(pdfCanvas.style.width || (pdfCanvas.width / 2));
         const ratioY = pdfCanvas.height / parseFloat(pdfCanvas.style.height || (pdfCanvas.height / 2));
@@ -376,11 +417,9 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         const textWidthOnCanvas = metrics.width;
         const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (12 * ratioX));
 
-        // กลบคำเดิมด้วยสีพื้นหลัง
         ctx.fillStyle = colors.bg.hex;
         ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
 
-        // คำนวณตำแหน่ง X สำหรับวาด
         let drawX;
         if (isCentered) {
             drawX = (insetLeft * ratioX) + ((clearWidth - textWidthOnCanvas) / 2);
@@ -388,7 +427,6 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             drawX = (insetLeft + currentOffsetX) * ratioX;
         }
 
-        // คำนวณตำแหน่ง Baseline Y
         let drawBaselineY;
         if (matchedOrig && matchedOrig.viewportY) {
             drawBaselineY = matchedOrig.viewportY * ratioY;
@@ -396,12 +434,10 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             drawBaselineY = (insetTop + (insetHeight * 0.74)) * ratioY;
         }
 
-        // วาดตัวหนังสือใหม่ลงบนเนื้อ Canvas
         ctx.fillStyle = colors.text.hex;
         ctx.textBaseline = 'alphabetic';
         ctx.fillText(text, drawX, drawBaselineY);
 
-        // เก็บข้อมูลสำหรับส่งออก Vector PDF
         const wrapperHeight = parseFloat(wrapper.style.height);
         let pdfY;
         if (matchedOrig && matchedOrig.origPdfY) {
@@ -427,15 +463,8 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         });
 
         createReEditHotspot(wrapper, pageNum, pdfCanvas, insetLeft, insetTop, (clearWidth / ratioX), insetHeight, colors, matchedOrig, text);
-
-        showToast("บันทึกคำตรงแนวเรียบร้อยแล้วค่ะ");
+        showToast("ประทับข้อความลงเอกสารเรียบร้อยแล้วค่ะ");
     }
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') input.blur();
-        if (e.key === 'Escape') node.remove();
-    });
-    input.addEventListener('blur', commitToCanvas);
 }
 
 function createReEditHotspot(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig, currentText) {
@@ -455,9 +484,6 @@ function createReEditHotspot(wrapper, pageNum, pdfCanvas, left, top, width, heig
     layer.appendChild(hotspot);
 }
 
-// -------------------------------------------------------------
-// Canvas Drawing & Highlighter Engine
-// -------------------------------------------------------------
 function bindDrawingEngine(canvas, pageNum) {
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
@@ -518,9 +544,6 @@ function bindDrawingEngine(canvas, pageNum) {
     window.addEventListener('pointerup', endDraw);
 }
 
-// -------------------------------------------------------------
-// ระบบเซ็นลายเซ็น & วางลงบนเอกสาร
-// -------------------------------------------------------------
 function openSignatureModal() {
     document.getElementById('sig-modal').style.display = 'flex';
     clearSigCanvas();
@@ -617,22 +640,30 @@ function placeSignatureOnDoc() {
 }
 
 // -------------------------------------------------------------
-// ส่งออก Vector PDF แท้ ด้วย pdf-lib + fontkit (คมกริบ 100%)
+// ส่งออก Vector PDF (พร้อมระบบ Fallback Font ป้องกันบั๊ก)
 // -------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; }
 
     try {
         showToast("กำลังสร้างไฟล์ PDF คมชัดระดับเวกเตอร์...");
-        const { PDFDocument, rgb } = PDFLib;
+        const { PDFDocument, rgb, StandardFonts } = PDFLib;
         const loadedPdf = await PDFDocument.load(originalPdfBytes);
-        loadedPdf.registerFontkit(fontkit);
-
-        if (!cachedFontBytes) {
-            const res = await fetch(THAI_FONT_URL);
-            cachedFontBytes = await res.arrayBuffer();
+        
+        let thaiFont = null;
+        try {
+            loadedPdf.registerFontkit(fontkit);
+            if (!cachedFontBytes) {
+                const res = await fetch(THAI_FONT_URL);
+                if (!res.ok) throw new Error("ดาวน์โหลดฟอนต์ล้มเหลว");
+                cachedFontBytes = await res.arrayBuffer();
+            }
+            thaiFont = await loadedPdf.embedFont(cachedFontBytes);
+        } catch (fontErr) {
+            console.warn("โหลดฟอนต์ไทยไม่สำเร็จ สลับใช้ฟอนต์มาตรฐานแทน:", fontErr);
+            thaiFont = await loadedPdf.embedFont(StandardFonts.Helvetica);
         }
-        const thaiFont = await loadedPdf.embedFont(cachedFontBytes);
+
         const pages = loadedPdf.getPages();
 
         for (let pageNum in documentPatches) {
@@ -705,9 +736,6 @@ async function exportVectorPDF() {
     }
 }
 
-// -------------------------------------------------------------
-// สลับเครื่องมือและการจัดมุมมอง
-// -------------------------------------------------------------
 function setTool(tool) {
     currentTool = tool;
     document.querySelectorAll('.dock-btn').forEach(b => b.classList.remove('active'));
@@ -744,7 +772,6 @@ function undoLastAction() {
     showToast("ย้อนกลับการกระทำล่าสุดแล้วค่ะ");
 }
 
-// DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('upload-pdf').addEventListener('change', handleFileOpen);
     sigCanvas = document.getElementById('sig-canvas');
