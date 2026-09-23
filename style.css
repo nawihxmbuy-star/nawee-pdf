@@ -22,12 +22,9 @@ body {
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
-    touch-action: none; /* ล็อกการเคลื่อนไหวเบราว์เซอร์ เพื่อให้ระบบ Gestures ของเราคุม 100% */
+    touch-action: none;
 }
 
-/* ==========================================================================
-   TOP BAR
-   ========================================================================== */
 .top-bar {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 56px;
@@ -71,16 +68,13 @@ body {
     .btn-text { display: none; }
 }
 
-/* ==========================================================================
-   WORKSPACE & CANVASES
-   ========================================================================== */
 .workspace {
     width: 100vw; height: 100vh;
     overflow: auto;
     padding: 76px 20px 100px 20px;
     display: flex; flex-direction: column; align-items: center;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-x pan-y; /* ให้เลื่อนด้วยมือได้ */
+    touch-action: pan-x pan-y;
 }
 .welcome-box {
     background: #1e293b;
@@ -103,7 +97,7 @@ body {
 #document-container {
     margin: 0 auto;
     transform-origin: top center;
-    transition: transform 0.04s ease-out; /* ซูมลื่นไหลแบบ Native */
+    transition: transform 0.04s ease-out;
 }
 .page-wrapper {
     position: relative;
@@ -118,9 +112,6 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 
 .patch-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
-/* ==========================================================================
-   SMART PATCH & TABLET NUDGE TOOLBAR
-   ========================================================================== */
 .selection-box {
     position: absolute;
     border: 1.5px dashed var(--accent);
@@ -198,6 +189,10 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     color: #fff;
     background: rgba(255, 255, 255, 0.18);
 }
+.nudge-btn.active {
+    background: var(--accent);
+    color: #0f172a;
+}
 .nudge-btn.btn-done {
     background: #0ea5e9;
     color: #0f172a;
@@ -221,9 +216,6 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     outline: 1.5px dashed rgba(14, 165, 233, 0.6);
 }
 
-/* ==========================================================================
-   INTERACTIVE VECTOR SHAPES (RECTANGLE, ELLIPSE & TAGS)
-   ========================================================================== */
 .shape-interactive-node {
     position: absolute;
     box-sizing: border-box;
@@ -243,7 +235,6 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     border-radius: 50%;
 }
 
-/* ขยายปุ่ม Handle ให้แตะด้วยนิ้วบนแท็บเล็ตได้ถนัดขึ้น */
 .shape-handle {
     position: absolute;
     width: 14px;
@@ -343,9 +334,6 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     pointer-events: none;
 }
 
-/* ==========================================================================
-   FLOATING DOCK TOOLBAR
-   ========================================================================== */
 .floating-dock {
     position: fixed;
     bottom: 20px; left: 50%;
@@ -364,7 +352,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .floating-dock::-webkit-scrollbar { display: none; }
 .dock-btn {
     background: transparent; border: none;
-    color: var(--text-muted); width: 44px; height: 44px; /* ปรับขนาดปุ่ม 44px ตามมาตรฐาน Touch Target ของแท็บเล็ต */
+    color: var(--text-muted); width: 44px; height: 44px;
     border-radius: 12px; cursor: pointer;
     font-size: 18px; display: flex; align-items: center; justify-content: center;
     position: relative; transition: all 0.15s; flex-shrink: 0;
@@ -387,9 +375,6 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .color-circle:hover { transform: scale(1.15); }
 .color-circle.active { transform: scale(1.25); border-color: #fff; }
 
-/* ==========================================================================
-   SIGNATURE / DRAGGABLE NODE
-   ========================================================================== */
 .custom-draggable-sig {
     position: absolute;
     cursor: move;
@@ -408,9 +393,6 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     cursor: pointer; border: 1.5px solid #fff;
 }
 
-/* ==========================================================================
-   MODAL
-   ========================================================================== */
 .modal-backdrop {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
     background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px);
