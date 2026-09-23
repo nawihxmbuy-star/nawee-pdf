@@ -220,7 +220,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 }
 
 /* ==========================================================================
-   INTERACTIVE VECTOR SHAPES (RECTANGLE & ELLIPSE)
+   INTERACTIVE VECTOR SHAPES (RECTANGLE, ELLIPSE & TAGS)
    ========================================================================== */
 .shape-interactive-node {
     position: absolute;
@@ -257,7 +257,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 
 .shape-quick-toolbar {
     position: absolute;
-    top: -34px;
+    top: -36px;
     left: 50%;
     transform: translateX(-50%);
     background: #1e293b;
@@ -279,6 +279,40 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     transition: transform 0.1s;
 }
 .shape-color-dot:hover { transform: scale(1.2); }
+
+.shape-note-input {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-family: 'Sarabun', sans-serif;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    outline: none;
+    width: 115px;
+}
+.shape-note-input::placeholder {
+    color: #94a3b8;
+}
+
+.shape-confirm-btn {
+    background: #0ea5e9;
+    color: #0f172a;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+.shape-confirm-btn:hover {
+    background: #38bdf8;
+}
+
 .shape-del-btn {
     background: none;
     border: none;
@@ -288,6 +322,23 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     padding: 2px 4px;
     display: flex;
     align-items: center;
+}
+
+/* ป้ายแท็กข้อความกำกับที่ติดกับรูปทรง */
+.shape-attached-tag {
+    position: absolute;
+    top: -12px;
+    left: 8px;
+    background: var(--shape-color, #0033aa);
+    color: #ffffff;
+    font-family: 'Sarabun', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    pointer-events: none;
 }
 
 /* ==========================================================================
