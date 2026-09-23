@@ -16,6 +16,7 @@ let documentPatches = {};
 let undoStack = [];
 let redoStack = [];
 
+// ฟอนต์ภาษาไทย Sarabun Binary แท้
 const THAI_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
 let cachedFontBytes = null;
 
@@ -148,6 +149,7 @@ async function renderPage(pageNum, container) {
 
     await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
 
+    // สกัด Metadata รวมถึง FontName เพื่อตรวจจับ Bold / น้ำหนักหมึกเดิม
     const textContent = await page.getTextContent();
     const displayViewport = page.getViewport({ scale: 1.0 });
 
@@ -161,6 +163,7 @@ async function renderPage(pageNum, container) {
             height: fontSize,
             fontSize: fontSize,
             text: item.str,
+            fontName: item.fontName || '',
             pdfX: item.transform[4],
             pdfY: item.transform[5],
             viewportY: top
@@ -171,21 +174,24 @@ async function renderPage(pageNum, container) {
     bindDrawingEngine(annotCanvas, pageNum);
 }
 
+// -------------------------------------------------------------
+// อัลกอริทึมดูดสีจริง 1:1 (True Text Ink & Background Sampling)
+// -------------------------------------------------------------
 function analyzeBoxColors(canvas, x, y, width, height) {
     const ctx = canvas.getContext('2d');
     const ratioX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
     const ratioY = canvas.height / parseFloat(canvas.style.height || (canvas.height / 2));
 
-    const safeLeft = Math.floor((x + 3) * ratioX);
-    const safeTop = Math.floor((y + 2.5) * ratioY);
-    const safeWidth = Math.max(1, Math.floor((width - 6) * ratioX));
-    const safeHeight = Math.max(1, Math.floor((height - 5) * ratioY));
+    const safeLeft = Math.floor((x + 2) * ratioX);
+    const safeTop = Math.floor((y + 2) * ratioY);
+    const safeWidth = Math.max(1, Math.floor((width - 4) * ratioX));
+    const safeHeight = Math.max(1, Math.floor((height - 4) * ratioY));
 
     try {
         const imgData = ctx.getImageData(safeLeft, safeTop, safeWidth, safeHeight).data;
         const colorCounts = {};
 
-        const step = Math.max(1, Math.floor((safeWidth * safeHeight) / 120));
+        const step = Math.max(1, Math.floor((safeWidth * safeHeight) / 200));
         for (let i = 0; i < imgData.length; i += step * 4) {
             if (imgData[i + 3] < 128) continue;
             const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
@@ -194,14 +200,32 @@ function analyzeBoxColors(canvas, x, y, width, height) {
         }
 
         const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
+
+        // สีพื้นหลัง = สีที่มีจำนวนพิกเซลมากที่สุด
         const bgKey = sortedColors[0] || '255,255,255';
         const [bgR, bgG, bgB] = bgKey.split(',').map(Number);
         const bgBrightness = (bgR * 299 + bgG * 587 + bgB * 114) / 1000;
 
-        let textR = 51, textG = 65, textB = 85, textHex = '#334155';
-        if (bgBrightness < 128) {
-            textR = 255; textG = 255; textB = 255; textHex = '#ffffff';
+        // ค้นหาสีตัวอักษรจริงจากพิกเซลที่มี Contrast ชัดเจนกับพื้นหลัง
+        let textR = bgBrightness < 128 ? 255 : 17;
+        let textG = bgBrightness < 128 ? 255 : 24;
+        let textB = bgBrightness < 128 ? 255 : 39;
+        let maxContrast = 0;
+
+        for (let i = 1; i < sortedColors.length; i++) {
+            const [cR, cG, cB] = sortedColors[i].split(',').map(Number);
+            const b = (cR * 299 + cG * 587 + cB * 114) / 1000;
+            const diff = Math.abs(b - bgBrightness);
+
+            if (diff > 75 && diff > maxContrast) {
+                maxContrast = diff;
+                textR = cR;
+                textG = cG;
+                textB = cB;
+            }
         }
+
+        const textHex = `#${((1 << 24) + (textR << 16) + (textG << 8) + textB).toString(16).slice(1)}`;
 
         return {
             bg: {
@@ -216,11 +240,14 @@ function analyzeBoxColors(canvas, x, y, width, height) {
     } catch (e) {
         return {
             bg: { r: 1, g: 1, b: 1, hex: '#ffffff' },
-            text: { r: 0.2, g: 0.25, b: 0.33, hex: '#334155' }
+            text: { r: 0.07, g: 0.09, b: 0.15, hex: '#111827' }
         };
     }
 }
 
+// -------------------------------------------------------------
+// อัลกอริทึมค้นหาข้อความเดิม (ตรวจจับขนาดฟอนต์, แนว X, และตัวหนา Bold)
+// -------------------------------------------------------------
 function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
     if (!textMetadata || textMetadata.length === 0) return null;
 
@@ -236,13 +263,17 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
 
     if (overlaps.length > 0) {
         const orig = overlaps[0];
+        // ตรวจจับว่าข้อความเดิมเป็นตัวหนาหรือไม่จากชื่อฟอนต์
+        const isBold = orig.fontName ? (/bold|black|heavy|semibold|medium/i.test(orig.fontName)) : false;
+
         return {
             fontSize: Math.round(orig.fontSize),
             origX: orig.x,
             origY: orig.y,
             viewportY: orig.viewportY,
             origPdfY: orig.pdfY,
-            origWidth: orig.width
+            origWidth: orig.width,
+            fontWeight: isBold ? '700' : '500' // คืนค่าน้ำหนักฟอนต์จริง
         };
     }
     return null;
@@ -313,7 +344,7 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 }
 
 // -------------------------------------------------------------
-// Interactive Shape Engine (พร้อมป้ายแท็กข้อความกำกับ + ปุ่มยืนยัน)
+// Interactive Shape Engine (พร้อมแท็กข้อความกำกับ + ปุ่มยืนยัน)
 // -------------------------------------------------------------
 function createInteractiveShape(wrapper, pageNum, left, top, width, height, type, initialColor) {
     const layer = wrapper.querySelector('.patch-layer');
@@ -326,13 +357,11 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     shapeNode.style.height = height + 'px';
     shapeNode.style.setProperty('--shape-color', initialColor);
 
-    // ป้ายแท็กข้อความที่ติดมุมรูปทรง
     const attachedTag = document.createElement('div');
     attachedTag.className = 'shape-attached-tag';
     attachedTag.style.display = 'none';
     shapeNode.appendChild(attachedTag);
 
-    // เมนูบาร์รูปทรง + ช่องพิมพ์โน้ต + ปุ่มยืนยัน
     const toolbar = document.createElement('div');
     toolbar.className = 'shape-quick-toolbar';
     toolbar.innerHTML = `
@@ -397,7 +426,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         }
     });
 
-    // 🎯 จังหวะกดยืนยัน (Confirm)
     function confirmShape() {
         noteText = noteInput.value.trim();
         if (noteText) {
@@ -482,12 +510,13 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
 }
 
 // -------------------------------------------------------------
-// กล่อง Input แก้ไขคำ (Enter to Adjust Mode)
+// กล่อง Input แก้ไขคำ (ใช้น้ำหนักฟอนต์จริง + ปรับตำแหน่งได้หลังกด Enter)
 // -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
     const fontSize = matchedOrig ? matchedOrig.fontSize : Math.max(11, Math.min(24, Math.round(height * 0.72)));
+    const fontWeight = matchedOrig ? matchedOrig.fontWeight : '500'; // 🎯 ดึงน้ำหนักตัวหนาจริง
     
     const insetLeft = left + 1.5;
     const insetTop = top + 1;
@@ -519,12 +548,14 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     input.className = 'patch-input-inline';
     input.style.color = colors.text.hex;
     input.style.fontSize = fontSize + 'px';
+    input.style.fontWeight = fontWeight; // แสดงน้ำหนักตัวหนาจริงบนหน้าจอ
     node.appendChild(input);
 
     const textPreview = document.createElement('div');
     textPreview.className = 'patch-text-preview';
     textPreview.style.color = colors.text.hex;
     textPreview.style.fontSize = fontSize + 'px';
+    textPreview.style.fontWeight = fontWeight;
     textPreview.style.display = 'none';
     node.appendChild(textPreview);
 
@@ -638,7 +669,8 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         const ratioY = pdfCanvas.height / parseFloat(pdfCanvas.style.height || (pdfCanvas.height / 2));
 
         const canvasFontSize = fontSize * ratioY;
-        ctx.font = `500 ${canvasFontSize}px 'Sarabun', sans-serif`;
+        // 🎯 วาดลง Canvas ด้วยน้ำหนักตัวหนาจริง (700 หรือ 500)
+        ctx.font = `${fontWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
         const metrics = ctx.measureText(text);
         const textWidthOnCanvas = metrics.width;
         const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (12 * ratioX));
@@ -685,6 +717,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             height: insetHeight,
             text: text,
             fontSize: fontSize,
+            fontWeight: fontWeight,
             bgColor: colors.bg,
             textColor: colors.text
         };
@@ -705,6 +738,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
                 documentPatches[pageNum].patches.push(patchData);
                 ctx.fillStyle = colors.bg.hex;
                 ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
+                ctx.font = `${fontWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
                 ctx.fillStyle = colors.text.hex;
                 ctx.fillText(text, drawX, drawBaselineY);
             }
@@ -731,6 +765,9 @@ function createReEditHotspot(wrapper, pageNum, pdfCanvas, left, top, width, heig
     layer.appendChild(hotspot);
 }
 
+// -------------------------------------------------------------
+// Drawing Engine
+// -------------------------------------------------------------
 function bindDrawingEngine(canvas, pageNum) {
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
@@ -791,6 +828,9 @@ function bindDrawingEngine(canvas, pageNum) {
     window.addEventListener('pointerup', endDraw);
 }
 
+// -------------------------------------------------------------
+// ระบบเซ็นลายเซ็น
+// -------------------------------------------------------------
 function openSignatureModal() {
     document.getElementById('sig-modal').style.display = 'flex';
     clearSigCanvas();
@@ -971,7 +1011,7 @@ async function exportVectorPDF() {
                         });
                     }
 
-                    // 🎯 พิมพ์ข้อความแท็กกำกับลงใน PDF คมกริบ
+                    // พิมพ์ข้อความแท็กกำกับลงใน PDF คมกริบ
                     if (sh.note && sh.note.trim() !== '') {
                         targetPage.drawText(sh.note, {
                             x: sh.x + 4,
