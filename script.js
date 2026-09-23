@@ -4,7 +4,7 @@ if (pdfjsLib) {
 }
 
 // Global States
-let currentTool = 'patch';
+let currentTool = 'patch'; // 'patch', 'rect', 'circle', 'pen', 'highlighter', 'eraser', 'pan'
 let currentInkColor = '#0033aa';
 let currentScale = 1.0;
 let pdfDoc = null;
@@ -12,9 +12,11 @@ let originalPdfBytes = null;
 let originalFileName = 'Nawee_Document';
 
 let documentPatches = {};
+
 let undoStack = [];
 let redoStack = [];
 
+// ฟอนต์ภาษาไทย Sarabun Binary แท้
 const THAI_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
 let cachedFontBytes = null;
 
@@ -114,7 +116,7 @@ async function handleFileOpen(e) {
     }
 
     setTool('patch');
-    showToast(`เปิดเอกสารเรียบร้อย (${pdfDoc.numPages} หน้า) - แตะบรรทัดเพื่อแก้ไขได้เลยค่ะ`);
+    showToast(`เปิดเอกสารเรียบร้อย (${pdfDoc.numPages} หน้า) - แตะคำเพื่อแก้ หรือกาง 2 นิ้วเพื่อซูมได้เลยค่ะ`);
 }
 
 async function renderPage(pageNum, container) {
@@ -172,7 +174,7 @@ async function renderPage(pageNum, container) {
 }
 
 // -------------------------------------------------------------
-// ระบบ Gestures สำหรับแท็บเล็ต
+// ระบบสัมผัส 2 นิ้วบนแท็บเล็ต: Pinch-to-Zoom & Two-Finger Pan
 // -------------------------------------------------------------
 function initTabletGestures() {
     const workspaceEl = document.querySelector('.workspace');
@@ -288,9 +290,6 @@ function analyzeBoxColors(canvas, x, y, width, height) {
     }
 }
 
-// -------------------------------------------------------------
-// อัลกอริทึมค้นหาข้อความเดิม (ตรวจจับ Bold เฉพาะคำที่เป็น Bold จริงๆ)
-// -------------------------------------------------------------
 function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
     if (!textMetadata || textMetadata.length === 0) return null;
 
@@ -306,11 +305,7 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
 
     if (overlaps.length > 0) {
         const orig = overlaps[0];
-        // 🎯 ตรวจจับ Bold แม่นยำ: เฉพาะ bold, black, heavy ตัดคำว่า medium ออก เพื่อไม่ให้เนื้อความกลายเป็นตัวหนา
-        const isBold = orig.fontName ? (/bold|black|heavy/i.test(orig.fontName)) : false;
-        
-        // 🎯 ตรวจจับว่าเป็นตัวเลขตารางราคาหรือไม่ (เช่น 800,000 หรือ 40Kw)
-        const isNumberColumn = /^[\d,.\s+-]+$/.test(orig.text.trim());
+        const isBold = orig.fontName ? (/bold|black|heavy|semibold|medium/i.test(orig.fontName)) : false;
 
         return {
             fontSize: Math.round(orig.fontSize),
@@ -319,8 +314,7 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
             viewportY: orig.viewportY,
             origPdfY: orig.pdfY,
             origWidth: orig.width,
-            fontWeight: isBold ? '700' : '400', // 🎯 Default เนื้อหาใช้ 400 (Regular) คมโปร่งตา
-            isNumber: isNumberColumn,
+            fontWeight: isBold ? '700' : '500',
             text: orig.text
         };
     }
@@ -328,7 +322,7 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
 }
 
 // -------------------------------------------------------------
-// Engine การลากคลุม + รวมประโยคยาวอัตโนมัติ (Line Merging)
+// Engine การลากคลุม + โหมดแตะ 1 ครั้งล็อกคำอัตโนมัติ (Tap-to-Select)
 // -------------------------------------------------------------
 function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     let startX = 0, startY = 0;
@@ -369,7 +363,7 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
         selectionBox.style.top = Math.min(startY, curY) + 'px';
     });
 
-    wrapper.addEventListener('pointerup', () => {
+    wrapper.addEventListener('pointerup', (e) => {
         if (!isDragging || !selectionBox) return;
         isDragging = false;
 
@@ -382,28 +376,22 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
         const touchDuration = Date.now() - touchStartTime;
 
-        // 🎯 ตรรกะอัจฉริยะรวบประโยคยาว (Single Tap & Long Line Merging)
-        if (boxWidth < 14 && boxHeight < 14 && touchDuration < 350 && currentTool === 'patch') {
-            const hit = textMetadata.find(item => 
-                startX >= item.x - 6 && startX <= item.x + item.width + 6 &&
-                startY >= item.y - 4 && startY <= item.y + item.height + 4
-            );
+        // 🎯 ฟังก์ชันเด็ดสำหรับแท็บเล็ต: แตะ 1 ครั้งแบบเร็วๆ (Single Tap) เพื่อดูดข้อความเดิมอัตโนมัติ
+        if (boxWidth < 12 && boxHeight < 12 && touchDuration < 320 && currentTool === 'patch') {
+            const hit = textMetadata.find(item => {
+                return (
+                    startX >= item.x - 4 &&
+                    startX <= item.x + item.width + 4 &&
+                    startY >= item.y - 4 &&
+                    startY <= item.y + item.height + 4
+                );
+            });
 
             if (hit) {
-                // รวบคำทั้งหมดที่อยู่บนระนาบบรรทัดเดียวกัน (ความสูง Y ใกล้กัน)
-                const lineSiblings = textMetadata.filter(item => 
-                    Math.abs(item.y - hit.y) < 4 &&
-                    item.x >= hit.x - 220 && item.x <= hit.x + 350
-                );
-
-                if (lineSiblings.length > 0) {
-                    const minX = Math.min(...lineSiblings.map(s => s.x));
-                    const maxX = Math.max(...lineSiblings.map(s => s.x + s.width));
-                    boxLeft = minX - 2;
-                    boxTop = hit.y;
-                    boxWidth = (maxX - minX) + 6;
-                    boxHeight = hit.height + 4;
-                }
+                boxLeft = hit.x - 2;
+                boxTop = hit.y;
+                boxWidth = hit.width + 4;
+                boxHeight = hit.height + 4;
             } else {
                 return;
             }
@@ -590,13 +578,13 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
 }
 
 // -------------------------------------------------------------
-// กล่อง Input แก้ไขคำ (พร้อมปุ่ม Right-Align & Bold Toggle)
+// กล่อง Input แก้ไขคำ (Smart Adjust Mode & In-Place Canvas)
 // -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
     const fontSize = matchedOrig ? matchedOrig.fontSize : Math.max(11, Math.min(24, Math.round(height * 0.72)));
-    let currentWeight = matchedOrig ? matchedOrig.fontWeight : '400';
+    const fontWeight = matchedOrig ? matchedOrig.fontWeight : '500';
     
     const insetLeft = left + 1.5;
     const insetTop = top + 1;
@@ -611,14 +599,11 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     node.style.height = insetHeight + 'px';
     node.style.background = colors.bg.hex;
 
-    // แถบ Nudge Bar พร้อมปุ่มชิดซ้าย กึ่งกลาง ชิดขวา และปุ่มตัวหนา B
     const nudgeBar = document.createElement('div');
     nudgeBar.className = 'nudge-toolbar';
     nudgeBar.innerHTML = `
-        <button type="button" class="nudge-btn" id="nb-bold" title="สลับตัวหนา/ตัวปกติ"><strong>B</strong></button>
         <button type="button" class="nudge-btn" id="nb-left" title="ชิดซ้าย"><i class="fa-solid fa-align-left"></i></button>
         <button type="button" class="nudge-btn" id="nb-center" title="กึ่งกลาง"><i class="fa-solid fa-align-center"></i></button>
-        <button type="button" class="nudge-btn" id="nb-right" title="ชิดขวา (สำหรับตัวเลขราคา)"><i class="fa-solid fa-align-right"></i></button>
         <button type="button" class="nudge-btn" id="nb-step-left" title="ขยับซ้าย 1px (หรือปุ่ม ◄)">◀</button>
         <button type="button" class="nudge-btn" id="nb-step-right" title="ขยับขวา 1px (หรือปุ่ม ►)">▶</button>
         <button type="button" class="nudge-btn btn-done" id="nb-done" title="ตกลง ประทับลงเอกสาร"><i class="fa-solid fa-check"></i> เสร็จ</button>
@@ -631,51 +616,35 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     input.className = 'patch-input-inline';
     input.style.color = colors.text.hex;
     input.style.fontSize = fontSize + 'px';
-    input.style.fontWeight = currentWeight;
+    input.style.fontWeight = fontWeight;
     node.appendChild(input);
 
     const textPreview = document.createElement('div');
     textPreview.className = 'patch-text-preview';
     textPreview.style.color = colors.text.hex;
     textPreview.style.fontSize = fontSize + 'px';
-    textPreview.style.fontWeight = currentWeight;
+    textPreview.style.fontWeight = fontWeight;
     textPreview.style.display = 'none';
     node.appendChild(textPreview);
 
     let currentOffsetX = 0;
-    let currentAlign = (matchedOrig && matchedOrig.isNumber) ? 'right' : 'left'; // ถ้าเป็นตัวเลขชิดขวาอัตโนมัติ
+    let isCentered = false;
     let isAdjustMode = false;
 
-    if (currentAlign === 'right') {
-        input.style.textAlign = 'right';
-        input.style.paddingRight = '4px';
-    } else if (matchedOrig && matchedOrig.origX > insetLeft) {
+    if (matchedOrig && matchedOrig.origX > insetLeft) {
         currentOffsetX = matchedOrig.origX - insetLeft;
         input.style.paddingLeft = currentOffsetX + 'px';
     }
 
     function updatePreviewPosition() {
-        textPreview.style.textAlign = currentAlign;
-        if (currentAlign === 'right') {
-            textPreview.style.paddingRight = '4px';
+        if (isCentered) {
+            textPreview.style.textAlign = 'center';
             textPreview.style.paddingLeft = '0px';
-        } else if (currentAlign === 'center') {
-            textPreview.style.paddingLeft = '0px';
-            textPreview.style.paddingRight = '0px';
         } else {
+            textPreview.style.textAlign = 'left';
             textPreview.style.paddingLeft = currentOffsetX + 'px';
-            textPreview.style.paddingRight = '0px';
         }
     }
-
-    // สลับตัวหนา / ตัวปกติ (Bold Toggle)
-    nudgeBar.querySelector('#nb-bold').onclick = (e) => {
-        e.stopPropagation();
-        currentWeight = currentWeight === '700' ? '400' : '700';
-        input.style.fontWeight = currentWeight;
-        textPreview.style.fontWeight = currentWeight;
-        nudgeBar.querySelector('#nb-bold').classList.toggle('active', currentWeight === '700');
-    };
 
     nudgeBar.querySelector('#nb-step-left').onclick = (e) => {
         e.stopPropagation();
@@ -691,24 +660,15 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     };
     nudgeBar.querySelector('#nb-center').onclick = (e) => {
         e.stopPropagation();
-        currentAlign = 'center';
+        isCentered = true;
         input.style.textAlign = 'center';
         input.style.paddingLeft = '0px';
-        input.style.paddingRight = '0px';
         updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-left').onclick = (e) => {
         e.stopPropagation();
-        currentAlign = 'left';
+        isCentered = false;
         input.style.textAlign = 'left';
-        updatePreviewPosition();
-    };
-    nudgeBar.querySelector('#nb-right').onclick = (e) => {
-        e.stopPropagation();
-        currentAlign = 'right';
-        input.style.textAlign = 'right';
-        input.style.paddingRight = '4px';
-        input.style.paddingLeft = '0px';
         updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-done').onclick = (e) => {
@@ -777,20 +737,16 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         const ratioY = pdfCanvas.height / parseFloat(pdfCanvas.style.height || (pdfCanvas.height / 2));
 
         const canvasFontSize = fontSize * ratioY;
-        ctx.font = `${currentWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
+        ctx.font = `${fontWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
         const metrics = ctx.measureText(text);
         const textWidthOnCanvas = metrics.width;
-        
-        // 🎯 Auto-Grow Box: กว้างเท่าขนาดที่มากที่สุดระหว่างคำเดิมกับคำใหม่ เพื่อกลบคำเดิมมิด 100%
-        const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (16 * ratioX));
+        const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (12 * ratioX));
 
         ctx.fillStyle = colors.bg.hex;
         ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
 
         let drawX;
-        if (currentAlign === 'right') {
-            drawX = (insetLeft * ratioX) + clearWidth - textWidthOnCanvas - (4 * ratioX);
-        } else if (currentAlign === 'center') {
+        if (isCentered) {
             drawX = (insetLeft * ratioX) + ((clearWidth - textWidthOnCanvas) / 2);
         } else {
             drawX = (insetLeft + currentOffsetX) * ratioX;
@@ -815,7 +771,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             pdfY = wrapperHeight - (insetTop + insetHeight) + ((insetHeight - fontSize) / 2);
         }
 
-        const finalVectorX = (drawX / ratioX);
+        const finalVectorX = isCentered ? (insetLeft + ((insetWidth - (textWidthOnCanvas / ratioX)) / 2)) : (insetLeft + currentOffsetX);
 
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
         
@@ -828,7 +784,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             height: insetHeight,
             text: text,
             fontSize: fontSize,
-            fontWeight: currentWeight,
+            fontWeight: fontWeight,
             bgColor: colors.bg,
             textColor: colors.text
         };
@@ -849,7 +805,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
                 documentPatches[pageNum].patches.push(patchData);
                 ctx.fillStyle = colors.bg.hex;
                 ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
-                ctx.font = `${currentWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
+                ctx.font = `${fontWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
                 ctx.fillStyle = colors.text.hex;
                 ctx.fillText(text, drawX, drawBaselineY);
             }
@@ -896,7 +852,7 @@ function bindDrawingEngine(canvas, pageNum) {
 
     function startDraw(e) {
         if (currentTool !== 'pen' && currentTool !== 'highlighter' && currentTool !== 'eraser') return;
-        if (e.touches && e.touches.length > 1) return;
+        if (e.touches && e.touches.length > 1) return; // ข้ามเมื่อใช้ 2 นิ้วซูม
         const c = getCoords(e);
         isDrawing = true; lastX = c.x; lastY = c.y;
     }
@@ -1070,6 +1026,7 @@ async function exportVectorPDF() {
             const targetPage = pages[pIdx];
             const pData = documentPatches[pageNum];
 
+            // 1. วาดกล่องลบคำผิดและข้อความใหม่
             if (pData.patches) {
                 pData.patches.forEach(pt => {
                     const boxX = pt.boxLeft !== undefined ? pt.boxLeft : pt.x;
@@ -1092,6 +1049,7 @@ async function exportVectorPDF() {
                 });
             }
 
+            // 2. วาดรูปทรงเวกเตอร์สี่เหลี่ยม / วงรี พร้อมพิมพ์แท็กกำกับ
             if (pData.shapes) {
                 pData.shapes.forEach(sh => {
                     const hexToRgb = (hex) => {
@@ -1132,6 +1090,7 @@ async function exportVectorPDF() {
                 });
             }
 
+            // 3. วาดรูปภาพ/ตรายาง
             if (pData.images) {
                 for (let img of pData.images) {
                     try {
@@ -1145,6 +1104,7 @@ async function exportVectorPDF() {
             }
         }
 
+        // 4. วาดลายเส้นจาก Canvas ปากกาฟรีแฮนด์
         const wrappers = document.querySelectorAll('.page-wrapper');
         for (let idx = 0; idx < wrappers.length; idx++) {
             const c = wrappers[idx].querySelector('.annotation-canvas');
@@ -1207,7 +1167,7 @@ function zoomDoc(delta) {
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('upload-pdf').addEventListener('change', handleFileOpen);
-    initTabletGestures();
+    initTabletGestures(); // เริ่มระบบ Gesture แท็บเล็ตทันที
 
     sigCanvas = document.getElementById('sig-canvas');
     if (sigCanvas) {
