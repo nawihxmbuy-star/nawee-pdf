@@ -5,7 +5,7 @@ if (pdfjsLib) {
 
 // Global States
 let currentTool = 'patch';
-let currentInkColor = '#ef4444'; // สีเริ่มต้นเป็นสีแดงสด
+let currentInkColor = '#ef4444'; // สีเริ่มต้นเป็นสีแดง
 let currentScale = 1.0;
 let pdfDoc = null;
 let originalPdfBytes = null;
@@ -15,8 +15,12 @@ let documentPatches = {};
 let undoStack = [];
 let redoStack = [];
 
-const THAI_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
-let cachedFontBytes = null;
+// 🎯 โหลดทั้ง Regular และ Bold เพื่อให้ตัวหนาใน PDF เนียนสนิท 1:1
+const THAI_FONT_REGULAR_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
+const THAI_FONT_BOLD_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Bold.ttf';
+
+let cachedRegularFontBytes = null;
+let cachedBoldFontBytes = null;
 
 let sigCanvas, sigCtx, isDrawingSig = false, sigColor = '#0033aa', uploadedSigBase64 = null;
 
@@ -138,7 +142,7 @@ async function renderPage(pageNum, container) {
     annotCanvas.height = viewport.height;
     wrapper.appendChild(annotCanvas);
 
-    // SVG สำหรับวาดเส้นโยงระหว่างรูปทรงกับกล่องคอมเมนต์สีแดง
+    // SVG สำหรับวาดเส้นโยง Leader Line
     const svgLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgLayer.setAttribute('class', 'leader-lines-svg');
     wrapper.appendChild(svgLayer);
@@ -463,7 +467,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     const layer = wrapper.querySelector('.patch-layer');
     const svgLayer = wrapper.querySelector('.leader-lines-svg');
 
-    // 1. ตัวรูปทรงหลัก (Rectangle หรือ Circle)
     const shapeNode = document.createElement('div');
     shapeNode.className = `shape-interactive-node shape-${type}`;
     shapeNode.style.left = left + 'px';
@@ -472,7 +475,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     shapeNode.style.height = height + 'px';
     shapeNode.style.setProperty('--shape-color', initialColor);
 
-    // ทูลบาร์ด่วนสำหรับตั้งค่า
     const toolbar = document.createElement('div');
     toolbar.className = 'shape-quick-toolbar';
     toolbar.innerHTML = `
@@ -486,7 +488,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     `;
     shapeNode.appendChild(toolbar);
 
-    // ด้ามจับยืดขยายมุม (Resize Handles)
     const handles = [];
     ['tl', 'tr', 'bl', 'br'].forEach(pos => {
         const h = document.createElement('div');
@@ -495,7 +496,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         handles.push(h);
     });
 
-    // 2. เส้นโยง Leader Line (SVG Line)
     const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     leaderLine.setAttribute('stroke', initialColor);
     leaderLine.setAttribute('stroke-width', '2');
@@ -504,7 +504,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     leaderLine.style.display = 'none';
     svgLayer.appendChild(leaderLine);
 
-    // 3. กล่องคอมเมนต์สีแดง (Draggable Red Callout Bubble)
     const calloutBubble = document.createElement('div');
     calloutBubble.className = 'shape-callout-bubble';
     calloutBubble.style.display = 'none';
@@ -519,7 +518,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
     let noteText = '';
     const noteInput = toolbar.querySelector('.shape-note-input');
 
-    // ข้อมูลสถานะของ Callout
     let calloutX = left + 10;
     let calloutY = Math.max(10, top - 36);
 
@@ -549,22 +547,20 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         const bW = calloutBubble.offsetWidth || 70;
         const bH = calloutBubble.offsetHeight || 24;
 
-        // จุดยึดรูปทรง (ขอบที่ใกล้กับกล่องคอมเมนต์ที่สุด)
         const shapeCenterX = sL + (sW / 2);
         const shapeCenterY = sT + (sH / 2);
 
-        // จุดยึดของกล่องคอมเมนต์ (กึ่งกลางกล่อง)
         const bubbleCenterX = bL + (bW / 2);
         const bubbleCenterY = bT + (bH / 2);
 
         let anchorX = shapeCenterX;
         let anchorY = shapeCenterY;
 
-        if (bubbleCenterY < sT) anchorY = sT; // กล่องอยู่ข้างบน
-        else if (bubbleCenterY > sT + sH) anchorY = sT + sH; // กล่องอยู่ข้างล่าง
+        if (bubbleCenterY < sT) anchorY = sT;
+        else if (bubbleCenterY > sT + sH) anchorY = sT + sH;
 
-        if (bubbleCenterX < sL) anchorX = sL; // กล่องอยู่ทางซ้าย
-        else if (bubbleCenterX > sL + sW) anchorX = sL + sW; // กล่องอยู่ทางขวา
+        if (bubbleCenterX < sL) anchorX = sL;
+        else if (bubbleCenterX > sL + sW) anchorX = sL + sW;
 
         leaderLine.setAttribute('x1', anchorX);
         leaderLine.setAttribute('y1', anchorY);
@@ -577,7 +573,7 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         shapeData.callout = {
             text: noteText,
             x: bL,
-            y: wH - (bT + bH), // แปลงเป็นระบบพิกัด PDF จากมุมล่างซ้าย
+            y: wH - (bT + bH),
             width: bW,
             height: bH,
             anchorX: anchorX,
@@ -630,7 +626,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         showToast("ลบรูปทรงแล้วค่ะ");
     };
 
-    // ลากรูปทรงหลัก (Move Shape)
     let isMovingShape = false, startSX = 0, startSY = 0, origSL = left, origST = top;
     shapeNode.addEventListener('pointerdown', (e) => {
         if (e.target.closest('.shape-handle') || e.target.closest('.shape-quick-toolbar')) return;
@@ -655,7 +650,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         }
     });
 
-    // 🎯 ลากกล่องคอมเมนต์สีแดง (Move Callout Bubble อิสระไปทั่วหน้าจอ)
     let isMovingCallout = false, startBX = 0, startBY = 0, origBL = 0, origBT = 0;
     calloutBubble.addEventListener('pointerdown', (e) => {
         isMovingCallout = true;
@@ -697,7 +691,7 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         toolbar.style.display = 'none';
         handles.forEach(h => h.style.display = 'none');
         syncShapeToData();
-        showToast("ยืนยันรูปทรงและข้อความชี้เป้าเรียบร้อย (ลากกล่องแดงไปวางตำแหน่งที่ต้องการได้เลย)");
+        showToast("ยืนยันรูปทรงและข้อความชี้เป้าเรียบร้อย");
     }
 
     toolbar.querySelector('.shape-confirm-btn').onclick = (e) => {
@@ -712,7 +706,6 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
         }
     });
 
-    // ดับเบิลคลิกเพื่อแก้ไขข้อความ
     shapeNode.addEventListener('dblclick', (e) => {
         e.stopPropagation();
         toolbar.style.display = 'flex';
@@ -1182,7 +1175,7 @@ function placeSignatureOnDoc() {
 }
 
 // -------------------------------------------------------------
-// ส่งออก Vector PDF (เรนเดอร์ Shape, เส้นโยง และกล่องคอมเมนต์สีแดงคมชัด)
+// ส่งออก Vector PDF (รองรับทั้ง Sarabun-Bold และ Regular 100%)
 // -------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; }
@@ -1192,18 +1185,26 @@ async function exportVectorPDF() {
         const { PDFDocument, rgb, StandardFonts } = PDFLib;
         const loadedPdf = await PDFDocument.load(originalPdfBytes);
         
-        let thaiFont = null;
+        let thaiFontRegular = null;
+        let thaiFontBold = null;
         try {
             loadedPdf.registerFontkit(fontkit);
-            if (!cachedFontBytes) {
-                const res = await fetch(THAI_FONT_URL);
-                if (!res.ok) throw new Error("ดาวน์โหลดฟอนต์ล้มเหลว");
-                cachedFontBytes = await res.arrayBuffer();
+            if (!cachedRegularFontBytes) {
+                const res = await fetch(THAI_FONT_REGULAR_URL);
+                if (!res.ok) throw new Error("โหลด Sarabun-Regular ล้มเหลว");
+                cachedRegularFontBytes = await res.arrayBuffer();
             }
-            thaiFont = await loadedPdf.embedFont(cachedFontBytes);
+            if (!cachedBoldFontBytes) {
+                const res = await fetch(THAI_FONT_BOLD_URL);
+                if (!res.ok) throw new Error("โหลด Sarabun-Bold ล้มเหลว");
+                cachedBoldFontBytes = await res.arrayBuffer();
+            }
+            thaiFontRegular = await loadedPdf.embedFont(cachedRegularFontBytes);
+            thaiFontBold = await loadedPdf.embedFont(cachedBoldFontBytes);
         } catch (fontErr) {
             console.warn("สลับใช้ฟอนต์มาตรฐานแทน:", fontErr);
-            thaiFont = await loadedPdf.embedFont(StandardFonts.Helvetica);
+            thaiFontRegular = await loadedPdf.embedFont(StandardFonts.Helvetica);
+            thaiFontBold = await loadedPdf.embedFont(StandardFonts.HelveticaBold);
         }
 
         const pages = loadedPdf.getPages();
@@ -1214,7 +1215,7 @@ async function exportVectorPDF() {
             const targetPage = pages[pIdx];
             const pData = documentPatches[pageNum];
 
-            // 1. เรนเดอร์การแก้ไขคำในตาราง (Patches)
+            // 1. เรนเดอร์การแก้ไขคำในตาราง (เลือกฟอนต์ Regular หรือ Bold ตามจริง)
             if (pData.patches) {
                 pData.patches.forEach(pt => {
                     const safeBgR = Math.min(1.0, Math.max(0.0, pt.bgColor.r));
@@ -1224,6 +1225,10 @@ async function exportVectorPDF() {
                     const safeTxtR = Math.min(1.0, Math.max(0.0, pt.textColor.r));
                     const safeTxtG = Math.min(1.0, Math.max(0.0, pt.textColor.g));
                     const safeTxtB = Math.min(1.0, Math.max(0.0, pt.textColor.b));
+
+                    // 🎯 สลับใช้ฟอนต์ตัวหนาจริงเมื่อตั้งสถานะเป็น bold หรือ 700
+                    const isBold = (pt.fontWeight === '700' || pt.fontWeight === 'bold');
+                    const selectedFont = isBold ? thaiFontBold : thaiFontRegular;
 
                     targetPage.drawRectangle({
                         x: pt.boxLeft,
@@ -1237,7 +1242,7 @@ async function exportVectorPDF() {
                         x: pt.x,
                         y: pt.y,
                         size: pt.fontSize,
-                        font: thaiFont,
+                        font: selectedFont,
                         color: rgb(safeTxtR, safeTxtG, safeTxtB),
                     });
                 });
@@ -1247,16 +1252,15 @@ async function exportVectorPDF() {
             if (pData.shapes) {
                 pData.shapes.forEach(sh => {
                     const hexToRgb = (hex) => {
-                        const num = parseInt(hex.replace('#', ''), 16);
+                        const num = parseInt(String(hex).replace('#', ''), 16);
                         return rgb(
                             Math.min(1, Math.max(0, (num >> 16 & 255) / 255)),
                             Math.min(1, Math.max(0, (num >> 8 & 255) / 255)),
                             Math.min(1, Math.max(0, (num & 255) / 255))
                         );
                     };
-                    const shapeColor = hexToRgb(sh.color);
+                    const shapeColor = hexToRgb(sh.color || '#ef4444');
 
-                    // วาดกรอบสี่เหลี่ยมหรือวงกลม
                     if (sh.type === 'rect') {
                         targetPage.drawRectangle({
                             x: sh.x,
@@ -1277,35 +1281,46 @@ async function exportVectorPDF() {
                         });
                     }
 
-                    // วาดเส้นโยงและกล่องคอมเมนต์สีแดง (ถ้ามีข้อความ)
-                    if (sh.callout && sh.callout.text && sh.callout.text.trim() !== '') {
-                        const callout = sh.callout;
-                        const calloutColor = hexToRgb(callout.color || sh.color);
+                    // วาดเส้นโยงและกล่องคอมเมนต์สีแดง
+                    const noteText = (sh.callout && sh.callout.text) ? sh.callout.text.trim() : (sh.note ? sh.note.trim() : '');
+                    if (noteText) {
+                        const calloutColor = shapeColor;
+                        const textPaddingX = 8;
+                        const boxHeight = 22;
+                        const boxWidth = Math.max(70, noteText.length * 8 + (textPaddingX * 2));
+                        
+                        const boxX = (sh.callout && sh.callout.x !== undefined) ? sh.callout.x : (sh.x + sh.width + 10);
+                        const boxY = (sh.callout && sh.callout.y !== undefined) ? sh.callout.y : (sh.y + sh.height);
+
+                        const startX = sh.x + (sh.width / 2);
+                        const startY = sh.y + (sh.height / 2);
+                        const endX = boxX + (boxWidth / 2);
+                        const endY = boxY + (boxHeight / 2);
 
                         // ลากเส้นโยง (Leader Line)
                         targetPage.drawLine({
-                            start: { x: callout.anchorX, y: callout.anchorY },
-                            end: { x: callout.x + (callout.width / 2), y: callout.y + (callout.height / 2) },
+                            start: { x: startX, y: startY },
+                            end: { x: endX, y: endY },
                             thickness: 1.5,
                             color: calloutColor,
                             dashArray: [3, 3]
                         });
 
-                        // วาดพื้นหลังกล่องคอมเมนต์สีแดง
+                        // วาดพื้นหลังกล่องคอมเมนต์สีแดงทึบ
                         targetPage.drawRectangle({
-                            x: callout.x,
-                            y: callout.y,
-                            width: callout.width,
-                            height: callout.height,
+                            x: boxX,
+                            y: boxY,
+                            width: boxWidth,
+                            height: boxHeight,
                             color: calloutColor,
                         });
 
-                        // พิมพ์ข้อความสีขาวลงในกล่องคอมเมนต์
-                        targetPage.drawText(callout.text, {
-                            x: callout.x + 8,
-                            y: callout.y + (callout.height * 0.28),
+                        // ตัวหนังสือสีขาวตัวหนาคมชัดในกล่องคอมเมนต์
+                        targetPage.drawText(noteText, {
+                            x: boxX + textPaddingX,
+                            y: boxY + 6,
                             size: 11,
-                            font: thaiFont,
+                            font: thaiFontBold,
                             color: rgb(1, 1, 1),
                         });
                     }
