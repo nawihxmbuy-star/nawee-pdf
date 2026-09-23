@@ -174,9 +174,6 @@ async function renderPage(pageNum, container) {
     bindDrawingEngine(annotCanvas, pageNum);
 }
 
-// -------------------------------------------------------------
-// ระบบสัมผัส 2 นิ้วบนแท็บเล็ต: Pinch-to-Zoom & Pan
-// -------------------------------------------------------------
 function initTabletGestures() {
     const workspaceEl = document.querySelector('.workspace');
     let initialDistance = 0;
@@ -223,65 +220,72 @@ function initTabletGestures() {
 }
 
 // -------------------------------------------------------------
-// วิเคราะห์สีพื้นหลังและสีตัวหนังสือจริง 1:1
+// ระบบดูดสีพื้นหลังและสีหมึกอักษรแบบแม่นยำสูง (คัดกรองขอบ Anti-aliasing ออก)
 // -------------------------------------------------------------
 function analyzeBoxColors(canvas, x, y, width, height) {
     const ctx = canvas.getContext('2d');
     const ratioX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
     const ratioY = canvas.height / parseFloat(canvas.style.height || (canvas.height / 2));
 
-    const safeLeft = Math.floor((x + 2) * ratioX);
-    const safeTop = Math.floor((y + 2) * ratioY);
-    const safeWidth = Math.max(1, Math.floor((width - 4) * ratioX));
-    const safeHeight = Math.max(1, Math.floor((height - 4) * ratioY));
+    const safeLeft = Math.max(0, Math.floor(x * ratioX));
+    const safeTop = Math.max(0, Math.floor(y * ratioY));
+    const safeWidth = Math.max(1, Math.floor(width * ratioX));
+    const safeHeight = Math.max(1, Math.floor(height * ratioY));
 
     try {
         const imgData = ctx.getImageData(safeLeft, safeTop, safeWidth, safeHeight).data;
         const colorCounts = {};
 
-        const step = Math.max(1, Math.floor((safeWidth * safeHeight) / 200));
-        for (let i = 0; i < imgData.length; i += step * 4) {
-            if (imgData[i + 3] < 128) continue;
-            const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
+        // 1. ตรวจหาสีพื้นหลัง (Background)
+        for (let i = 0; i < imgData.length; i += 4) {
+            if (imgData[i + 3] < 150) continue;
+            const r = Math.round(imgData[i] / 6) * 6;
+            const g = Math.round(imgData[i + 1] / 6) * 6;
+            const b = Math.round(imgData[i + 2] / 6) * 6;
             const key = `${r},${g},${b}`;
             colorCounts[key] = (colorCounts[key] || 0) + 1;
         }
 
         const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
-
         const bgKey = sortedColors[0] || '255,255,255';
         const [bgR, bgG, bgB] = bgKey.split(',').map(Number);
-        const bgBrightness = (bgR * 299 + bgG * 587 + bgB * 114) / 1000;
+        const bgLuma = (bgR * 299 + bgG * 587 + bgB * 114) / 1000;
 
-        let textR = bgBrightness < 128 ? 255 : 17;
-        let textG = bgBrightness < 128 ? 255 : 24;
-        let textB = bgBrightness < 128 ? 255 : 39;
-        let maxContrast = 0;
+        // 2. ตรวจหาสีหมึกตัวหนังสือจริง โดยกรองตัดขอบฟุ้ง Anti-Aliasing ออก
+        const textCandidateCounts = {};
+        for (let i = 0; i < imgData.length; i += 4) {
+            if (imgData[i + 3] < 200) continue;
+            const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
+            const luma = (r * 299 + g * 587 + b * 114) / 1000;
+            const diff = Math.abs(luma - bgLuma);
 
-        for (let i = 1; i < sortedColors.length; i++) {
-            const [cR, cG, cB] = sortedColors[i].split(',').map(Number);
-            const b = (cR * 299 + cG * 587 + cB * 114) / 1000;
-            const diff = Math.abs(b - bgBrightness);
-
-            if (diff > 75 && diff > maxContrast) {
-                maxContrast = diff;
-                textR = cR;
-                textG = cG;
-                textB = cB;
+            if (diff >= 65) {
+                const qr = Math.round(r / 8) * 8;
+                const qg = Math.round(g / 8) * 8;
+                const qb = Math.round(b / 8) * 8;
+                const k = `${qr},${qg},${qb}`;
+                textCandidateCounts[k] = (textCandidateCounts[k] || 0) + 1;
             }
         }
 
-        const textHex = `#${((1 << 24) + (textR << 16) + (textG << 8) + textB).toString(16).slice(1)}`;
+        const sortedText = Object.keys(textCandidateCounts).sort((a, b) => textCandidateCounts[b] - textCandidateCounts[a]);
+        let textR, textG, textB;
+
+        if (sortedText.length > 0) {
+            [textR, textG, textB] = sortedText[0].split(',').map(Number);
+        } else {
+            textR = bgLuma < 128 ? 255 : 17;
+            textG = bgLuma < 128 ? 255 : 24;
+            textB = bgLuma < 128 ? 255 : 39;
+        }
+
+        const toHex = (num) => Math.min(255, Math.max(0, num)).toString(16).padStart(2, '0');
+        const textHex = `#${toHex(textR)}${toHex(textG)}${toHex(textB)}`;
+        const bgHex = `#${toHex(bgR)}${toHex(bgG)}${toHex(bgB)}`;
 
         return {
-            bg: {
-                r: bgR / 255, g: bgG / 255, b: bgB / 255,
-                hex: `#${((1 << 24) + (bgR << 16) + (bgG << 8) + bgB).toString(16).slice(1)}`
-            },
-            text: {
-                r: textR / 255, g: textG / 255, b: textB / 255,
-                hex: textHex
-            }
+            bg: { r: bgR / 255, g: bgG / 255, b: bgB / 255, hex: bgHex },
+            text: { r: textR / 255, g: textG / 255, b: textB / 255, hex: textHex }
         };
     } catch (e) {
         return {
@@ -291,39 +295,52 @@ function analyzeBoxColors(canvas, x, y, width, height) {
     }
 }
 
+// -------------------------------------------------------------
+// ดึงขนาดฟอนต์จริง น้ำหนักตัวหนา และพิกัดจากคำที่แตะ
+// -------------------------------------------------------------
 function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
     if (!textMetadata || textMetadata.length === 0) return null;
 
+    const centerX = boxLeft + (boxWidth / 2);
+    const centerY = boxTop + (boxHeight / 2);
+
     const overlaps = textMetadata.filter(item => {
         return (
-            item.x < boxLeft + boxWidth &&
-            item.x + item.width > boxLeft &&
-            item.y < boxTop + boxHeight &&
-            item.y + item.height > boxTop &&
+            centerX >= item.x - 6 &&
+            centerX <= item.x + item.width + 6 &&
+            centerY >= item.y - 8 &&
+            centerY <= item.y + item.height + 8 &&
             item.text && item.text.trim() !== ''
         );
     });
 
-    if (overlaps.length > 0) {
-        const orig = overlaps[0];
-        const isBold = orig.fontName ? (/bold|black|heavy/i.test(orig.fontName)) : false;
+    const target = overlaps.length > 0 ? overlaps[0] : null;
+
+    if (target) {
+        const isBold = target.fontName ? (/bold|black|heavy|medium|semibold/i.test(target.fontName)) : false;
+        const realFontSize = Math.round(target.fontSize || target.height);
 
         return {
-            fontSize: Math.round(orig.fontSize),
-            origX: orig.x,
-            origY: orig.y,
-            viewportY: orig.viewportY,
-            origPdfY: orig.pdfY,
-            origWidth: orig.width,
+            fontSize: Math.max(10, Math.min(36, realFontSize)),
+            origX: target.x,
+            origY: target.y,
+            viewportY: target.viewportY,
+            origPdfY: target.pdfY,
+            origWidth: target.width,
             fontWeight: isBold ? '700' : '400',
-            text: orig.text
+            text: target.text
         };
     }
-    return null;
+
+    return {
+        fontSize: Math.max(11, Math.min(28, Math.round(boxHeight * 0.75))),
+        fontWeight: '400',
+        text: ''
+    };
 }
 
 // -------------------------------------------------------------
-// Engine การแตะคำ: ล็อกเฉพาะคำที่เขียนติดกัน ไม่ข้ามเว้นวรรค ไม่ล้นตาราง
+// Engine การแตะคำ: ล็อกเฉพาะคำติดกัน ไม่หลุด ไม่หาย แตะตรงไหนก็เปิด
 // -------------------------------------------------------------
 function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     let startX = 0, startY = 0;
@@ -377,48 +394,52 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
         const touchDuration = Date.now() - touchStartTime;
 
-        // 🎯 ตรรกะจับเฉพาะคำที่เขียนติดกันเป็นก้อนเดียว (เจอเว้นวรรคให้หยุดทันที ไม่ล้นข้ามตาราง)
-        if (boxWidth < 14 && boxHeight < 14 && touchDuration < 350 && currentTool === 'patch') {
+        // ตรรกะตรวจจับคำ: จับเฉพาะคำที่ติดกัน แตะโดนคำไหนเกาะคำนั้น แตะที่ว่างสร้างกล่องทันที
+        if (boxWidth < 18 && boxHeight < 18 && touchDuration < 450 && currentTool === 'patch') {
             const hit = textMetadata.find(item => 
-                startX >= item.x - 4 && startX <= item.x + item.width + 4 &&
-                startY >= item.y - 4 && startY <= item.y + item.height + 4
+                startX >= item.x - 8 && startX <= item.x + item.width + 8 &&
+                startY >= item.y - 8 && startY <= item.y + item.height + 8
             );
 
             if (hit) {
                 const lineItems = textMetadata
-                    .filter(item => Math.abs(item.y - hit.y) < 3 && item.text && item.text.trim() !== '')
+                    .filter(item => Math.abs(item.y - hit.y) <= 6 && item.text && item.text.trim() !== '')
                     .sort((a, b) => a.x - b.x);
 
                 const hitIdx = lineItems.findIndex(item => item === hit);
 
-                // ขยายซ้าย: หยุดเมื่อเจอเว้นวรรค หรือระยะห่างเกิน 3px
+                // ขยายซ้าย: หยุดเมื่อเจอเว้นวรรคชัดเจน หรือห่างเกิน 6px
                 let startWord = hit;
                 for (let i = hitIdx - 1; i >= 0; i--) {
                     const prev = lineItems[i];
                     const gap = startWord.x - (prev.x + prev.width);
-                    if (gap > 3 || /\s$/.test(prev.text) || /^\s/.test(startWord.text)) {
+                    if (gap > 6 || /\s$/.test(prev.text) || /^\s/.test(startWord.text)) {
                         break;
                     }
                     startWord = prev;
                 }
 
-                // ขยายขวา: หยุดเมื่อเจอเว้นวรรค หรือระยะห่างเกิน 3px
+                // ขยายขวา: หยุดเมื่อเจอเว้นวรรคชัดเจน หรือห่างเกิน 6px
                 let endWord = hit;
                 for (let i = hitIdx + 1; i < lineItems.length; i++) {
                     const next = lineItems[i];
                     const gap = next.x - (endWord.x + endWord.width);
-                    if (gap > 3 || /\s$/.test(endWord.text) || /^\s/.test(next.text)) {
+                    if (gap > 6 || /\s$/.test(endWord.text) || /^\s/.test(next.text)) {
                         break;
                     }
                     endWord = next;
                 }
 
                 boxLeft = startWord.x - 1;
-                boxTop = hit.y;
-                boxWidth = (endWord.x + endWord.width) - startWord.x + 3;
-                boxHeight = hit.height + 3;
+                boxTop = Math.min(hit.y, startWord.y, endWord.y);
+                boxWidth = Math.max(20, (endWord.x + endWord.width) - startWord.x + 4);
+                boxHeight = Math.max(hit.height, startWord.height, endWord.height) + 4;
             } else {
-                return;
+                // หากแตะในช่องว่าง ให้สร้างกล่องเริ่มต้นตรงจุดนั้นทันที
+                boxLeft = Math.max(0, startX - 30);
+                boxTop = Math.max(0, startY - 11);
+                boxWidth = 80;
+                boxHeight = 22;
             }
         }
 
@@ -603,18 +624,18 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
 }
 
 // -------------------------------------------------------------
-// กล่อง Input แก้ไขคำ (ขนาดพอดีคำ + ขยายตามตัวอักษรจริง)
+// กล่อง Input: ปรับฟอนต์และสีตามต้นฉบับอัตโนมัติ
 // -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
-    const fontSize = matchedOrig ? matchedOrig.fontSize : Math.max(11, Math.min(24, Math.round(height * 0.72)));
-    let currentWeight = matchedOrig ? matchedOrig.fontWeight : '400';
+    const fontSize = matchedOrig && matchedOrig.fontSize ? matchedOrig.fontSize : Math.max(12, Math.round(height * 0.72));
+    let currentWeight = matchedOrig && matchedOrig.fontWeight ? matchedOrig.fontWeight : '400';
     
-    const insetLeft = left + 1.5;
-    const insetTop = top + 1;
-    let insetWidth = Math.max(12, width - 3);
-    const insetHeight = Math.max(10, height - 2);
+    const insetLeft = left;
+    const insetTop = top;
+    let insetWidth = Math.max(20, width);
+    const insetHeight = Math.max(14, height);
 
     const node = document.createElement('div');
     node.className = 'active-patch-node';
@@ -639,11 +660,12 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.placeholder = 'พิมพ์คำใหม่...';
+    input.placeholder = matchedOrig && matchedOrig.text ? matchedOrig.text : 'พิมพ์คำใหม่...';
     input.className = 'patch-input-inline';
     input.style.color = colors.text.hex;
     input.style.fontSize = fontSize + 'px';
     input.style.fontWeight = currentWeight;
+    input.style.lineHeight = insetHeight + 'px';
     node.appendChild(input);
 
     const textPreview = document.createElement('div');
@@ -662,11 +684,10 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         input.style.textAlign = 'right';
         input.style.paddingRight = '3px';
     } else if (matchedOrig && matchedOrig.origX > insetLeft) {
-        currentOffsetX = matchedOrig.origX - insetLeft;
+        currentOffsetX = Math.max(0, matchedOrig.origX - insetLeft);
         input.style.paddingLeft = currentOffsetX + 'px';
     }
 
-    // ขยายกล่องตามขนาดตัวอักษรจริงที่พิมพ์เพิ่ม
     input.addEventListener('input', () => {
         const tempSpan = document.createElement('span');
         tempSpan.style.font = `${currentWeight} ${fontSize}px 'Sarabun', sans-serif`;
@@ -1065,7 +1086,7 @@ function placeSignatureOnDoc() {
 }
 
 // -------------------------------------------------------------
-// ส่งออก Vector PDF (รวม Patches, Shapes + Tags, และ Fallback Font)
+// ส่งออก Vector PDF คมชัด 100%
 // -------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; }
