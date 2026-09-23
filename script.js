@@ -9,7 +9,7 @@ let currentInkColor = '#0033aa';
 let currentScale = 1.0;
 let pdfDoc = null;
 let originalPdfBytes = null;
-let originalFileName = 'Nawee_Document';
+let originalFileName = 'Sunita_Document';
 
 let documentPatches = {};
 
@@ -78,14 +78,16 @@ function resetApp() {
         documentPatches = {};
         undoStack = [];
         redoStack = [];
-        originalFileName = "Nawee_Document";
+        originalFileName = "Sunita_Document";
         currentScale = 1.0;
         const container = document.getElementById('document-container');
         container.innerHTML = `
             <div class="welcome-box">
-                <div class="welcome-icon"><i class="fa-solid fa-file-pdf"></i></div>
-                <h2>ยินดีต้อนรับสู่ Nawee PDF Studio</h2>
-                <p>แก้ไขเอกสารแบบแนบเนียน ลบคำผิด ดูดสีพื้นหลัง วาดกรอบสี่เหลี่ยม วงรี และส่งออกไฟล์คมชัดระดับเวกเตอร์</p>
+                <div class="welcome-avatar-wrap">
+                    <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\\'welcome-icon\\'><i class=\\'fa-solid fa-file-pdf\\'></i></div>'">
+                </div>
+                <h2>ยินดีต้อนรับสู่ Sunita PDF Studio</h2>
+                <p>เครื่องมือตรวจแก้เอกสารและใบเสนอราคาฉบับพิเศษสำหรับ Sunita ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี และส่งออกคมชัดระดับเวกเตอร์</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
@@ -305,7 +307,8 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
 
     if (overlaps.length > 0) {
         const orig = overlaps[0];
-        const isBold = orig.fontName ? (/bold|black|heavy|semibold|medium/i.test(orig.fontName)) : false;
+        // 🎯 ตรวจจับเฉพาะ bold, black, heavy ตัดคำว่า medium ออกเพื่อไม่ให้ตัวหนังสือหนาเกินจริง
+        const isBold = orig.fontName ? (/bold|black|heavy/i.test(orig.fontName)) : false;
 
         return {
             fontSize: Math.round(orig.fontSize),
@@ -314,7 +317,7 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
             viewportY: orig.viewportY,
             origPdfY: orig.pdfY,
             origWidth: orig.width,
-            fontWeight: isBold ? '700' : '500',
+            fontWeight: isBold ? '700' : '400', // 🎯 Default ใช้ 400 (Regular) คมโปร่งตา
             text: orig.text
         };
     }
@@ -363,7 +366,7 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
         selectionBox.style.top = Math.min(startY, curY) + 'px';
     });
 
-    wrapper.addEventListener('pointerup', (e) => {
+    wrapper.addEventListener('pointerup', () => {
         if (!isDragging || !selectionBox) return;
         isDragging = false;
 
@@ -376,22 +379,27 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
         const touchDuration = Date.now() - touchStartTime;
 
-        // 🎯 ฟังก์ชันเด็ดสำหรับแท็บเล็ต: แตะ 1 ครั้งแบบเร็วๆ (Single Tap) เพื่อดูดข้อความเดิมอัตโนมัติ
-        if (boxWidth < 12 && boxHeight < 12 && touchDuration < 320 && currentTool === 'patch') {
-            const hit = textMetadata.find(item => {
-                return (
-                    startX >= item.x - 4 &&
-                    startX <= item.x + item.width + 4 &&
-                    startY >= item.y - 4 &&
-                    startY <= item.y + item.height + 4
-                );
-            });
+        // 🎯 ฟังก์ชันสำหรับแท็บเล็ต: แตะ 1 ครั้งแบบเร็วๆ (Single Tap) กวาดทั้งคำ/ประโยคในบรรทัดเดียวกัน
+        if (boxWidth < 14 && boxHeight < 14 && touchDuration < 350 && currentTool === 'patch') {
+            const hit = textMetadata.find(item => 
+                startX >= item.x - 6 && startX <= item.x + item.width + 6 &&
+                startY >= item.y - 4 && startY <= item.y + item.height + 4
+            );
 
             if (hit) {
-                boxLeft = hit.x - 2;
-                boxTop = hit.y;
-                boxWidth = hit.width + 4;
-                boxHeight = hit.height + 4;
+                const lineSiblings = textMetadata.filter(item => 
+                    Math.abs(item.y - hit.y) < 4 &&
+                    item.x >= hit.x - 220 && item.x <= hit.x + 350
+                );
+
+                if (lineSiblings.length > 0) {
+                    const minX = Math.min(...lineSiblings.map(s => s.x));
+                    const maxX = Math.max(...lineSiblings.map(s => s.x + s.width));
+                    boxLeft = minX - 2;
+                    boxTop = hit.y;
+                    boxWidth = (maxX - minX) + 6;
+                    boxHeight = hit.height + 4;
+                }
             } else {
                 return;
             }
@@ -584,7 +592,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     const layer = wrapper.querySelector('.patch-layer');
 
     const fontSize = matchedOrig ? matchedOrig.fontSize : Math.max(11, Math.min(24, Math.round(height * 0.72)));
-    const fontWeight = matchedOrig ? matchedOrig.fontWeight : '500';
+    let currentWeight = matchedOrig ? matchedOrig.fontWeight : '400';
     
     const insetLeft = left + 1.5;
     const insetTop = top + 1;
@@ -604,6 +612,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     nudgeBar.innerHTML = `
         <button type="button" class="nudge-btn" id="nb-left" title="ชิดซ้าย"><i class="fa-solid fa-align-left"></i></button>
         <button type="button" class="nudge-btn" id="nb-center" title="กึ่งกลาง"><i class="fa-solid fa-align-center"></i></button>
+        <button type="button" class="nudge-btn" id="nb-right" title="ชิดขวา (สำหรับตัวเลขราคา)"><i class="fa-solid fa-align-right"></i></button>
         <button type="button" class="nudge-btn" id="nb-step-left" title="ขยับซ้าย 1px (หรือปุ่ม ◄)">◀</button>
         <button type="button" class="nudge-btn" id="nb-step-right" title="ขยับขวา 1px (หรือปุ่ม ►)">▶</button>
         <button type="button" class="nudge-btn btn-done" id="nb-done" title="ตกลง ประทับลงเอกสาร"><i class="fa-solid fa-check"></i> เสร็จ</button>
@@ -616,33 +625,40 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     input.className = 'patch-input-inline';
     input.style.color = colors.text.hex;
     input.style.fontSize = fontSize + 'px';
-    input.style.fontWeight = fontWeight;
+    input.style.fontWeight = currentWeight;
     node.appendChild(input);
 
     const textPreview = document.createElement('div');
     textPreview.className = 'patch-text-preview';
     textPreview.style.color = colors.text.hex;
     textPreview.style.fontSize = fontSize + 'px';
-    textPreview.style.fontWeight = fontWeight;
+    textPreview.style.fontWeight = currentWeight;
     textPreview.style.display = 'none';
     node.appendChild(textPreview);
 
     let currentOffsetX = 0;
-    let isCentered = false;
+    let currentAlign = (matchedOrig && /^[\d,.\s+-]+$/.test(matchedOrig.text.trim())) ? 'right' : 'left';
     let isAdjustMode = false;
 
-    if (matchedOrig && matchedOrig.origX > insetLeft) {
+    if (currentAlign === 'right') {
+        input.style.textAlign = 'right';
+        input.style.paddingRight = '4px';
+    } else if (matchedOrig && matchedOrig.origX > insetLeft) {
         currentOffsetX = matchedOrig.origX - insetLeft;
         input.style.paddingLeft = currentOffsetX + 'px';
     }
 
     function updatePreviewPosition() {
-        if (isCentered) {
-            textPreview.style.textAlign = 'center';
+        textPreview.style.textAlign = currentAlign;
+        if (currentAlign === 'right') {
+            textPreview.style.paddingRight = '4px';
             textPreview.style.paddingLeft = '0px';
+        } else if (currentAlign === 'center') {
+            textPreview.style.paddingLeft = '0px';
+            textPreview.style.paddingRight = '0px';
         } else {
-            textPreview.style.textAlign = 'left';
             textPreview.style.paddingLeft = currentOffsetX + 'px';
+            textPreview.style.paddingRight = '0px';
         }
     }
 
@@ -660,15 +676,24 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     };
     nudgeBar.querySelector('#nb-center').onclick = (e) => {
         e.stopPropagation();
-        isCentered = true;
+        currentAlign = 'center';
         input.style.textAlign = 'center';
         input.style.paddingLeft = '0px';
+        input.style.paddingRight = '0px';
         updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-left').onclick = (e) => {
         e.stopPropagation();
-        isCentered = false;
+        currentAlign = 'left';
         input.style.textAlign = 'left';
+        updatePreviewPosition();
+    };
+    nudgeBar.querySelector('#nb-right').onclick = (e) => {
+        e.stopPropagation();
+        currentAlign = 'right';
+        input.style.textAlign = 'right';
+        input.style.paddingRight = '4px';
+        input.style.paddingLeft = '0px';
         updatePreviewPosition();
     };
     nudgeBar.querySelector('#nb-done').onclick = (e) => {
@@ -737,16 +762,20 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         const ratioY = pdfCanvas.height / parseFloat(pdfCanvas.style.height || (pdfCanvas.height / 2));
 
         const canvasFontSize = fontSize * ratioY;
-        ctx.font = `${fontWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
+        ctx.font = `${currentWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
         const metrics = ctx.measureText(text);
         const textWidthOnCanvas = metrics.width;
-        const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (12 * ratioX));
+        
+        // Auto-Grow Box กลบคำเดิมมิดชิด
+        const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (16 * ratioX));
 
         ctx.fillStyle = colors.bg.hex;
         ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
 
         let drawX;
-        if (isCentered) {
+        if (currentAlign === 'right') {
+            drawX = (insetLeft * ratioX) + clearWidth - textWidthOnCanvas - (4 * ratioX);
+        } else if (currentAlign === 'center') {
             drawX = (insetLeft * ratioX) + ((clearWidth - textWidthOnCanvas) / 2);
         } else {
             drawX = (insetLeft + currentOffsetX) * ratioX;
@@ -771,7 +800,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             pdfY = wrapperHeight - (insetTop + insetHeight) + ((insetHeight - fontSize) / 2);
         }
 
-        const finalVectorX = isCentered ? (insetLeft + ((insetWidth - (textWidthOnCanvas / ratioX)) / 2)) : (insetLeft + currentOffsetX);
+        const finalVectorX = (drawX / ratioX);
 
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
         
@@ -784,7 +813,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             height: insetHeight,
             text: text,
             fontSize: fontSize,
-            fontWeight: fontWeight,
+            fontWeight: currentWeight,
             bgColor: colors.bg,
             textColor: colors.text
         };
@@ -805,7 +834,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
                 documentPatches[pageNum].patches.push(patchData);
                 ctx.fillStyle = colors.bg.hex;
                 ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
-                ctx.font = `${fontWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
+                ctx.font = `${currentWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
                 ctx.fillStyle = colors.text.hex;
                 ctx.fillText(text, drawX, drawBaselineY);
             }
@@ -1167,7 +1196,7 @@ function zoomDoc(delta) {
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('upload-pdf').addEventListener('change', handleFileOpen);
-    initTabletGestures(); // เริ่มระบบ Gesture แท็บเล็ตทันที
+    initTabletGestures();
 
     sigCanvas = document.getElementById('sig-canvas');
     if (sigCanvas) {
