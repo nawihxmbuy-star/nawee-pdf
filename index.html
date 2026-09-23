@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
+    <!-- Core PDF Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://unpkg.com/@pdf-lib/fontkit@0.0.4/dist/fontkit.umd.min.js"></script>
@@ -17,6 +18,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
+    <!-- TOP NAVIGATION BAR -->
     <header class="top-bar">
         <div class="brand">
             <i class="fa-solid fa-file-signature text-glow"></i>
@@ -37,12 +39,13 @@
 
     <input type="file" id="upload-pdf" accept="application/pdf" style="display:none;">
 
+    <!-- WORKSPACE AREA -->
     <main class="workspace">
         <div id="document-container">
             <div class="welcome-box">
                 <div class="welcome-icon"><i class="fa-solid fa-file-pdf"></i></div>
                 <h2>ยินดีต้อนรับสู่ Nawee PDF Studio</h2>
-                <p>โปรแกรมแก้ไขเอกสาร PDF แบบแนบเนียน ลากคลุมลบคำผิด เซ็นลายเซ็น และส่งออกไฟล์คมกริบ</p>
+                <p>แก้ไขเอกสารแบบแนบเนียน ลบคำผิด ดูดสีพื้นหลังอัตโนมัติ ไม่บังเส้นตาราง และส่งออกไฟล์คมชัดระดับเวกเตอร์</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
@@ -50,6 +53,7 @@
         </div>
     </main>
 
+    <!-- FLOATING DOCK TOOLBAR -->
     <nav class="floating-dock">
         <button onclick="setTool('pan')" id="tool-pan" class="dock-btn" title="เลื่อนดูเอกสาร">
             <i class="fa-solid fa-hand"></i>
@@ -99,6 +103,7 @@
         </button>
     </nav>
 
+    <!-- SIGNATURE MODAL -->
     <div id="sig-modal" class="modal-backdrop" style="display: none;">
         <div class="modal-box">
             <div class="modal-header">
