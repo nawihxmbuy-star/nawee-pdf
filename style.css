@@ -11,6 +11,7 @@
     margin: 0; 
     padding: 0; 
     box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -21,6 +22,7 @@ body {
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
+    touch-action: none; /* ล็อกการเคลื่อนไหวเบราว์เซอร์ เพื่อให้ระบบ Gestures ของเราคุม 100% */
 }
 
 /* ==========================================================================
@@ -78,6 +80,7 @@ body {
     padding: 76px 20px 100px 20px;
     display: flex; flex-direction: column; align-items: center;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y; /* ให้เลื่อนด้วยมือได้ */
 }
 .welcome-box {
     background: #1e293b;
@@ -100,13 +103,14 @@ body {
 #document-container {
     margin: 0 auto;
     transform-origin: top center;
-    transition: transform 0.05s ease-out;
+    transition: transform 0.04s ease-out; /* ซูมลื่นไหลแบบ Native */
 }
 .page-wrapper {
     position: relative;
     margin-bottom: 24px;
     background: #fff;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+    touch-action: none;
 }
 .pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: block; }
 .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
@@ -115,7 +119,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .patch-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
 /* ==========================================================================
-   SMART PATCH & NUDGE TOOLBAR
+   SMART PATCH & TABLET NUDGE TOOLBAR
    ========================================================================== */
 .selection-box {
     position: absolute;
@@ -132,7 +136,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     display: flex;
     align-items: center;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-    border: 1px solid var(--accent);
+    border: 1.5px solid var(--accent);
     padding: 0 2px;
     box-sizing: border-box;
 }
@@ -148,12 +152,11 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     height: 100%;
     line-height: 1.15;
     vertical-align: middle;
-    font-weight: 500;
     letter-spacing: -0.01em;
     text-rendering: optimizeLegibility !important;
     -webkit-font-smoothing: antialiased !important;
     -moz-osx-font-smoothing: grayscale !important;
-    transition: padding-left 0.05s ease-out;
+    transition: padding-left 0.04s ease-out;
 }
 
 .patch-text-preview {
@@ -162,46 +165,45 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     height: 100%;
     display: flex;
     align-items: center;
-    font-weight: 500;
     pointer-events: none;
     box-sizing: border-box;
 }
 
 .nudge-toolbar {
     position: absolute;
-    top: -32px;
+    top: -38px;
     left: 0;
     display: flex;
-    gap: 3px;
+    gap: 4px;
     background: #1e293b;
-    padding: 3px 6px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
     z-index: 1000;
 }
 .nudge-btn {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.05);
     border: none;
     color: var(--text-muted);
-    font-size: 11px;
-    padding: 2px 6px;
+    font-size: 13px;
+    padding: 4px 8px;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .nudge-btn:hover {
     color: #fff;
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.18);
 }
 .nudge-btn.btn-done {
     background: #0ea5e9;
     color: #0f172a;
     font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
 }
 .nudge-btn.btn-done:hover {
     background: #38bdf8;
@@ -216,7 +218,7 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     z-index: 85;
 }
 .canvas-hotspot:hover {
-    outline: 1px dashed rgba(14, 165, 233, 0.6);
+    outline: 1.5px dashed rgba(14, 165, 233, 0.6);
 }
 
 /* ==========================================================================
@@ -241,41 +243,42 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     border-radius: 50%;
 }
 
+/* ขยายปุ่ม Handle ให้แตะด้วยนิ้วบนแท็บเล็ตได้ถนัดขึ้น */
 .shape-handle {
     position: absolute;
-    width: 9px;
-    height: 9px;
+    width: 14px;
+    height: 14px;
     background: #ffffff;
-    border: 2px solid #0ea5e9;
+    border: 2.5px solid #0ea5e9;
     border-radius: 50%;
     z-index: 105;
 }
-.shape-handle.handle-tl { top: -5px; left: -5px; cursor: nwse-resize; }
-.shape-handle.handle-tr { top: -5px; right: -5px; cursor: nesw-resize; }
-.shape-handle.handle-bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
-.shape-handle.handle-br { bottom: -5px; right: -5px; cursor: nwse-resize; }
+.shape-handle.handle-tl { top: -7px; left: -7px; cursor: nwse-resize; }
+.shape-handle.handle-tr { top: -7px; right: -7px; cursor: nesw-resize; }
+.shape-handle.handle-bl { bottom: -7px; left: -7px; cursor: nesw-resize; }
+.shape-handle.handle-br { bottom: -7px; right: -7px; cursor: nwse-resize; }
 
 .shape-quick-toolbar {
     position: absolute;
-    top: -36px;
+    top: -40px;
     left: 50%;
     transform: translateX(-50%);
     background: #1e293b;
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
-    padding: 3px 6px;
+    padding: 4px 8px;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.5);
     z-index: 110;
 }
 .shape-color-dot {
-    width: 14px;
-    height: 14px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     cursor: pointer;
-    border: 1px solid #fff;
+    border: 1.5px solid #fff;
     transition: transform 0.1s;
 }
 .shape-color-dot:hover { transform: scale(1.2); }
@@ -285,11 +288,11 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: #fff;
     font-family: 'Sarabun', sans-serif;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 4px;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 6px;
     outline: none;
-    width: 115px;
+    width: 120px;
 }
 .shape-note-input::placeholder {
     color: #94a3b8;
@@ -299,14 +302,14 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     background: #0ea5e9;
     color: #0f172a;
     border: none;
-    border-radius: 4px;
-    padding: 2px 7px;
-    font-size: 11px;
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     white-space: nowrap;
 }
 .shape-confirm-btn:hover {
@@ -318,24 +321,23 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     border: none;
     color: #ef4444;
     cursor: pointer;
-    font-size: 12px;
-    padding: 2px 4px;
+    font-size: 14px;
+    padding: 2px 6px;
     display: flex;
     align-items: center;
 }
 
-/* ป้ายแท็กข้อความกำกับที่ติดกับรูปทรง */
 .shape-attached-tag {
     position: absolute;
-    top: -12px;
+    top: -14px;
     left: 8px;
     background: var(--shape-color, #0033aa);
     color: #ffffff;
     font-family: 'Sarabun', sans-serif;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 4px;
+    padding: 2px 8px;
+    border-radius: 5px;
     white-space: nowrap;
     box-shadow: 0 1px 4px rgba(0,0,0,0.3);
     pointer-events: none;
@@ -352,8 +354,8 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 18px;
-    padding: 6px 14px;
-    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    display: flex; align-items: center; gap: 8px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     z-index: 9999;
     max-width: 95vw;
@@ -362,9 +364,9 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .floating-dock::-webkit-scrollbar { display: none; }
 .dock-btn {
     background: transparent; border: none;
-    color: var(--text-muted); width: 40px; height: 40px;
+    color: var(--text-muted); width: 44px; height: 44px; /* ปรับขนาดปุ่ม 44px ตามมาตรฐาน Touch Target ของแท็บเล็ต */
     border-radius: 12px; cursor: pointer;
-    font-size: 17px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; display: flex; align-items: center; justify-content: center;
     position: relative; transition: all 0.15s; flex-shrink: 0;
 }
 .dock-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
@@ -373,12 +375,12 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     box-shadow: 0 2px 10px var(--accent-glow);
 }
 .dock-divider {
-    width: 1px; height: 24px; background: rgba(255, 255, 255, 0.12);
+    width: 1px; height: 26px; background: rgba(255, 255, 255, 0.12);
     flex-shrink: 0; margin: 0 4px;
 }
-.color-dock-group { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.color-dock-group { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 .color-circle {
-    width: 22px; height: 22px; border-radius: 50%;
+    width: 24px; height: 24px; border-radius: 50%;
     cursor: pointer; border: 2px solid rgba(255, 255, 255, 0.3);
     transition: transform 0.1s;
 }
@@ -395,15 +397,15 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
     touch-action: none;
     z-index: 105;
     transform: translate(-50%, -50%);
-    border: 1px dashed var(--accent);
+    border: 1.5px dashed var(--accent);
 }
 .custom-draggable-sig img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .btn-del-sig {
-    position: absolute; top: -8px; right: -8px;
+    position: absolute; top: -10px; right: -10px;
     background: #ef4444; color: #fff; border-radius: 50%;
-    width: 18px; height: 18px; font-size: 11px;
+    width: 22px; height: 22px; font-size: 13px;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; border: 1px solid #fff;
+    cursor: pointer; border: 1.5px solid #fff;
 }
 
 /* ==========================================================================
@@ -427,32 +429,32 @@ body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body
 .btn-close { background: none; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; }
 .modal-tabs { display: flex; gap: 6px; padding: 12px 18px 0 18px; }
 .modal-tabs button {
-    flex: 1; padding: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.05);
+    flex: 1; padding: 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted);
-    font-size: 12px; cursor: pointer;
+    font-size: 13px; cursor: pointer;
 }
 .modal-tabs button.active { background: var(--accent); color: #0f172a; font-weight: 700; }
 .modal-body { padding: 14px 18px; }
 #sig-canvas {
-    width: 100%; height: 170px; background: #ffffff;
+    width: 100%; height: 180px; background: #ffffff;
     border-radius: 10px; cursor: crosshair; touch-action: none;
 }
-.sig-tools { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-.btn-mini { background: rgba(255,255,255,0.06); border: none; color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; }
-.sig-color-pick { display: flex; gap: 6px; }
-.dot-pick { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid #fff; }
+.sig-tools { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.btn-mini { background: rgba(255,255,255,0.06); border: none; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.sig-color-pick { display: flex; gap: 8px; }
+.dot-pick { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 1.5px solid #fff; }
 .drop-zone {
     border: 2px dashed rgba(14, 165, 233, 0.4); border-radius: 12px;
     padding: 30px 15px; text-align: center; cursor: pointer;
 }
 .modal-footer {
-    padding: 12px 18px; background: #0f172a; display: flex;
+    padding: 14px 18px; background: #0f172a; display: flex;
     justify-content: flex-end; gap: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
-.btn-cancel { background: transparent; border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+.btn-cancel { background: transparent; border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
 
 .custom-toast {
     position: fixed; top: 16px; right: 16px; background: #1e293b; color: #fff;
-    padding: 10px 18px; border-radius: 8px; border-left: 4px solid var(--accent);
-    font-size: 13px; z-index: 99999; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    padding: 12px 20px; border-radius: 10px; border-left: 4px solid var(--accent);
+    font-size: 14px; z-index: 99999; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
 }
