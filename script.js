@@ -81,7 +81,7 @@ async function handleFileOpen(e) {
 
 async function renderPage(pageNum, container) {
     const page = await pdfDoc.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 }); // Render 2x Retina Clarity
+    const viewport = page.getViewport({ scale: 2.0 });
 
     const wrapper = document.createElement('div');
     wrapper.className = 'page-wrapper';
@@ -89,21 +89,18 @@ async function renderPage(pageNum, container) {
     wrapper.style.width = (viewport.width / 2) + 'px';
     wrapper.style.height = (viewport.height / 2) + 'px';
 
-    // 1. Base Canvas แสดงผลหน้าเอกสารจริง
     const pdfCanvas = document.createElement('canvas');
     pdfCanvas.className = 'pdf-page-canvas';
     pdfCanvas.width = viewport.width;
     pdfCanvas.height = viewport.height;
     wrapper.appendChild(pdfCanvas);
 
-    // 2. Annotation Canvas สำหรับวาดเขียนปากกา/ไฮไลต์
     const annotCanvas = document.createElement('canvas');
     annotCanvas.className = 'annotation-canvas';
     annotCanvas.width = viewport.width;
     annotCanvas.height = viewport.height;
     wrapper.appendChild(annotCanvas);
 
-    // 3. Layer ชั่วคราวสำหรับรองรับ Drag Selection & Input Box
     const patchLayer = document.createElement('div');
     patchLayer.className = 'patch-layer';
     wrapper.appendChild(patchLayer);
@@ -112,7 +109,7 @@ async function renderPage(pageNum, container) {
 
     await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
 
-    // สกัด Metadata ข้อความเดิมเพื่อนำมาสแน็ป Baseline & Font Size
+    // สกัด Metadata ข้อความเดิมเพื่อนำมาสแน็ป Baseline & Column Alignment
     const textContent = await page.getTextContent();
     const displayViewport = page.getViewport({ scale: 1.0 });
 
@@ -128,7 +125,7 @@ async function renderPage(pageNum, container) {
             text: item.str,
             pdfX: item.transform[4],
             pdfY: item.transform[5],
-            viewportY: top // เส้น Baseline ระดับ 1x
+            viewportY: top
         };
     });
 
@@ -137,23 +134,23 @@ async function renderPage(pageNum, container) {
 }
 
 // -------------------------------------------------------------
-// อัลกอริทึมแยกสีพื้นหลังและสีตัวอักษรเดิม (Dual Color Analyzer)
+// ระบบดูดสี Edge-Guard (กันขอบตาราง 3px และตัดสีดำทึบทิ้ง)
 // -------------------------------------------------------------
 function analyzeBoxColors(canvas, x, y, width, height) {
     const ctx = canvas.getContext('2d');
     const ratioX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
     const ratioY = canvas.height / parseFloat(canvas.style.height || (canvas.height / 2));
 
-    const safeLeft = Math.floor((x + 1.5) * ratioX);
-    const safeTop = Math.floor((y + 1.5) * ratioY);
-    const safeWidth = Math.max(1, Math.floor((width - 3) * ratioX));
-    const safeHeight = Math.max(1, Math.floor((height - 3) * ratioY));
+    // เว้นขอบเข้ามา 3px ป้องกันการดูดติดเส้นตารางหรือขอบคำ
+    const safeLeft = Math.floor((x + 3) * ratioX);
+    const safeTop = Math.floor((y + 2.5) * ratioY);
+    const safeWidth = Math.max(1, Math.floor((width - 6) * ratioX));
+    const safeHeight = Math.max(1, Math.floor((height - 5) * ratioY));
 
     try {
         const imgData = ctx.getImageData(safeLeft, safeTop, safeWidth, safeHeight).data;
         const colorCounts = {};
 
-        // สุ่มตัวอย่างพิกเซลภายในกรอบ
         const step = Math.max(1, Math.floor((safeWidth * safeHeight) / 120));
         for (let i = 0; i < imgData.length; i += step * 4) {
             if (imgData[i + 3] < 128) continue;
@@ -162,26 +159,18 @@ function analyzeBoxColors(canvas, x, y, width, height) {
             colorCounts[key] = (colorCounts[key] || 0) + 1;
         }
 
-        // เรียงลำดับสีที่พบมากที่สุดไปน้อยที่สุด
         const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
 
-        // สีพื้นหลังคือสีที่มีสัดส่วนมากที่สุด
         const bgKey = sortedColors[0] || '255,255,255';
         const [bgR, bgG, bgB] = bgKey.split(',').map(Number);
         const bgBrightness = (bgR * 299 + bgG * 587 + bgB * 114) / 1000;
 
-        // หาสีตัวอักษรเดิมที่มีความเปรียบต่าง (Contrast) กับสีพื้นหลัง
-        let textR = bgBrightness < 128 ? 255 : 31;
-        let textG = bgBrightness < 128 ? 255 : 41;
-        let textB = bgBrightness < 128 ? 255 : 55;
+        // ถ้าพื้นสว่าง ให้ใช้หมึกสี Slate-700 (#334155) เนียนนุ่ม ไม่ดำแข็งกระด้าง
+        let textR = 51, textG = 65, textB = 85, textHex = '#334155';
 
-        for (let i = 1; i < sortedColors.length; i++) {
-            const [cR, cG, cB] = sortedColors[i].split(',').map(Number);
-            const b = (cR * 299 + cG * 587 + cB * 114) / 1000;
-            if (Math.abs(b - bgBrightness) > 60) { // มีความต่างของสีชัดเจน
-                textR = cR; textG = cG; textB = cB;
-                break;
-            }
+        if (bgBrightness < 128) {
+            // พื้นเข้ม ใช้ตัวหนังสือสีขาว
+            textR = 255; textG = 255; textB = 255; textHex = '#ffffff';
         }
 
         return {
@@ -191,19 +180,19 @@ function analyzeBoxColors(canvas, x, y, width, height) {
             },
             text: {
                 r: textR / 255, g: textG / 255, b: textB / 255,
-                hex: `#${((1 << 24) + (textR << 16) + (textG << 8) + textB).toString(16).slice(1)}`
+                hex: textHex
             }
         };
     } catch (e) {
         return {
             bg: { r: 1, g: 1, b: 1, hex: '#ffffff' },
-            text: { r: 0.12, g: 0.16, b: 0.21, hex: '#1f2937' }
+            text: { r: 0.2, g: 0.25, b: 0.33, hex: '#334155' }
         };
     }
 }
 
 // -------------------------------------------------------------
-// อัลกอริทึมค้นหาข้อความเดิม (จับคู่ขนาดฟอนต์ และ Baseline เดิม)
+// อัลกอริทึมค้นหาข้อความเดิม (Snap X คอลัมน์เดิม + Baseline)
 // -------------------------------------------------------------
 function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
     if (!textMetadata || textMetadata.length === 0) return null;
@@ -222,17 +211,18 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
         const orig = overlaps[0];
         return {
             fontSize: Math.round(orig.fontSize),
-            origX: orig.x,
+            origX: orig.x,        // พิกัดชิดซ้ายเดิมของคอลัมน์
             origY: orig.y,
             viewportY: orig.viewportY,
-            origPdfY: orig.pdfY
+            origPdfY: orig.pdfY,
+            origWidth: orig.width
         };
     }
     return null;
 }
 
 // -------------------------------------------------------------
-// ระบบลากคลุมลบคำผิด & In-Place Canvas Engine
+// Smart Patch + In-Place Canvas Engine พร้อม Micro-Nudge Toolbar
 // -------------------------------------------------------------
 function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     let startX = 0, startY = 0;
@@ -241,7 +231,7 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
     wrapper.addEventListener('pointerdown', (e) => {
         if (currentTool !== 'patch') return;
-        if (e.target.closest('.active-patch-node') || e.target.closest('.custom-draggable-sig')) return;
+        if (e.target.closest('.active-patch-node') || e.target.closest('.nudge-toolbar') || e.target.closest('.custom-draggable-sig')) return;
 
         const rect = wrapper.getBoundingClientRect();
         startX = (e.clientX - rect.left) / currentScale;
@@ -282,23 +272,19 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
         if (boxWidth < 10 || boxHeight < 8) return;
 
-        // 1. วิเคราะห์สีพื้นหลังและสีตัวอักษรเดิม
         const colors = analyzeBoxColors(pdfCanvas, boxLeft, boxTop, boxWidth, boxHeight);
-        
-        // 2. ค้นหาข้อความเดิมเพื่อสแน็ป Baseline
         const matchedOrig = getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata);
 
         createInPlaceInputBox(wrapper, pageNum, pdfCanvas, boxLeft, boxTop, boxWidth, boxHeight, colors, matchedOrig);
     });
 }
 
-// กล่อง Input ชั่วคราวสำหรับการพิมพ์ เมื่อพิมพ์เสร็จจะประทับลง Canvas ทันที
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
     const fontSize = matchedOrig ? matchedOrig.fontSize : Math.max(11, Math.min(24, Math.round(height * 0.72)));
     
-    // Inset ขอบ 1.5px ไม่ให้บังเส้นตาราง
+    // Inset ขอบ 1.5px ไม่บังเส้นตาราง
     const insetLeft = left + 1.5;
     const insetTop = top + 1;
     const insetWidth = Math.max(10, width - 3);
@@ -312,6 +298,17 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     node.style.height = insetHeight + 'px';
     node.style.background = colors.bg.hex;
 
+    // แถบปรับขยับตำแหน่งและจัดกึ่งกลาง
+    const nudgeBar = document.createElement('div');
+    nudgeBar.className = 'nudge-toolbar';
+    nudgeBar.innerHTML = `
+        <button type="button" class="nudge-btn" id="nb-left" title="ชิดซ้ายคอลัมน์"><i class="fa-solid fa-align-left"></i></button>
+        <button type="button" class="nudge-btn" id="nb-center" title="กึ่งกลางช่อง"><i class="fa-solid fa-align-center"></i></button>
+        <button type="button" class="nudge-btn" id="nb-step-left" title="ขยับซ้าย 1.5px">◀</button>
+        <button type="button" class="nudge-btn" id="nb-step-right" title="ขยับขวา 1.5px">▶</button>
+    `;
+    node.appendChild(nudgeBar);
+
     const input = document.createElement('input');
     input.type = 'text';
     input.placeholder = 'พิมพ์คำใหม่...';
@@ -320,45 +317,91 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     input.style.fontSize = fontSize + 'px';
     node.appendChild(input);
 
+    let currentOffsetX = 0;
+    let isCentered = false;
+
+    // ถ้าเจอพิกัดข้อความเดิม ให้ขยับ input ไปเกาะแนวเดิมตั้งแต่แรก
+    if (matchedOrig && matchedOrig.origX > insetLeft) {
+        currentOffsetX = matchedOrig.origX - insetLeft;
+        input.style.paddingLeft = currentOffsetX + 'px';
+    }
+
+    // ฟังก์ชันปุ่มปรับใน Toolbar
+    nudgeBar.querySelector('#nb-step-left').onclick = (e) => {
+        e.stopPropagation();
+        currentOffsetX -= 1.5;
+        input.style.paddingLeft = Math.max(0, currentOffsetX) + 'px';
+        input.focus();
+    };
+    nudgeBar.querySelector('#nb-step-right').onclick = (e) => {
+        e.stopPropagation();
+        currentOffsetX += 1.5;
+        input.style.paddingLeft = currentOffsetX + 'px';
+        input.focus();
+    };
+    nudgeBar.querySelector('#nb-center').onclick = (e) => {
+        e.stopPropagation();
+        isCentered = true;
+        input.style.textAlign = 'center';
+        input.style.paddingLeft = '0px';
+        currentOffsetX = 0;
+        input.focus();
+    };
+    nudgeBar.querySelector('#nb-left').onclick = (e) => {
+        e.stopPropagation();
+        isCentered = false;
+        input.style.textAlign = 'left';
+        currentOffsetX = matchedOrig && matchedOrig.origX > insetLeft ? (matchedOrig.origX - insetLeft) : 2;
+        input.style.paddingLeft = currentOffsetX + 'px';
+        input.focus();
+    };
+
     layer.appendChild(node);
     setTimeout(() => input.focus(), 50);
 
     function commitToCanvas() {
         const text = input.value.trim();
-        node.remove(); // สลายกล่อง HTML ทันที
+        node.remove();
 
         if (!text) return;
 
-        // 🎯 วาดลงเนื้อ Canvas Buffer 2x โดยตรง (เนียนระดับเดียวกับตัวหนังสือเดิม)
+        // วาดลงบนผืนผ้าใบ Canvas Buffer ระดับ 2x โดยตรง
         const ctx = pdfCanvas.getContext('2d');
         const ratioX = pdfCanvas.width / parseFloat(pdfCanvas.style.width || (pdfCanvas.width / 2));
         const ratioY = pdfCanvas.height / parseFloat(pdfCanvas.style.height || (pdfCanvas.height / 2));
 
-        // 1. วัดความยาวข้อความบน Canvas เพื่อเคลียร์ขนาดกลบให้พอดี
         const canvasFontSize = fontSize * ratioY;
         ctx.font = `500 ${canvasFontSize}px 'Sarabun', sans-serif`;
         const metrics = ctx.measureText(text);
         const textWidthOnCanvas = metrics.width;
-        const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (8 * ratioX));
+        const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (12 * ratioX));
 
-        // 2. เคลียร์กลบคำเดิมด้วยสีพื้นหลังเดิมเป๊ะๆ
+        // กลบคำเดิมด้วยสีพื้นหลัง
         ctx.fillStyle = colors.bg.hex;
         ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
 
-        // 3. ล็อก Baseline เส้นบรรทัดเดิมอย่างแม่นยำ
+        // คำนวณตำแหน่ง X สำหรับวาด
+        let drawX;
+        if (isCentered) {
+            drawX = (insetLeft * ratioX) + ((clearWidth - textWidthOnCanvas) / 2);
+        } else {
+            drawX = (insetLeft + currentOffsetX) * ratioX;
+        }
+
+        // คำนวณตำแหน่ง Baseline Y
         let drawBaselineY;
         if (matchedOrig && matchedOrig.viewportY) {
             drawBaselineY = matchedOrig.viewportY * ratioY;
         } else {
-            drawBaselineY = (insetTop + (insetHeight * 0.76)) * ratioY;
+            drawBaselineY = (insetTop + (insetHeight * 0.74)) * ratioY;
         }
 
-        // 4. วาดตัวหนังสือใหม่ลงเนื้อแคนวาสโดยตรง
+        // วาดตัวหนังสือใหม่ลงบนเนื้อ Canvas
         ctx.fillStyle = colors.text.hex;
         ctx.textBaseline = 'alphabetic';
-        ctx.fillText(text, (insetLeft + 2) * ratioX, drawBaselineY);
+        ctx.fillText(text, drawX, drawBaselineY);
 
-        // 5. บันทึกข้อมูลเข้า Vector Store สำหรับส่งออก PDF เวกเตอร์แท้
+        // เก็บข้อมูลสำหรับส่งออก Vector PDF
         const wrapperHeight = parseFloat(wrapper.style.height);
         let pdfY;
         if (matchedOrig && matchedOrig.origPdfY) {
@@ -367,9 +410,12 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             pdfY = wrapperHeight - (insetTop + insetHeight) + ((insetHeight - fontSize) / 2);
         }
 
+        const finalVectorX = isCentered ? (insetLeft + ((insetWidth - (textWidthOnCanvas / ratioX)) / 2)) : (insetLeft + currentOffsetX);
+
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [] };
         documentPatches[pageNum].patches.push({
-            x: insetLeft,
+            x: finalVectorX,
+            boxLeft: insetLeft,
             y: pdfY,
             patchBoxY: wrapperHeight - (insetTop + insetHeight),
             width: (clearWidth / ratioX),
@@ -380,10 +426,9 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             textColor: colors.text
         });
 
-        // สร้าง Hotspot ใสสำหรับดับเบิ้ลคลิกกลับมาแก้คำนี้ได้อีก
         createReEditHotspot(wrapper, pageNum, pdfCanvas, insetLeft, insetTop, (clearWidth / ratioX), insetHeight, colors, matchedOrig, text);
 
-        showToast("บันทึกคำกลืนกับหน้ากระดาษเนียนกริบแล้วค่ะ");
+        showToast("บันทึกคำตรงแนวเรียบร้อยแล้วค่ะ");
     }
 
     input.addEventListener('keydown', (e) => {
@@ -393,7 +438,6 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     input.addEventListener('blur', commitToCanvas);
 }
 
-// พื้นที่โปร่งแสงสำหรับดับเบิ้ลคลิกแก้ไขคำเดิมที่ประทับลง Canvas แล้ว
 function createReEditHotspot(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig, currentText) {
     const layer = wrapper.querySelector('.patch-layer');
     const hotspot = document.createElement('div');
@@ -591,7 +635,6 @@ async function exportVectorPDF() {
         const thaiFont = await loadedPdf.embedFont(cachedFontBytes);
         const pages = loadedPdf.getPages();
 
-        // 1. นำข้อมูล Patches ไปวาดกลบลบคำเดิมและพิมพ์ใหม่
         for (let pageNum in documentPatches) {
             const pIdx = parseInt(pageNum) - 1;
             if (pIdx < 0 || pIdx >= pages.length) continue;
@@ -600,9 +643,10 @@ async function exportVectorPDF() {
 
             if (pData.patches) {
                 pData.patches.forEach(pt => {
+                    const boxX = pt.boxLeft !== undefined ? pt.boxLeft : pt.x;
                     const boxY = pt.patchBoxY !== undefined ? pt.patchBoxY : (pt.y - (pt.height * 0.1));
                     targetPage.drawRectangle({
-                        x: pt.x,
+                        x: boxX,
                         y: boxY,
                         width: pt.width,
                         height: pt.height,
@@ -610,7 +654,7 @@ async function exportVectorPDF() {
                     });
 
                     targetPage.drawText(pt.text, {
-                        x: pt.x + 2,
+                        x: pt.x,
                         y: pt.y,
                         size: pt.fontSize,
                         font: thaiFont,
@@ -632,7 +676,6 @@ async function exportVectorPDF() {
             }
         }
 
-        // 2. ฝังรอยวาดปากกาจาก Annotation Canvas
         const wrappers = document.querySelectorAll('.page-wrapper');
         for (let idx = 0; idx < wrappers.length; idx++) {
             const c = wrappers[idx].querySelector('.annotation-canvas');
