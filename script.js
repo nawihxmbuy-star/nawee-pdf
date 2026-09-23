@@ -55,7 +55,7 @@ function resetApp() {
 }
 
 // -------------------------------------------------------------
-// โหลดและเรนเดอร์เอกสาร
+// โหลดและเรนเดอร์เอกสาร (พร้อมสกัด Metadata ของข้อความเดิม)
 // -------------------------------------------------------------
 async function handleFileOpen(e) {
     const file = e.target.files[0];
@@ -112,21 +112,37 @@ async function renderPage(pageNum, container) {
 
     await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
 
-    bindSmartPatchEngine(wrapper, pageNum, pdfCanvas);
+    // 🎯 สกัดตำแหน่งและขนาดฟอนต์ของข้อความเดิมในหน้านี้ (Auto Font & Baseline Match)
+    const textContent = await page.getTextContent();
+    const displayViewport = page.getViewport({ scale: 1.0 });
+
+    const pageTextMetadata = textContent.items.map(item => {
+        const [left, top] = displayViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+        const fontSize = Math.hypot(item.transform[0], item.transform[1]);
+        return {
+            x: left,
+            y: top - fontSize,
+            width: item.width,
+            height: fontSize,
+            fontSize: fontSize,
+            text: item.str,
+            pdfX: item.transform[4],
+            pdfY: item.transform[5]
+        };
+    });
+
+    bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, pageTextMetadata);
     bindDrawingEngine(annotCanvas, pageNum);
 }
 
 // -------------------------------------------------------------
-// อัลกอริทึมดูดสีพื้นหลังอัจฉริยะ (Histogram Analysis แม่นยำ 100%)
+// อัลกอริทึมดูดสีพื้นหลังอัจฉริยะ (Histogram Analysis)
 // -------------------------------------------------------------
 function getCanvasPixelColor(canvas, x, y, width, height) {
     const ctx = canvas.getContext('2d');
-    
-    // อัตราส่วนความละเอียดจอต่อ Canvas Buffer (Viewport scale 2.0)
     const ratioX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
     const ratioY = canvas.height / parseFloat(canvas.style.height || (canvas.height / 2));
 
-    // กำหนดพื้นที่สุ่มด้านในกล่อง โดยเว้นขอบ 2px เพื่อไม่ให้อ่านโดนเส้นตาราง
     const safeLeft = Math.floor((x + 2) * ratioX);
     const safeTop = Math.floor((y + 2) * ratioY);
     const safeWidth = Math.max(1, Math.floor((width - 4) * ratioX));
@@ -138,11 +154,9 @@ function getCanvasPixelColor(canvas, x, y, width, height) {
         let maxCount = 0;
         let dominantColor = { r: 255, g: 255, b: 255, hex: '#ffffff' };
 
-        // ตรวจสอบพิกเซลแบบตารางกริดภายในพื้นที่กล่อง
-        const step = Math.max(1, Math.floor((safeWidth * safeHeight) / 100)); // สุ่มตัวอย่างไม่เกิน 100 จุด
+        const step = Math.max(1, Math.floor((safeWidth * safeHeight) / 100));
         for (let i = 0; i < imgData.length; i += step * 4) {
-            const a = imgData[i + 3];
-            if (a < 128) continue; // ข้ามพิกเซลโปร่งแสง
+            if (imgData[i + 3] < 128) continue;
 
             const r = imgData[i];
             const g = imgData[i + 1];
@@ -162,15 +176,43 @@ function getCanvasPixelColor(canvas, x, y, width, height) {
         }
         return dominantColor;
     } catch (e) {
-        console.warn("การวิเคราะห์สีพื้นหลังล้มเหลว:", e);
         return { r: 1, g: 1, b: 1, hex: '#ffffff' };
     }
 }
 
 // -------------------------------------------------------------
+// อัลกอริทึมค้นหาข้อความเดิม (จับคู่ขนาดฟอนต์ และเส้นบรรทัดเดิม)
+// -------------------------------------------------------------
+function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
+    if (!textMetadata || textMetadata.length === 0) return null;
+
+    const overlaps = textMetadata.filter(item => {
+        return (
+            item.x < boxLeft + boxWidth &&
+            item.x + item.width > boxLeft &&
+            item.y < boxTop + boxHeight &&
+            item.y + item.height > boxTop &&
+            item.text && item.text.trim() !== ''
+        );
+    });
+
+    if (overlaps.length > 0) {
+        const orig = overlaps[0];
+        return {
+            fontSize: Math.round(orig.fontSize),
+            origX: orig.x,
+            origY: orig.y,
+            origPdfY: orig.pdfY,
+            height: orig.height
+        };
+    }
+    return null;
+}
+
+// -------------------------------------------------------------
 // ระบบลากคลุมลบคำผิด & ดูดสีพื้นหลังอัตโนมัติ (Smart Auto-Sample Patch)
 // -------------------------------------------------------------
-function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas) {
+function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     let startX = 0, startY = 0;
     let isDragging = false;
     let selectionBox = null;
@@ -216,25 +258,28 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas) {
         selectionBox.remove();
         selectionBox = null;
 
-        if (boxWidth < 12 || boxHeight < 8) return;
+        if (boxWidth < 10 || boxHeight < 8) return;
 
-        // ดูดสีพื้นหลังด้วยอัลกอริทึม Histogram ที่แม่นยำ
+        // 1. ดูดสีพื้นหลัง
         const sampleColor = getCanvasPixelColor(pdfCanvas, boxLeft, boxTop, boxWidth, boxHeight);
-        createPatchBox(wrapper, pageNum, boxLeft, boxTop, boxWidth, boxHeight, sampleColor);
+        
+        // 2. ตรวจจับข้อมูลข้อความเดิมใต้กรอบ (ขนาดฟอนต์ และระดับเส้นบรรทัด)
+        const matchedOrig = getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata);
+
+        createPatchBox(wrapper, pageNum, boxLeft, boxTop, boxWidth, boxHeight, sampleColor, matchedOrig);
     });
 }
 
-function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor) {
+function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
-    // ตรวจสอบความสว่างของสีพื้นหลัง
     const isDark = (bgColor.r * 299 + bgColor.g * 587 + bgColor.b * 114) / 1000 < 0.5;
     const textColor = isDark ? '#ffffff' : '#000000';
     
-    // คำนวณขนาดฟอนต์ให้สมส่วนกับความสูงของบรรทัด
-    const fontSize = Math.max(11, Math.min(24, Math.round(height * 0.72)));
+    // 🎯 ถ้าเจอข้อความเดิม ให้ล็อกขนาดฟอนต์ตามของเดิมเป๊ะๆ
+    const fontSize = matchedOrig ? matchedOrig.fontSize : Math.max(11, Math.min(24, Math.round(height * 0.72)));
 
-    // หดขอบเข้าด้านใน 1.5px เพื่อรักษากรอบเส้นตารางเดิม
+    // หดขอบ 1.5px เพื่อไม่ให้กินเส้นตารางเดิม
     const insetLeft = left + 1.5;
     const insetTop = top + 1;
     const insetWidth = Math.max(10, width - 3);
@@ -266,7 +311,7 @@ function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor) {
             return;
         }
 
-        // แปลงเป็นกล่องที่วางทับและหดให้พอดีคำ
+        // แปลงเป็นกล่องข้อความที่บันทึกแล้ว
         node.className = 'committed-patch-node';
         node.style.color = textColor;
         node.style.fontSize = fontSize + 'px';
@@ -276,14 +321,22 @@ function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor) {
 
         const finalWidth = node.offsetWidth;
         const wrapperHeight = parseFloat(wrapper.style.height);
-        const baselineOffset = (insetHeight - fontSize) / 2;
-        const pdfY = wrapperHeight - (insetTop + insetHeight) + baselineOffset;
+
+        // 🎯 สแน็ปเส้นบรรทัด: ถ้ามีพิกัดเดิม ให้วางตรงระดับเดิมเป๊ะๆ
+        let pdfY;
+        if (matchedOrig && matchedOrig.origPdfY) {
+            pdfY = matchedOrig.origPdfY;
+        } else {
+            const baselineOffset = (insetHeight - fontSize) / 2;
+            pdfY = wrapperHeight - (insetTop + insetHeight) + baselineOffset;
+        }
 
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [] };
 
         documentPatches[pageNum].patches.push({
             x: insetLeft,
             y: pdfY,
+            patchBoxY: wrapperHeight - (insetTop + insetHeight),
             width: finalWidth + 2,
             height: insetHeight,
             text: text,
@@ -295,7 +348,7 @@ function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor) {
         // ดับเบิ้ลคลิกแก้ไขคำเดิมได้ตลอดเวลา
         node.addEventListener('dblclick', () => {
             node.remove();
-            createPatchBox(wrapper, pageNum, left, top, width, height, bgColor);
+            createPatchBox(wrapper, pageNum, left, top, width, height, bgColor, matchedOrig);
         });
 
         showToast("บันทึกคำแนบเนียนแล้วค่ะ");
@@ -488,7 +541,7 @@ async function exportVectorPDF() {
         const thaiFont = await loadedPdf.embedFont(cachedFontBytes);
         const pages = loadedPdf.getPages();
 
-        // นำข้อมูล Patches ไปวาดกลบลบคำเดิมและพิมพ์ใหม่
+        // 1. นำข้อมูล Patches ไปวาดกลบลบคำเดิมและพิมพ์ใหม่
         for (let pageNum in documentPatches) {
             const pIdx = parseInt(pageNum) - 1;
             if (pIdx < 0 || pIdx >= pages.length) continue;
@@ -497,14 +550,17 @@ async function exportVectorPDF() {
 
             if (pData.patches) {
                 pData.patches.forEach(pt => {
+                    // วาดสี่เหลี่ยมสีเดียวกับพื้นหลังเดิมกลบคำเดิม
+                    const boxY = pt.patchBoxY !== undefined ? pt.patchBoxY : (pt.y - (pt.height * 0.1));
                     targetPage.drawRectangle({
                         x: pt.x,
-                        y: pt.y - (pt.height * 0.1),
+                        y: boxY,
                         width: pt.width,
                         height: pt.height,
                         color: rgb(pt.bgColor.r, pt.bgColor.g, pt.bgColor.b),
                     });
 
+                    // พิมพ์ข้อความใหม่ทับตรงเส้นบรรทัดเดิม
                     const tColor = pt.textColor === '#ffffff' ? rgb(1, 1, 1) : rgb(0, 0, 0);
                     targetPage.drawText(pt.text, {
                         x: pt.x + 2,
@@ -529,7 +585,7 @@ async function exportVectorPDF() {
             }
         }
 
-        // ฝังรอยวาดปากกาจาก Annotation Canvas
+        // 2. ฝังรอยวาดปากกาจาก Annotation Canvas
         const wrappers = document.querySelectorAll('.page-wrapper');
         for (let idx = 0; idx < wrappers.length; idx++) {
             const c = wrappers[idx].querySelector('.annotation-canvas');
