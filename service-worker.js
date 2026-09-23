@@ -1,5 +1,5 @@
 // 🎯 service-worker.js (v21.0 - Sunita PDF Studio Auto-Sync Engine)
-const CACHE_NAME = 'sunita-pdf-v21.0';
+const CACHE_NAME = 'sunita-pdf-v24.0';
 
 // ไฟล์หลักของโปรเจกต์ภายในเครื่อง
 const CORE_ASSETS = [
