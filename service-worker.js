@@ -1,15 +1,14 @@
-// 🎯 service-worker.js (v17.0 - Nawee PDF Vector Studio & Offline Engine)
-const CACHE_NAME = 'nawee-pdf-pro-v17.0';
+// 🎯 service-worker.js (v18.0 - Sunita PDF Studio & Offline Engine)
+const CACHE_NAME = 'sunita-pdf-v18.0';
 
-// ไฟล์หลักของโปรเจกต์ภายในเครื่อง
+// ไฟล์หลักของโปรเจกต์ภายในเครื่อง (เพิ่ม cat-avatar.png เรียบร้อย)
 const CORE_ASSETS = [
   './',
   './index.html',
   './style.css',
   './script.js',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
+  './cat-avatar.png'
 ];
 
 // ไลบรารีภายนอกที่จำเป็นสำหรับระบบ Vector PDF และ Fontkit
@@ -21,8 +20,9 @@ const EXTERNAL_LIBS = [
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'
 ];
 
-// 1. ทำการติดตั้งแคชเมื่อโหลดเวอร์ชันใหม่
+// 1. ทำการติดตั้งแคชและบังคับ Skip Waiting ทันที
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       // แคช Core Assets ให้สำเร็จแน่นอนเป็นอันดับแรก
@@ -34,7 +34,7 @@ self.addEventListener('install', (event) => {
       } catch (err) {
         console.warn('บาง CDN ภายนอกแคชไม่สำเร็จขณะติดตั้ง:', err);
       }
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -54,29 +54,22 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. ดักจับ Request แบบ Cache-First และ Dynamic Cache ออฟไลน์
+// 3. ดักจับ Request แบบ Network-First สำหรับไฟล์ในเครื่องเพื่อป้องกันแคชค้าง
 self.addEventListener('fetch', (event) => {
-  // กรองเฉพาะคำขอผ่านโปรโตคอล http / https
   if (!event.request.url.startsWith('http')) return;
 
-  // สำหรับคำขอที่ไม่ใช่ GET (เช่น ส่งคำสั่งหา Gemini API) ให้ปล่อยผ่านไปยังอินเทอร์เน็ตตรงๆ
   if (event.request.method !== 'GET') {
     return;
   }
 
-  // ไม่แคชการยิงไปยัง Google Generative Language API
   if (event.request.url.includes('generativelanguage.googleapis.com')) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(event.request).then((networkResponse) => {
-        // หากดาวน์โหลดไฟล์สำเร็จ (รวมถึงฟอนต์ Sarabun) ให้เก็บสำรองเข้าแคชไว้ใช้งานออฟไลน์
+    // ดึงจากเน็ตก่อนเพื่อให้ได้เวอร์ชันล่าสุดเสมอ ถ้าไม่มีเน็ตจะดึงจาก Cache ให้
+    fetch(event.request)
+      .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type !== 'opaque') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -84,7 +77,7 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
