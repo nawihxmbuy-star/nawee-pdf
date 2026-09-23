@@ -1,5 +1,5 @@
-// 🎯 service-worker.js (v18.0 - Sunita PDF Studio & Offline Engine)
-const CACHE_NAME = 'sunita-pdf-v18.5';
+// 🎯 service-worker.js (v21.0 - Sunita PDF Studio Auto-Sync Engine)
+const CACHE_NAME = 'sunita-pdf-v21.0';
 
 // ไฟล์หลักของโปรเจกต์ภายในเครื่อง
 const CORE_ASSETS = [
@@ -51,7 +51,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. ดักจับ Request แบบ Network-First ป้องกันแคชค้าง
+// 3. ดักจับ Request แบบ Network-First สำหรับไฟล์แอปหลัก ป้องกันแคชค้าง
 self.addEventListener('fetch', (event) => {
   if (!event.request.url.startsWith('http')) return;
 
