@@ -11,10 +11,10 @@ let pdfDoc = null;
 let originalPdfBytes = null;
 let originalFileName = 'Nawee_Document';
 
-// Patch Store เก็บข้อมูล Object ทั้งหมดรายหน้า { [pageNum]: { patches: [], images: [] } }
+// เก็บข้อมูล Object รายหน้า { [pageNum]: { patches: [], images: [] } }
 let documentPatches = {};
 
-// ฟอนต์ภาษาไทยสำหรับ Vector PDF
+// Font สำหรับ Vector PDF
 const THAI_FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/sarabun/Sarabun-Regular.ttf';
 let cachedFontBytes = null;
 
@@ -55,7 +55,7 @@ function resetApp() {
 }
 
 // -------------------------------------------------------------
-// โหลดและเรนเดอร์เอกสาร (พร้อมสกัด Metadata ของข้อความเดิม)
+// โหลดและเรนเดอร์เอกสาร
 // -------------------------------------------------------------
 async function handleFileOpen(e) {
     const file = e.target.files[0];
@@ -81,7 +81,7 @@ async function handleFileOpen(e) {
 
 async function renderPage(pageNum, container) {
     const page = await pdfDoc.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 });
+    const viewport = page.getViewport({ scale: 2.0 }); // Render 2x Retina Clarity
 
     const wrapper = document.createElement('div');
     wrapper.className = 'page-wrapper';
@@ -89,21 +89,21 @@ async function renderPage(pageNum, container) {
     wrapper.style.width = (viewport.width / 2) + 'px';
     wrapper.style.height = (viewport.height / 2) + 'px';
 
-    // 1. Canvas แสดงผล PDF เดิม คมกริบ
+    // 1. Base Canvas แสดงผลหน้าเอกสารจริง
     const pdfCanvas = document.createElement('canvas');
     pdfCanvas.className = 'pdf-page-canvas';
     pdfCanvas.width = viewport.width;
     pdfCanvas.height = viewport.height;
     wrapper.appendChild(pdfCanvas);
 
-    // 2. Canvas วาดเขียน/ไฮไลต์
+    // 2. Annotation Canvas สำหรับวาดเขียนปากกา/ไฮไลต์
     const annotCanvas = document.createElement('canvas');
     annotCanvas.className = 'annotation-canvas';
     annotCanvas.width = viewport.width;
     annotCanvas.height = viewport.height;
     wrapper.appendChild(annotCanvas);
 
-    // 3. Layer รองรับการลากกล่องแก้คำ (Smart Patch)
+    // 3. Layer ชั่วคราวสำหรับรองรับ Drag Selection & Input Box
     const patchLayer = document.createElement('div');
     patchLayer.className = 'patch-layer';
     wrapper.appendChild(patchLayer);
@@ -112,7 +112,7 @@ async function renderPage(pageNum, container) {
 
     await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: viewport }).promise;
 
-    // 🎯 สกัดตำแหน่งและขนาดฟอนต์ของข้อความเดิมในหน้านี้ (Auto Font & Baseline Match)
+    // สกัด Metadata ข้อความเดิมเพื่อนำมาสแน็ป Baseline & Font Size
     const textContent = await page.getTextContent();
     const displayViewport = page.getViewport({ scale: 1.0 });
 
@@ -127,7 +127,8 @@ async function renderPage(pageNum, container) {
             fontSize: fontSize,
             text: item.str,
             pdfX: item.transform[4],
-            pdfY: item.transform[5]
+            pdfY: item.transform[5],
+            viewportY: top // เส้น Baseline ระดับ 1x
         };
     });
 
@@ -136,52 +137,73 @@ async function renderPage(pageNum, container) {
 }
 
 // -------------------------------------------------------------
-// อัลกอริทึมดูดสีพื้นหลังอัจฉริยะ (Histogram Analysis)
+// อัลกอริทึมแยกสีพื้นหลังและสีตัวอักษรเดิม (Dual Color Analyzer)
 // -------------------------------------------------------------
-function getCanvasPixelColor(canvas, x, y, width, height) {
+function analyzeBoxColors(canvas, x, y, width, height) {
     const ctx = canvas.getContext('2d');
     const ratioX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
     const ratioY = canvas.height / parseFloat(canvas.style.height || (canvas.height / 2));
 
-    const safeLeft = Math.floor((x + 2) * ratioX);
-    const safeTop = Math.floor((y + 2) * ratioY);
-    const safeWidth = Math.max(1, Math.floor((width - 4) * ratioX));
-    const safeHeight = Math.max(1, Math.floor((height - 4) * ratioY));
+    const safeLeft = Math.floor((x + 1.5) * ratioX);
+    const safeTop = Math.floor((y + 1.5) * ratioY);
+    const safeWidth = Math.max(1, Math.floor((width - 3) * ratioX));
+    const safeHeight = Math.max(1, Math.floor((height - 3) * ratioY));
 
     try {
         const imgData = ctx.getImageData(safeLeft, safeTop, safeWidth, safeHeight).data;
         const colorCounts = {};
-        let maxCount = 0;
-        let dominantColor = { r: 255, g: 255, b: 255, hex: '#ffffff' };
 
-        const step = Math.max(1, Math.floor((safeWidth * safeHeight) / 100));
+        // สุ่มตัวอย่างพิกเซลภายในกรอบ
+        const step = Math.max(1, Math.floor((safeWidth * safeHeight) / 120));
         for (let i = 0; i < imgData.length; i += step * 4) {
             if (imgData[i + 3] < 128) continue;
-
-            const r = imgData[i];
-            const g = imgData[i + 1];
-            const b = imgData[i + 2];
+            const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
             const key = `${r},${g},${b}`;
-
             colorCounts[key] = (colorCounts[key] || 0) + 1;
-            if (colorCounts[key] > maxCount) {
-                maxCount = colorCounts[key];
-                dominantColor = {
-                    r: r / 255,
-                    g: g / 255,
-                    b: b / 255,
-                    hex: `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
-                };
+        }
+
+        // เรียงลำดับสีที่พบมากที่สุดไปน้อยที่สุด
+        const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
+
+        // สีพื้นหลังคือสีที่มีสัดส่วนมากที่สุด
+        const bgKey = sortedColors[0] || '255,255,255';
+        const [bgR, bgG, bgB] = bgKey.split(',').map(Number);
+        const bgBrightness = (bgR * 299 + bgG * 587 + bgB * 114) / 1000;
+
+        // หาสีตัวอักษรเดิมที่มีความเปรียบต่าง (Contrast) กับสีพื้นหลัง
+        let textR = bgBrightness < 128 ? 255 : 31;
+        let textG = bgBrightness < 128 ? 255 : 41;
+        let textB = bgBrightness < 128 ? 255 : 55;
+
+        for (let i = 1; i < sortedColors.length; i++) {
+            const [cR, cG, cB] = sortedColors[i].split(',').map(Number);
+            const b = (cR * 299 + cG * 587 + cB * 114) / 1000;
+            if (Math.abs(b - bgBrightness) > 60) { // มีความต่างของสีชัดเจน
+                textR = cR; textG = cG; textB = cB;
+                break;
             }
         }
-        return dominantColor;
+
+        return {
+            bg: {
+                r: bgR / 255, g: bgG / 255, b: bgB / 255,
+                hex: `#${((1 << 24) + (bgR << 16) + (bgG << 8) + bgB).toString(16).slice(1)}`
+            },
+            text: {
+                r: textR / 255, g: textG / 255, b: textB / 255,
+                hex: `#${((1 << 24) + (textR << 16) + (textG << 8) + textB).toString(16).slice(1)}`
+            }
+        };
     } catch (e) {
-        return { r: 1, g: 1, b: 1, hex: '#ffffff' };
+        return {
+            bg: { r: 1, g: 1, b: 1, hex: '#ffffff' },
+            text: { r: 0.12, g: 0.16, b: 0.21, hex: '#1f2937' }
+        };
     }
 }
 
 // -------------------------------------------------------------
-// อัลกอริทึมค้นหาข้อความเดิม (จับคู่ขนาดฟอนต์ และเส้นบรรทัดเดิม)
+// อัลกอริทึมค้นหาข้อความเดิม (จับคู่ขนาดฟอนต์ และ Baseline เดิม)
 // -------------------------------------------------------------
 function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata) {
     if (!textMetadata || textMetadata.length === 0) return null;
@@ -202,15 +224,15 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
             fontSize: Math.round(orig.fontSize),
             origX: orig.x,
             origY: orig.y,
-            origPdfY: orig.pdfY,
-            height: orig.height
+            viewportY: orig.viewportY,
+            origPdfY: orig.pdfY
         };
     }
     return null;
 }
 
 // -------------------------------------------------------------
-// ระบบลากคลุมลบคำผิด & ดูดสีพื้นหลังอัตโนมัติ (Smart Auto-Sample Patch)
+// ระบบลากคลุมลบคำผิด & In-Place Canvas Engine
 // -------------------------------------------------------------
 function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
     let startX = 0, startY = 0;
@@ -219,7 +241,7 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
     wrapper.addEventListener('pointerdown', (e) => {
         if (currentTool !== 'patch') return;
-        if (e.target.closest('.active-patch-node') || e.target.closest('.committed-patch-node') || e.target.closest('.custom-draggable-sig')) return;
+        if (e.target.closest('.active-patch-node') || e.target.closest('.custom-draggable-sig')) return;
 
         const rect = wrapper.getBoundingClientRect();
         startX = (e.clientX - rect.left) / currentScale;
@@ -260,26 +282,23 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
 
         if (boxWidth < 10 || boxHeight < 8) return;
 
-        // 1. ดูดสีพื้นหลัง
-        const sampleColor = getCanvasPixelColor(pdfCanvas, boxLeft, boxTop, boxWidth, boxHeight);
+        // 1. วิเคราะห์สีพื้นหลังและสีตัวอักษรเดิม
+        const colors = analyzeBoxColors(pdfCanvas, boxLeft, boxTop, boxWidth, boxHeight);
         
-        // 2. ตรวจจับข้อมูลข้อความเดิมใต้กรอบ (ขนาดฟอนต์ และระดับเส้นบรรทัด)
+        // 2. ค้นหาข้อความเดิมเพื่อสแน็ป Baseline
         const matchedOrig = getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetadata);
 
-        createPatchBox(wrapper, pageNum, boxLeft, boxTop, boxWidth, boxHeight, sampleColor, matchedOrig);
+        createInPlaceInputBox(wrapper, pageNum, pdfCanvas, boxLeft, boxTop, boxWidth, boxHeight, colors, matchedOrig);
     });
 }
 
-function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor, matchedOrig) {
+// กล่อง Input ชั่วคราวสำหรับการพิมพ์ เมื่อพิมพ์เสร็จจะประทับลง Canvas ทันที
+function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
-    const isDark = (bgColor.r * 299 + bgColor.g * 587 + bgColor.b * 114) / 1000 < 0.5;
-    const textColor = isDark ? '#ffffff' : '#000000';
-    
-    // 🎯 ถ้าเจอข้อความเดิม ให้ล็อกขนาดฟอนต์ตามของเดิมเป๊ะๆ
     const fontSize = matchedOrig ? matchedOrig.fontSize : Math.max(11, Math.min(24, Math.round(height * 0.72)));
-
-    // หดขอบ 1.5px เพื่อไม่ให้กินเส้นตารางเดิม
+    
+    // Inset ขอบ 1.5px ไม่ให้บังเส้นตาราง
     const insetLeft = left + 1.5;
     const insetTop = top + 1;
     const insetWidth = Math.max(10, width - 3);
@@ -291,74 +310,105 @@ function createPatchBox(wrapper, pageNum, left, top, width, height, bgColor, mat
     node.style.top = insetTop + 'px';
     node.style.width = insetWidth + 'px';
     node.style.height = insetHeight + 'px';
-    node.style.background = bgColor.hex;
+    node.style.background = colors.bg.hex;
 
     const input = document.createElement('input');
     input.type = 'text';
     input.placeholder = 'พิมพ์คำใหม่...';
     input.className = 'patch-input-inline';
-    input.style.color = textColor;
+    input.style.color = colors.text.hex;
     input.style.fontSize = fontSize + 'px';
     node.appendChild(input);
 
     layer.appendChild(node);
     setTimeout(() => input.focus(), 50);
 
-    function commit() {
+    function commitToCanvas() {
         const text = input.value.trim();
-        if (!text) {
-            node.remove();
-            return;
+        node.remove(); // สลายกล่อง HTML ทันที
+
+        if (!text) return;
+
+        // 🎯 วาดลงเนื้อ Canvas Buffer 2x โดยตรง (เนียนระดับเดียวกับตัวหนังสือเดิม)
+        const ctx = pdfCanvas.getContext('2d');
+        const ratioX = pdfCanvas.width / parseFloat(pdfCanvas.style.width || (pdfCanvas.width / 2));
+        const ratioY = pdfCanvas.height / parseFloat(pdfCanvas.style.height || (pdfCanvas.height / 2));
+
+        // 1. วัดความยาวข้อความบน Canvas เพื่อเคลียร์ขนาดกลบให้พอดี
+        const canvasFontSize = fontSize * ratioY;
+        ctx.font = `500 ${canvasFontSize}px 'Sarabun', sans-serif`;
+        const metrics = ctx.measureText(text);
+        const textWidthOnCanvas = metrics.width;
+        const clearWidth = Math.max(insetWidth * ratioX, textWidthOnCanvas + (8 * ratioX));
+
+        // 2. เคลียร์กลบคำเดิมด้วยสีพื้นหลังเดิมเป๊ะๆ
+        ctx.fillStyle = colors.bg.hex;
+        ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
+
+        // 3. ล็อก Baseline เส้นบรรทัดเดิมอย่างแม่นยำ
+        let drawBaselineY;
+        if (matchedOrig && matchedOrig.viewportY) {
+            drawBaselineY = matchedOrig.viewportY * ratioY;
+        } else {
+            drawBaselineY = (insetTop + (insetHeight * 0.76)) * ratioY;
         }
 
-        // แปลงเป็นกล่องข้อความที่บันทึกแล้ว
-        node.className = 'committed-patch-node';
-        node.style.color = textColor;
-        node.style.fontSize = fontSize + 'px';
-        node.style.width = 'auto'; 
-        node.style.minWidth = insetWidth + 'px'; 
-        node.innerText = text;
+        // 4. วาดตัวหนังสือใหม่ลงเนื้อแคนวาสโดยตรง
+        ctx.fillStyle = colors.text.hex;
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(text, (insetLeft + 2) * ratioX, drawBaselineY);
 
-        const finalWidth = node.offsetWidth;
+        // 5. บันทึกข้อมูลเข้า Vector Store สำหรับส่งออก PDF เวกเตอร์แท้
         const wrapperHeight = parseFloat(wrapper.style.height);
-
-        // 🎯 สแน็ปเส้นบรรทัด: ถ้ามีพิกัดเดิม ให้วางตรงระดับเดิมเป๊ะๆ
         let pdfY;
         if (matchedOrig && matchedOrig.origPdfY) {
             pdfY = matchedOrig.origPdfY;
         } else {
-            const baselineOffset = (insetHeight - fontSize) / 2;
-            pdfY = wrapperHeight - (insetTop + insetHeight) + baselineOffset;
+            pdfY = wrapperHeight - (insetTop + insetHeight) + ((insetHeight - fontSize) / 2);
         }
 
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [] };
-
         documentPatches[pageNum].patches.push({
             x: insetLeft,
             y: pdfY,
             patchBoxY: wrapperHeight - (insetTop + insetHeight),
-            width: finalWidth + 2,
+            width: (clearWidth / ratioX),
             height: insetHeight,
             text: text,
             fontSize: fontSize,
-            bgColor: bgColor,
-            textColor: textColor
+            bgColor: colors.bg,
+            textColor: colors.text
         });
 
-        // ดับเบิ้ลคลิกแก้ไขคำเดิมได้ตลอดเวลา
-        node.addEventListener('dblclick', () => {
-            node.remove();
-            createPatchBox(wrapper, pageNum, left, top, width, height, bgColor, matchedOrig);
-        });
+        // สร้าง Hotspot ใสสำหรับดับเบิ้ลคลิกกลับมาแก้คำนี้ได้อีก
+        createReEditHotspot(wrapper, pageNum, pdfCanvas, insetLeft, insetTop, (clearWidth / ratioX), insetHeight, colors, matchedOrig, text);
 
-        showToast("บันทึกคำแนบเนียนแล้วค่ะ");
+        showToast("บันทึกคำกลืนกับหน้ากระดาษเนียนกริบแล้วค่ะ");
     }
 
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') input.blur();
         if (e.key === 'Escape') node.remove();
     });
-    input.addEventListener('blur', commit);
+    input.addEventListener('blur', commitToCanvas);
+}
+
+// พื้นที่โปร่งแสงสำหรับดับเบิ้ลคลิกแก้ไขคำเดิมที่ประทับลง Canvas แล้ว
+function createReEditHotspot(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig, currentText) {
+    const layer = wrapper.querySelector('.patch-layer');
+    const hotspot = document.createElement('div');
+    hotspot.className = 'canvas-hotspot';
+    hotspot.style.left = left + 'px';
+    hotspot.style.top = top + 'px';
+    hotspot.style.width = width + 'px';
+    hotspot.style.height = height + 'px';
+
+    hotspot.addEventListener('dblclick', () => {
+        hotspot.remove();
+        createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig);
+    });
+
+    layer.appendChild(hotspot);
 }
 
 // -------------------------------------------------------------
@@ -550,7 +600,6 @@ async function exportVectorPDF() {
 
             if (pData.patches) {
                 pData.patches.forEach(pt => {
-                    // วาดสี่เหลี่ยมสีเดียวกับพื้นหลังเดิมกลบคำเดิม
                     const boxY = pt.patchBoxY !== undefined ? pt.patchBoxY : (pt.y - (pt.height * 0.1));
                     targetPage.drawRectangle({
                         x: pt.x,
@@ -560,14 +609,12 @@ async function exportVectorPDF() {
                         color: rgb(pt.bgColor.r, pt.bgColor.g, pt.bgColor.b),
                     });
 
-                    // พิมพ์ข้อความใหม่ทับตรงเส้นบรรทัดเดิม
-                    const tColor = pt.textColor === '#ffffff' ? rgb(1, 1, 1) : rgb(0, 0, 0);
                     targetPage.drawText(pt.text, {
                         x: pt.x + 2,
                         y: pt.y,
                         size: pt.fontSize,
                         font: thaiFont,
-                        color: tColor,
+                        color: rgb(pt.textColor.r, pt.textColor.g, pt.textColor.b),
                     });
                 });
             }
