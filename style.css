@@ -1,16 +1,14 @@
 :root {
     --bg-main: #0b0f19;
-    --dock-bg: rgba(17, 24, 39, 0.92);
+    --dock-bg: rgba(17, 24, 39, 0.95);
     --accent: #0ea5e9;
-    --accent-glow: rgba(14, 165, 233, 0.35);
+    --accent-glow: rgba(14, 165, 233, 0.4);
     --text-light: #f8fafc;
     --text-muted: #94a3b8;
 }
 
 * { 
-    margin: 0; 
-    padding: 0; 
-    box-sizing: border-box; 
+    margin: 0; padding: 0; box-sizing: border-box; 
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -26,24 +24,19 @@ body {
 }
 
 /* ==========================================================================
-   TOP BAR & STUDIO DOCK
+   TOP BAR & CONTEXT RIBBON
    ========================================================================== */
 .top-bar {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 54px;
     background: #111827;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center;
-    padding: 0 16px;
-    gap: 8px;
-    z-index: 1000;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 16px; gap: 8px; z-index: 1000;
 }
 .brand {
     display: flex; align-items: center; gap: 8px;
-    font-size: 15px; font-weight: 700; color: #fff;
-    flex-shrink: 0;
+    font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0;
 }
 .brand-avatar {
     width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
@@ -56,111 +49,108 @@ body {
 }
 
 .top-dock-bar {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     background: rgba(30, 41, 59, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 10px;
-    padding: 2px 6px;
-    gap: 3px;
+    border-radius: 10px; padding: 2px 6px; gap: 3px;
     backdrop-filter: blur(8px);
 }
 
 .dock-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    width: 32px; height: 32px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.12s ease;
-    flex-shrink: 0;
+    background: transparent; border: none; color: var(--text-muted);
+    width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+    font-size: 14px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.12s ease; flex-shrink: 0;
 }
 .dock-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
 .dock-btn.active {
-    background: var(--accent);
-    color: #0f172a;
+    background: var(--accent); color: #0f172a;
     box-shadow: 0 1px 6px var(--accent-glow);
 }
 
-.dock-divider {
-    width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); margin: 0 4px; flex-shrink: 0;
+.dock-divider { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); margin: 0 4px; flex-shrink: 0; }
+.dock-divider-sub { width: 1px; height: 14px; background: rgba(255, 255, 255, 0.1); margin: 0 3px; flex-shrink: 0; }
+
+/* Context Ribbon Sub-tools */
+.context-ribbon {
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(15, 23, 42, 0.7);
+    border-radius: 8px; padding: 2px 6px;
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    animation: slideInRibbon 0.15s ease-out;
 }
 
-.color-picker-wrap {
-    display: flex; align-items: center; justify-content: center; padding: 0 2px;
+@keyframes slideInRibbon {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
 }
-#active-color-input {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    width: 22px; height: 22px;
-    background: none; border: none; cursor: pointer; border-radius: 50%;
+
+.dock-btn-sm {
+    background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #cbd5e1; border-radius: 5px; width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    font-size: 11px; transition: all 0.12s ease;
 }
-#active-color-input::-webkit-color-swatch {
-    border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 4px rgba(0,0,0,0.5);
+.dock-btn-sm:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.dock-btn-sm.active { background: var(--accent); color: #0f172a; border-color: var(--accent); font-weight: bold; }
+
+.rib-input-num {
+    background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #38bdf8; border-radius: 5px; width: 42px; height: 24px;
+    text-align: center; font-size: 11px; font-weight: 600; outline: none;
 }
+.rib-unit { font-size: 11px; color: #64748b; margin-left: -2px; margin-right: 2px; }
+.rib-label { font-size: 11px; color: var(--text-muted); padding: 0 2px; }
+
+.rib-color-wrap {
+    display: flex; align-items: center; gap: 3px; color: #94a3b8; font-size: 11px; cursor: pointer; padding: 0 2px;
+}
+.rib-color-wrap input[type="color"] {
+    -webkit-appearance: none; width: 20px; height: 20px;
+    border: 1.5px solid #fff; border-radius: 4px; background: none; cursor: pointer; padding: 0;
+}
+
+.btn-rib-commit { background: #10b981 !important; color: #fff !important; border-color: #10b981 !important; }
+.btn-rib-del:hover { background: rgba(239, 68, 68, 0.2) !important; color: #ef4444 !important; border-color: #ef4444 !important; }
 
 .action-buttons { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 .btn-secondary {
     background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-light); padding: 6px 12px; border-radius: 6px; cursor: pointer;
-    font-size: 13px; display: flex; align-items: center; gap: 6px; transition: all 0.15s;
+    font-size: 13px; display: flex; align-items: center; gap: 6px;
 }
-.btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
 .btn-primary {
     background: linear-gradient(135deg, #0284c7, #38bdf8);
     color: #0f172a; border: none; font-weight: 700;
     padding: 6px 14px; border-radius: 6px; cursor: pointer;
     font-size: 13px; display: flex; align-items: center; gap: 6px;
-    box-shadow: 0 2px 10px var(--accent-glow); transition: all 0.15s;
-}
-.btn-primary:hover { transform: translateY(-1px); }
-
-@media (max-width: 900px) {
-    .btn-text { display: none; }
+    box-shadow: 0 2px 10px var(--accent-glow);
 }
 
 /* ==========================================================================
    WORKSPACE & CANVASES
    ========================================================================== */
 .workspace {
-    width: 100vw; height: 100vh;
-    overflow: auto;
-    padding: 68px 20px 30px 20px;
-    display: flex; flex-direction: column; align-items: center;
-    -webkit-overflow-scrolling: touch;
+    width: 100vw; height: 100vh; overflow: auto;
+    padding: 68px 20px 30px 20px; display: flex; flex-direction: column; align-items: center;
     touch-action: none;
 }
 .welcome-box {
     background: #1e293b; border: 1px dashed rgba(255, 255, 255, 0.15);
     border-radius: 14px; padding: 36px 28px; max-width: 480px; margin: 40px auto; text-align: center;
 }
-.welcome-avatar-wrap { margin-bottom: 14px; }
-.welcome-cat-avatar {
-    width: 76px; height: 76px; border-radius: 50%; object-fit: cover;
-    border: 3px solid var(--accent); box-shadow: 0 4px 16px var(--accent-glow);
-}
-.welcome-icon { font-size: 42px; color: var(--accent); margin-bottom: 12px; }
-.welcome-box h2 { font-size: 18px; margin-bottom: 8px; }
-.welcome-box p { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+.welcome-cat-avatar { width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--accent); }
 .btn-open-file {
     background: var(--accent); color: #0f172a; border: none;
     padding: 9px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px;
 }
 
-#document-container {
-    margin: 0 auto;
-    transform-origin: top center;
-    transition: transform 0.02s linear;
-}
+#document-container { margin: 0 auto; transform-origin: top center; }
 .page-wrapper {
     position: relative; margin-bottom: 24px; background: #fff;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6); touch-action: none;
 }
-.pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: block; }
+.pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
 body.tool-pen .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-events: auto; }
 
@@ -168,100 +158,56 @@ body.tool-pen .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-
 .glyph-interactive-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
 .vector-shapes-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
 
-/* Hitbox ไฮไลต์ตรวจจับตัวอักษรเดิม */
 .glyph-hitbox {
-    position: absolute; cursor: text; pointer-events: auto;
-    border-radius: 2px; box-sizing: border-box;
-    transition: background 0.12s ease;
+    position: absolute; cursor: text; pointer-events: auto; border-radius: 2px;
 }
 .glyph-hitbox:hover {
-    background: rgba(14, 165, 233, 0.16);
-    outline: 1px dashed rgba(14, 165, 233, 0.8);
+    background: rgba(14, 165, 233, 0.15); outline: 1px dashed rgba(14, 165, 233, 0.8);
 }
 
 /* ==========================================================================
-   CAD-GRADE IN-PLACE TEXT & BOUNDING BOX
+   CAD LIVE NODES
    ========================================================================== */
 .cad-text-node {
-    position: absolute;
-    box-sizing: border-box;
-    user-select: none;
-    cursor: move;
-    pointer-events: auto !important;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 2px;
-    white-space: nowrap;
-    transform-origin: center center !important;
+    position: absolute; box-sizing: border-box; user-select: none;
+    cursor: move; pointer-events: auto !important;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 2px; white-space: nowrap; transform-origin: center center !important;
     border: 1px solid transparent;
 }
+.cad-text-node.selected { border: 1.5px dashed var(--accent); }
 
-.cad-text-node.selected {
-    border: 1.5px solid var(--accent);
-}
-
-/* Rotation Handle (Lollipop Stem) */
+/* Lollipop Rotation Handle */
 .cad-rot-stem {
-    position: absolute;
-    top: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 1px;
-    height: 20px;
-    background: var(--accent);
-    display: none;
+    position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    width: 1px; height: 18px; background: var(--accent); display: none;
 }
 .cad-rot-handle {
-    position: absolute;
-    top: -28px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 10px;
-    height: 10px;
-    background: #fff;
-    border: 2px solid var(--accent);
-    border-radius: 50%;
-    cursor: grab;
-    display: none;
+    position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
+    width: 9px; height: 9px; background: #fff; border: 2px solid var(--accent);
+    border-radius: 50%; cursor: grab; display: none;
 }
 .cad-text-node.selected .cad-rot-stem,
-.cad-text-node.selected .cad-rot-handle {
-    display: block;
-}
-
-/* Delete badge */
-.cad-del-badge {
-    position: absolute;
-    top: -8px; right: -8px;
-    width: 16px; height: 16px;
-    background: #ef4444; color: #fff;
-    border-radius: 50%; font-size: 11px;
-    display: none; align-items: center; justify-content: center;
-    cursor: pointer; border: 1.5px solid #fff;
-}
-.cad-text-node:hover .cad-del-badge { display: flex; }
+.cad-text-node.selected .cad-rot-handle { display: block; }
 
 /* In-place Editable Input */
 .cad-inline-editor {
-    position: absolute;
-    border: 1.5px solid var(--accent);
-    outline: none;
-    background: #fff;
-    font-family: 'Sarabun', sans-serif !important;
-    padding: 0 2px;
-    margin: 0;
-    line-height: 1.15;
-    z-index: 200;
-    transform-origin: center center !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    position: absolute; border: 1.5px solid var(--accent); outline: none;
+    background: #fff; font-family: 'Sarabun', sans-serif !important;
+    padding: 0 2px; margin: 0; line-height: 1.15; z-index: 200;
+    transform-origin: center center !important; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* SVG Active Shape Bounding Box */
+.active-shape-box {
+    cursor: move; pointer-events: auto;
 }
 
 /* Modal */
 .modal-backdrop {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
     background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10050;
+    display: flex; align-items: center; justify-content: center; z-index: 10050;
 }
 .modal-box {
     background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1);
@@ -269,7 +215,6 @@ body.tool-pen .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-
 }
 .modal-header {
     background: #0f172a; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .btn-close { background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer; }
 .modal-tabs { display: flex; gap: 6px; padding: 10px 16px 0 16px; }
@@ -279,14 +224,14 @@ body.tool-pen .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-
 }
 .modal-tabs button.active { background: var(--accent); color: #0f172a; font-weight: 700; }
 .modal-body { padding: 12px 16px; }
-#sig-canvas { width: 100%; height: 160px; background: #ffffff; border-radius: 8px; cursor: crosshair; touch-action: none; }
+#sig-canvas { width: 100%; height: 160px; background: #ffffff; border-radius: 8px; cursor: crosshair; }
 .sig-tools { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 .btn-mini { background: rgba(255,255,255,0.06); border: none; color: #fff; padding: 5px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
 .sig-color-pick { display: flex; gap: 6px; }
 .dot-pick { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 1.5px solid #fff; }
 .drop-zone { border: 2px dashed rgba(14, 165, 233, 0.4); border-radius: 10px; padding: 24px 12px; text-align: center; cursor: pointer; }
 .modal-footer {
-    padding: 12px 16px; background: #0f172a; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 12px 16px; background: #0f172a; display: flex; justify-content: flex-end; gap: 8px;
 }
 .btn-cancel { background: transparent; border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
 
