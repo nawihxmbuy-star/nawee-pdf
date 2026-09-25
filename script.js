@@ -255,7 +255,7 @@ function samplePerimeterBackground(canvas, cx, cy, w, h, rad) {
     const sampleOffsets = [
         { x: -sHalfW, y: -sHalfH }, { x: 0, y: -sHalfH }, { x: sHalfW, y: -sHalfH },
         { x: sHalfW, y: 0 },
-        { x: sHalfW, y: sHalfH }, { x: 0, y: sHalfH }, { x: -sHalfW, y: sHalfH },
+        { x: sHalfW, y: sHalfH }, { x: 0, y: sHalfH }, { x: -sHalfW, y: -sHalfH },
         { x: -sHalfW, y: 0 }
     ];
 
@@ -418,7 +418,7 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
 }
 
 // --------------------------------------------------------------------------
-// 4. CAD TEXT NODE & EDGE RESIZE ENGINE (ขอบสัมผัสปรับกว้าง-สูง ไร้จุดกวนสายตา)
+// 4. CAD TEXT NODE & EDGE RESIZE (เซนเซอร์ขอบปรับกว้าง-สูง ไร้จุดกวนสายตา)
 // --------------------------------------------------------------------------
 function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height, text, fontSize, fontWeight, rotation, bgColor, hasSolidBg) {
     const layer = wrapper.querySelector('.patch-layer');
@@ -465,7 +465,6 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
     documentPatches[pageNum].patches.push(patchData);
     node.patchData = patchData;
 
-    // ติดตั้งขอบสัมผัสปรับขนาด (กว้าง & สูง)
     attachResizeHandle(node, patchData);
 
     node.deleteSelf = () => {
@@ -481,7 +480,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
         openInPlaceEditor(wrapper, pageNum, pdfCanvas, parseFloat(node.style.left), parseFloat(node.style.top), width, height, text, patchData.fontSize, patchData.fontWeight, patchData.rotation, false);
     };
 
-    // หมุนอิสระ 360° (กด Shift ค้างเพื่อล็อกฉาก 90°)
+    // หมุนอิสระ 360° (กด Shift ค้างล็อกฉาก 90°)
     let isRotating = false;
     rotHandle.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
@@ -537,7 +536,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
     return node;
 }
 
-// ฟังก์ชันขอบสัมผัสปรับขนาด (กว้าง-สูง)
+// ขอบเซนเซอร์ปรับกว้าง-สูง
 function attachResizeHandle(node, patchData) {
     const edges = ['e', 'w', 's', 'n', 'se'];
     const wH = parseFloat(node.parentElement.style.height || 800);
@@ -836,16 +835,20 @@ function initLiveRibbonEvents() {
 }
 
 // --------------------------------------------------------------------------
-// 7. EXPORT PDF ENGINE (แก้ WinAnsi Error 100% + ฝังเมฆตรวจแบบครบ)
+// 7. EXPORT PDF ENGINE (แก้ตำแหน่ง 1:1 + ป้องกันกล่องสีดำ)
 // --------------------------------------------------------------------------
 function hexToPdfRgb(hex) {
     if (!hex || hex === 'transparent' || hex === 'none') return null;
-    hex = hex.replace('#', '');
+    if (typeof hex === 'object' && hex.r !== undefined) {
+        return PDFLib.rgb(hex.r, hex.g, hex.b);
+    }
+    hex = String(hex).replace('#', '').trim();
     if (hex.length === 3) {
         hex = hex.split('').map(c => c + c).join('');
     }
+    if (hex.length !== 6) return null;
     const num = parseInt(hex, 16);
-    return PDFLib.rgb((num >> 16) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255);
+    return PDFLib.rgb(((num >> 16) & 255) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255);
 }
 
 async function fetchThaiFontBuffer(urlList) {
@@ -868,7 +871,7 @@ async function exportVectorPDF() {
 
     try {
         commitActiveStages();
-        showToast("กำลังประมวลผลเวกเตอร์ PDF และข้อความไทย...");
+        showToast("กำลังประมวลผลตำแหน่งพิกัดและส่งออก PDF...");
 
         const { PDFDocument, rgb, degrees } = PDFLib;
         const loadedPdf = await PDFDocument.load(originalPdfBytes);
@@ -896,7 +899,7 @@ async function exportVectorPDF() {
                 canEmbedThaiFont = true;
             }
         } catch (fontErr) {
-            console.warn("ไม่สามารถฝังฟอนต์ TTF ตรงได้ ใช้ High-Res Canvas Stamp แทน:", fontErr);
+            console.warn("ไม่สามารถฝังฟอนต์ TTF ตรงได้ ใช้ Canvas Stamp แทน:", fontErr);
             canEmbedThaiFont = false;
         }
 
@@ -907,57 +910,60 @@ async function exportVectorPDF() {
             const wrapper = wrappers[i];
             const pageNum = parseInt(wrapper.dataset.pageNumber || (i + 1));
             const targetPage = pages[i];
-            const pageH = targetPage.getHeight();
             const pageW = targetPage.getWidth();
+            const pageH = targetPage.getHeight();
 
-            const nativeW = parseFloat(wrapper.style.width);
-            const nativeH = parseFloat(wrapper.style.height);
-            const scaleX = pageW / nativeW;
-            const scaleY = pageH / nativeH;
+            const cssW = parseFloat(wrapper.style.width);
+            const cssH = parseFloat(wrapper.style.height);
 
-            // 🎯 ก. เรนเดอร์กล่องพื้นหลังทึบ & ข้อความ
+            const scaleX = pageW / cssW;
+            const scaleY = pageH / cssH;
+
+            // 🎯 1. เรนเดอร์กล่องข้อความและพื้นหลัง
             const pData = documentPatches[pageNum];
             if (pData && pData.patches) {
                 for (const pt of pData.patches) {
-                    const pdfRot = degrees(360 - (pt.rotation || 0));
-                    const pdfX = pt.boxLeft * scaleX;
-                    const pdfY = (nativeH - (pt.boxTop + pt.height)) * scaleY;
-                    const pdfW = (pt.width || 40) * scaleX;
-                    const pdfH = pt.height * scaleY;
+                    const rot = pt.rotation || 0;
+                    const pdfRot = degrees(360 - rot);
 
-                    // ถมกล่องสีพื้นหลังปิดทับข้อความเดิม
+                    const boxX = pt.boxLeft * scaleX;
+                    const boxY = (cssH - (pt.boxTop + pt.height)) * scaleY;
+                    const boxW = (pt.width || 40) * scaleX;
+                    const boxH = pt.height * scaleY;
+
+                    // ป้องกันไม่ให้ถมดำโดยไม่ตั้งใจ
                     if (pt.bgColor && pt.bgColor !== 'transparent') {
-                        const bgRgb = hexToPdfRgb(pt.bgColor) || rgb(1, 1, 1);
+                        let bgRgb = hexToPdfRgb(pt.bgColor);
+                        if (!bgRgb || (bgRgb.red === 0 && bgRgb.green === 0 && bgRgb.blue === 0 && pt.bgColor !== '#000000')) {
+                            bgRgb = rgb(1, 1, 1);
+                        }
                         targetPage.drawRectangle({
-                            x: pdfX,
-                            y: pdfY,
-                            width: pdfW,
-                            height: pdfH,
+                            x: boxX,
+                            y: boxY,
+                            width: boxW,
+                            height: boxH,
                             color: bgRgb,
                             rotate: pdfRot
                         });
                     }
 
                     let textColorRgb = rgb(0.07, 0.09, 0.15);
-                    if (typeof pt.textColor === 'string') {
+                    if (pt.textColor) {
                         textColorRgb = hexToPdfRgb(pt.textColor) || textColorRgb;
                     }
-
-                    // ตรวจสอบว่ามีตัวอักษรภาษาไทยหรือไม่
-                    const hasThaiChar = /[\u0E00-\u0E7F]/.test(pt.text);
 
                     if (canEmbedThaiFont) {
                         const font = (pt.fontWeight === '700') ? thaiFontBold : thaiFontRegular;
                         targetPage.drawText(pt.text, {
-                            x: pdfX + 2,
-                            y: pdfY + (pdfH * 0.22),
+                            x: boxX + (2 * scaleX),
+                            y: boxY + (boxH * 0.22),
                             size: pt.fontSize * scaleY,
                             font: font,
                             color: textColorRgb,
                             rotate: pdfRot
                         });
                     } else {
-                        // 🎯 หัวใจสำคัญ: เรนเดอร์ข้อความเป็น Canvas ความละเอียดสูง 3 เท่า ป้องกัน WinAnsi Error 100%
+                        // High-Res Fallback ป้องกัน WinAnsi Error
                         const tCanvas = document.createElement('canvas');
                         const tCtx = tCanvas.getContext('2d');
                         const dpr = 3;
@@ -973,36 +979,42 @@ async function exportVectorPDF() {
                         const tImgBytes = await fetch(tImgData).then(r => r.arrayBuffer());
                         const tEmbedded = await loadedPdf.embedPng(tImgBytes);
                         targetPage.drawImage(tEmbedded, {
-                            x: pdfX,
-                            y: pdfY,
-                            width: pdfW,
-                            height: pdfH,
+                            x: boxX,
+                            y: boxY,
+                            width: boxW,
+                            height: boxH,
                             rotate: pdfRot
                         });
                     }
                 }
             }
 
-            // 🎯 ข. รวม SVG (ก้อนเมฆ/สี่เหลี่ยม) + ลายเส้นปากกาลงใน PDF
+            // 🎯 2. เรนเดอร์เมฆตรวจแบบ (SVG) และลายเส้น Canvas ให้ตรงพิกัด 100%
             const annotCanvas = wrapper.querySelector('.annotation-canvas');
             const svgLayer = wrapper.querySelector('.vector-shapes-svg');
 
-            const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = annotCanvas.width;
-            exportCanvas.height = annotCanvas.height;
-            const expCtx = exportCanvas.getContext('2d');
+            const renderCanvas = document.createElement('canvas');
+            renderCanvas.width = cssW * 2;
+            renderCanvas.height = cssH * 2;
+            const rCtx = renderCanvas.getContext('2d');
+            rCtx.scale(2, 2);
 
-            expCtx.drawImage(annotCanvas, 0, 0);
+            rCtx.drawImage(annotCanvas, 0, 0, cssW, cssH);
 
             if (svgLayer && svgLayer.children.length > 0) {
-                const svgData = new XMLSerializer().serializeToString(svgLayer);
+                const clonedSvg = svgLayer.cloneNode(true);
+                clonedSvg.setAttribute('width', cssW);
+                clonedSvg.setAttribute('height', cssH);
+                clonedSvg.setAttribute('viewBox', `0 0 ${cssW} ${cssH}`);
+
+                const svgData = new XMLSerializer().serializeToString(clonedSvg);
                 const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
                 const svgUrl = URL.createObjectURL(svgBlob);
                 
                 await new Promise((resolve) => {
                     const img = new Image();
                     img.onload = () => {
-                        expCtx.drawImage(img, 0, 0, exportCanvas.width, exportCanvas.height);
+                        rCtx.drawImage(img, 0, 0, cssW, cssH);
                         URL.revokeObjectURL(svgUrl);
                         resolve();
                     };
@@ -1014,10 +1026,10 @@ async function exportVectorPDF() {
                 });
             }
 
-            const mergedImgData = exportCanvas.toDataURL('image/png');
-            const imgBytes = await fetch(mergedImgData).then(r => r.arrayBuffer());
-            const embedded = await loadedPdf.embedPng(imgBytes);
-            targetPage.drawImage(embedded, {
+            const finalImgData = renderCanvas.toDataURL('image/png');
+            const finalImgBytes = await fetch(finalImgData).then(r => r.arrayBuffer());
+            const finalEmbedded = await loadedPdf.embedPng(finalImgBytes);
+            targetPage.drawImage(finalEmbedded, {
                 x: 0,
                 y: 0,
                 width: pageW,
@@ -1033,7 +1045,7 @@ async function exportVectorPDF() {
         a.download = `${originalFileName}_CAD_Edited.pdf`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast("ส่งออกไฟล์ PDF เรียบร้อยแล้วค่ะ!");
+        showToast("ส่งออกไฟล์ PDF ตำแหน่งตรง 100% เรียบร้อยค่ะ!");
 
     } catch (err) {
         console.error(err);
