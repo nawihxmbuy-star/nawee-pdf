@@ -5,7 +5,7 @@ if (pdfjsLib) {
 
 // Global States
 let currentTool = 'patch';
-let currentInkColor = '#ef4444'; // สีเริ่มต้นเป็นสีแดง
+let currentInkColor = '#ef4444';
 let currentScale = 1.0;
 let pdfDoc = null;
 let originalPdfBytes = null;
@@ -15,7 +15,7 @@ let documentPatches = {};
 let undoStack = [];
 let redoStack = [];
 
-// 🎯 โหลดทั้ง Regular และ Bold เพื่อให้ตัวหนาใน PDF เนียนสนิท 1:1
+// ฟอนต์ภาษาไทยแท้สำหรับ Vector PDF (Regular + Bold)
 const THAI_FONT_REGULAR_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
 const THAI_FONT_BOLD_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Bold.ttf';
 
@@ -29,7 +29,7 @@ function showToast(msg) {
     toast.className = 'custom-toast';
     toast.innerText = msg;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2600);
+    setTimeout(() => toast.remove(), 2400);
 }
 
 function recordAction(action) {
@@ -69,6 +69,19 @@ window.addEventListener('keydown', (e) => {
         redoAction();
     }
 });
+
+// 🎯 ซูมเอกสารด้วย Ctrl + Mouse Wheel (คีย์ลัดงานเขียนแบบ CAD/Drawing)
+window.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const zoomStep = 0.08;
+        if (e.deltaY < 0) {
+            zoomDoc(zoomStep);
+        } else {
+            zoomDoc(-zoomStep);
+        }
+    }
+}, { passive: false });
 
 function resetApp() {
     if (confirm("ต้องการเริ่มงานใหม่และล้างเอกสารปัจจุบันหรือไม่คะ?")) {
@@ -117,7 +130,7 @@ async function handleFileOpen(e) {
     }
 
     setTool('patch');
-    showToast(`เปิดเอกสารเรียบร้อย (${pdfDoc.numPages} หน้า) - แตะคำเพื่อแก้ได้เลยค่ะ`);
+    showToast(`เปิดเอกสารเรียบร้อย (${pdfDoc.numPages} หน้า) - พร้อมแก้ไขค่ะ`);
 }
 
 async function renderPage(pageNum, container) {
@@ -142,7 +155,6 @@ async function renderPage(pageNum, container) {
     annotCanvas.height = viewport.height;
     wrapper.appendChild(annotCanvas);
 
-    // SVG สำหรับวาดเส้นโยง Leader Line
     const svgLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgLayer.setAttribute('class', 'leader-lines-svg');
     wrapper.appendChild(svgLayer);
@@ -163,11 +175,9 @@ async function renderPage(pageNum, container) {
         const fontHeight = Math.hypot(tx[2], tx[3]);
         const [left, top] = displayViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
 
-        // 🎯 1. คำนวณหามุมหมุนจริงของตัวอักษรจาก Transform Matrix [a, b, c, d, e, f]
         const angleRad = Math.atan2(item.transform[1], item.transform[0]);
         let angleDeg = Math.round(angleRad * (180 / Math.PI));
         if (angleDeg < 0) angleDeg += 360;
-        // ปรับ Snap ให้ตรงกับทิศหลัก 0, 90, 180, 270 องศา
         const snappedRotation = (Math.round(angleDeg / 90) * 90) % 360;
 
         return {
@@ -181,7 +191,7 @@ async function renderPage(pageNum, container) {
             pdfX: item.transform[4],
             pdfY: item.transform[5],
             viewportY: top,
-            rotation: snappedRotation // เก็บองศาของตัวหนังสือ
+            rotation: snappedRotation
         };
     });
 
@@ -215,7 +225,7 @@ function initTabletGestures() {
             if (initialDistance > 0) {
                 const factor = currentDistance / initialDistance;
                 let targetScale = initialTouchScale * factor;
-                targetScale = Math.max(0.5, Math.min(3.0, targetScale));
+                targetScale = Math.max(0.4, Math.min(3.5, targetScale));
                 currentScale = targetScale;
 
                 const container = document.getElementById('document-container');
@@ -334,7 +344,7 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
     const centerY = boxTop + (boxHeight / 2);
 
     let target = textMetadata.find(item => 
-        centerX >= item.x - 3 && centerX <= item.x + item.width + 3 &&
+        centerX >= item.x - 4 && centerX <= item.x + item.width + 4 &&
         centerY >= item.y - 4 && centerY <= item.y + item.height + 4 &&
         item.text && item.text.trim() !== ''
     );
@@ -352,12 +362,12 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
             origWidth: target.width,
             fontWeight: isBold ? '700' : '400',
             text: target.text,
-            rotation: target.rotation || 0 // ส่งค่ามุมหมุนต่อให้กล่อง Input
+            rotation: target.rotation || 0
         };
     }
 
     return {
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: '400',
         text: '',
         rotation: 0
@@ -374,7 +384,7 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
         if (currentTool !== 'patch' && currentTool !== 'rect' && currentTool !== 'circle') return;
         if (e.target.closest('.active-patch-node') || e.target.closest('.nudge-toolbar') || 
             e.target.closest('.shape-interactive-node') || e.target.closest('.shape-callout-bubble') ||
-            e.target.closest('.custom-draggable-sig')) return;
+            e.target.closest('.floating-patch-text') || e.target.closest('.custom-draggable-sig')) return;
 
         const coords = getPageAccurateCoords(e, wrapper);
         startX = coords.x;
@@ -422,41 +432,19 @@ function bindSmartPatchEngine(wrapper, pageNum, pdfCanvas, textMetadata) {
             );
 
             if (hit) {
-                const lineItems = textMetadata
-                    .filter(item => Math.abs(item.y - hit.y) <= 4 && item.text && item.text.trim() !== '')
-                    .sort((a, b) => a.x - b.x);
-
-                const hitIdx = lineItems.findIndex(item => item === hit);
-
-                let startWord = hit;
-                for (let i = hitIdx - 1; i >= 0; i--) {
-                    const prev = lineItems[i];
-                    const gap = startWord.x - (prev.x + prev.width);
-                    if (gap > 6 || /\s$/.test(prev.text) || /^\s/.test(startWord.text)) break;
-                    startWord = prev;
-                }
-
-                let endWord = hit;
-                for (let i = hitIdx + 1; i < lineItems.length; i++) {
-                    const next = lineItems[i];
-                    const gap = next.x - (endWord.x + endWord.width);
-                    if (gap > 6 || /\s$/.test(endWord.text) || /^\s/.test(next.text)) break;
-                    endWord = next;
-                }
-
-                boxLeft = startWord.x;
-                boxTop = Math.min(hit.y, startWord.y, endWord.y);
-                boxWidth = Math.max(16, (endWord.x + endWord.width) - startWord.x + 2);
-                boxHeight = Math.max(hit.height, startWord.height, endWord.height);
+                boxLeft = hit.x;
+                boxTop = hit.y;
+                boxWidth = Math.max(16, hit.width + 2);
+                boxHeight = hit.height;
             } else {
-                boxLeft = Math.max(0, startX - 30);
+                boxLeft = Math.max(0, startX - 25);
                 boxTop = Math.max(0, startY - 8);
-                boxWidth = 70;
+                boxWidth = 50;
                 boxHeight = 16;
             }
         }
 
-        if (boxWidth < 6 || boxHeight < 6) return;
+        if (boxWidth < 4 || boxHeight < 4) return;
 
         if (currentTool === 'rect' || currentTool === 'circle') {
             createInteractiveShape(wrapper, pageNum, boxLeft, boxTop, boxWidth, boxHeight, currentTool, currentInkColor);
@@ -753,20 +741,19 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
 }
 
 // -------------------------------------------------------------
-// กล่อง Input: หมุนองศาอิสระ + กระชับแนบชิด ไม่กินเส้นแบบ/ตาราง
+// กล่อง Input: หมุนกึ่งกลาง ไม่เหวี่ยง + จบงานเป็น Draggable Text
 // -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
-    const fontSize = matchedOrig && matchedOrig.fontSize ? matchedOrig.fontSize : 9;
+    const fontSize = matchedOrig && matchedOrig.fontSize ? matchedOrig.fontSize : 10;
     let currentWeight = matchedOrig && matchedOrig.fontWeight ? matchedOrig.fontWeight : '400';
     let currentRotation = matchedOrig && matchedOrig.rotation !== undefined ? matchedOrig.rotation : 0;
     
     const insetLeft = left;
     const insetTop = top;
-    let insetWidth = Math.max(16, width);
-    // 🎯 2. บีบความสูงกล่องถมสีพื้นให้พอดีกับความสูงฟอนต์จริง ไม่แลบไปทับเส้นแบบ
-    const tightBoxHeight = Math.max(fontSize + 1, Math.round(fontSize * 1.15));
+    let insetWidth = Math.max(20, width);
+    const tightBoxHeight = Math.max(fontSize + 2, Math.round(fontSize * 1.15));
 
     const node = document.createElement('div');
     node.className = 'active-patch-node';
@@ -775,27 +762,23 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     node.style.width = insetWidth + 'px';
     node.style.height = tightBoxHeight + 'px';
     node.style.background = colors.bg.hex;
-    node.style.transformOrigin = 'left top';
+    // 🎯 หมุนจากกึ่งกลางตัวกล่อง ป้องกันการเหวี่ยงกระเด็น
+    node.style.transformOrigin = 'center center';
     node.style.transform = `rotate(${currentRotation}deg)`;
 
     const nudgeBar = document.createElement('div');
     nudgeBar.className = 'nudge-toolbar';
-    // 🎯 เพิ่มปุ่มหมุนข้อความ (nb-rotate) บน Nudge Toolbar
     nudgeBar.innerHTML = `
         <button type="button" class="nudge-btn ${currentWeight === '700' ? 'active' : ''}" id="nb-bold" title="สลับตัวหนา/ตัวปกติ"><strong>B</strong></button>
-        <button type="button" class="nudge-btn" id="nb-rotate" title="หมุนองศาข้อความทีละ 90°"><i class="fa-solid fa-rotate"></i> <span id="rot-deg">${currentRotation}°</span></button>
-        <button type="button" class="nudge-btn" id="nb-left" title="ชิดซ้าย"><i class="fa-solid fa-align-left"></i></button>
-        <button type="button" class="nudge-btn" id="nb-center" title="กึ่งกลาง"><i class="fa-solid fa-align-center"></i></button>
-        <button type="button" class="nudge-btn" id="nb-right" title="ชิดขวา"><i class="fa-solid fa-align-right"></i></button>
-        <button type="button" class="nudge-btn" id="nb-step-left" title="ขยับซ้าย 1px">◀</button>
-        <button type="button" class="nudge-btn" id="nb-step-right" title="ขยับขวา 1px">▶</button>
-        <button type="button" class="nudge-btn btn-done" id="nb-done" title="ตกลง ประทับลงเอกสาร"><i class="fa-solid fa-check"></i> เสร็จ</button>
+        <button type="button" class="nudge-btn" id="nb-rotate" title="หมุนองศา"><i class="fa-solid fa-rotate"></i> <span id="rot-deg">${currentRotation}°</span></button>
+        <button type="button" class="nudge-btn btn-done" id="nb-done" title="ตกลง"><i class="fa-solid fa-check"></i> ตกลง</button>
     `;
     node.appendChild(nudgeBar);
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.placeholder = matchedOrig && matchedOrig.text ? matchedOrig.text : 'พิมพ์คำใหม่...';
+    input.value = matchedOrig && matchedOrig.text ? matchedOrig.text : '';
+    input.placeholder = 'พิมพ์ตัวเลข/ข้อความ...';
     input.className = 'patch-input-inline';
     input.style.color = colors.text.hex;
     input.style.fontSize = fontSize + 'px';
@@ -803,26 +786,13 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
     input.style.lineHeight = '1';
     node.appendChild(input);
 
-    const textPreview = document.createElement('div');
-    textPreview.className = 'patch-text-preview';
-    textPreview.style.color = colors.text.hex;
-    textPreview.style.fontSize = fontSize + 'px';
-    textPreview.style.fontWeight = currentWeight;
-    textPreview.style.display = 'none';
-    node.appendChild(textPreview);
-
-    let currentOffsetX = 0;
-    let currentAlign = 'left';
-    let isAdjustMode = false;
-
     input.addEventListener('input', () => {
         const tempSpan = document.createElement('span');
         tempSpan.style.font = `${currentWeight} ${fontSize}px 'Sarabun', sans-serif`;
         tempSpan.style.visibility = 'hidden';
-        tempSpan.style.position = 'absolute';
         tempSpan.innerText = input.value || input.placeholder;
         document.body.appendChild(tempSpan);
-        const textW = tempSpan.offsetWidth + 4;
+        const textW = tempSpan.offsetWidth + 6;
         tempSpan.remove();
 
         if (textW > insetWidth) {
@@ -830,235 +800,174 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         }
     });
 
-    function updatePreviewPosition() {
-        textPreview.style.textAlign = currentAlign;
-        if (currentAlign === 'right') {
-            textPreview.style.paddingRight = '2px';
-            textPreview.style.paddingLeft = '0px';
-        } else if (currentAlign === 'center') {
-            textPreview.style.paddingLeft = '0px';
-            textPreview.style.paddingRight = '0px';
-        } else {
-            textPreview.style.paddingLeft = currentOffsetX + 'px';
-            textPreview.style.paddingRight = '0px';
-        }
-    }
-
     nudgeBar.querySelector('#nb-bold').onclick = (e) => {
         e.stopPropagation();
         currentWeight = currentWeight === '700' ? '400' : '700';
         input.style.fontWeight = currentWeight;
-        textPreview.style.fontWeight = currentWeight;
         nudgeBar.querySelector('#nb-bold').classList.toggle('active', currentWeight === '700');
     };
 
-    // 🎯 ฟังก์ชันคลิกปุ่มหมุนข้อความ
     nudgeBar.querySelector('#nb-rotate').onclick = (e) => {
         e.stopPropagation();
         currentRotation = (currentRotation + 90) % 360;
         node.style.transform = `rotate(${currentRotation}deg)`;
         nudgeBar.querySelector('#rot-deg').innerText = `${currentRotation}°`;
-        showToast(`หมุนข้อความ ${currentRotation}° แล้วค่ะ`);
     };
 
-    nudgeBar.querySelector('#nb-step-left').onclick = (e) => {
-        e.stopPropagation();
-        currentOffsetX -= 1;
-        input.style.paddingLeft = Math.max(0, currentOffsetX) + 'px';
-        updatePreviewPosition();
-    };
-    nudgeBar.querySelector('#nb-step-right').onclick = (e) => {
-        e.stopPropagation();
-        currentOffsetX += 1;
-        input.style.paddingLeft = currentOffsetX + 'px';
-        updatePreviewPosition();
-    };
-    nudgeBar.querySelector('#nb-center').onclick = (e) => {
-        e.stopPropagation();
-        currentAlign = 'center';
-        input.style.textAlign = 'center';
-        updatePreviewPosition();
-    };
-    nudgeBar.querySelector('#nb-left').onclick = (e) => {
-        e.stopPropagation();
-        currentAlign = 'left';
-        input.style.textAlign = 'left';
-        updatePreviewPosition();
-    };
-    nudgeBar.querySelector('#nb-right').onclick = (e) => {
-        e.stopPropagation();
-        currentAlign = 'right';
-        input.style.textAlign = 'right';
-        updatePreviewPosition();
-    };
     nudgeBar.querySelector('#nb-done').onclick = (e) => {
         e.stopPropagation();
-        commitFinalToCanvas();
+        commitToDraggableNode();
     };
 
     layer.appendChild(node);
-    setTimeout(() => input.focus(), 50);
-
-    function enterAdjustMode() {
-        const text = input.value.trim();
-        if (!text) {
-            node.remove();
-            return;
-        }
-
-        isAdjustMode = true;
-        input.style.display = 'none';
-        node.style.border = '1px dashed var(--accent)';
-
-        textPreview.innerText = text;
-        textPreview.style.display = 'block';
-        updatePreviewPosition();
-
-        showToast("ขยับซ้าย-ขวา หรือหมุนองศา แล้วแตะ 'เสร็จ'");
-    }
-
-    function handleKeyNudge(e) {
-        if (!isAdjustMode) return;
-
-        if (e.key === 'ArrowLeft') {
-            e.preventDefault();
-            currentOffsetX -= 1;
-            updatePreviewPosition();
-        } else if (e.key === 'ArrowRight') {
-            e.preventDefault();
-            currentOffsetX += 1;
-            updatePreviewPosition();
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            commitFinalToCanvas();
-        }
-    }
-
-    window.addEventListener('keydown', handleKeyNudge);
+    setTimeout(() => { input.focus(); input.select(); }, 50);
 
     input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            enterAdjustMode();
-        } else if (e.key === 'Escape') {
-            window.removeEventListener('keydown', handleKeyNudge);
-            node.remove();
-        }
+        if (e.key === 'Enter') commitToDraggableNode();
+        else if (e.key === 'Escape') node.remove();
     });
 
-    function commitFinalToCanvas() {
-        window.removeEventListener('keydown', handleKeyNudge);
+    function commitToDraggableNode() {
         const text = input.value.trim();
+        const finalW = parseFloat(node.style.width) || insetWidth;
         node.remove();
-
         if (!text) return;
 
+        // ถมสีพื้นลบคำเดิมบน Canvas แบบแนบชิด (Zero-Bleed) ไม่ตัดเส้นแบบ
         const ctx = pdfCanvas.getContext('2d');
         const ratioX = pdfCanvas.width / parseFloat(pdfCanvas.style.width || (pdfCanvas.width / 2));
         const ratioY = pdfCanvas.height / parseFloat(pdfCanvas.style.height || (pdfCanvas.height / 2));
-
-        const canvasFontSize = fontSize * ratioY;
-        ctx.font = `${currentWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
-        const metrics = ctx.measureText(text);
-        const textWidthOnCanvas = metrics.width;
         
-        // 🎯 3. บีบขนาดกล่องถมสีพื้นให้พอดีตัวอักษรจริง ไม่บวก Padding จนล้นไปกินเส้นแบบ
-        const finalBoxW = parseFloat(node.style.width) || insetWidth;
-        const tightClearW = Math.max(finalBoxW * ratioX, textWidthOnCanvas + (2 * ratioX));
-        const tightClearH = tightBoxHeight * ratioY;
-
         ctx.save();
-        // หมุน Context ของ Canvas เพื่อแสดงผลพรีวิวตามมุมหมุน
-        ctx.translate(insetLeft * ratioX, insetTop * ratioY);
+        ctx.translate((insetLeft + (finalW / 2)) * ratioX, (insetTop + (tightBoxHeight / 2)) * ratioY);
         ctx.rotate((currentRotation * Math.PI) / 180);
-
-        // วาดกล่องถมสีพื้น
         ctx.fillStyle = colors.bg.hex;
-        ctx.fillRect(0, 0, tightClearW, tightClearH);
-
-        let drawX = currentOffsetX * ratioX;
-        if (currentAlign === 'right') {
-            drawX = tightClearW - textWidthOnCanvas - (2 * ratioX);
-        } else if (currentAlign === 'center') {
-            drawX = (tightClearW - textWidthOnCanvas) / 2;
-        }
-
-        const drawBaselineY = (fontSize * 0.88) * ratioY;
-
-        ctx.fillStyle = colors.text.hex;
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText(text, drawX, drawBaselineY);
+        ctx.fillRect(-(finalW * ratioX) / 2, -(tightBoxHeight * ratioY) / 2, finalW * ratioX, tightBoxHeight * ratioY);
         ctx.restore();
 
-        const wrapperHeight = parseFloat(wrapper.style.height);
-        
-        // พิกัดสำหรับส่งออกเวกเตอร์ PDF
-        const finalPdfX = insetLeft;
-        const finalPdfY = wrapperHeight - insetTop;
-
-        if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
-        
-        const patchData = {
-            x: finalPdfX,
-            boxLeft: insetLeft,
-            y: finalPdfY,
-            patchBoxY: finalPdfY,
-            width: (tightClearW / ratioX),
-            height: tightBoxHeight,
-            text: text,
-            fontSize: fontSize,
-            fontWeight: currentWeight,
-            rotation: currentRotation, // บันทึกมุมหมุนสำหรับ PDF
-            offsetX: currentOffsetX,
-            align: currentAlign,
-            bgColor: colors.bg,
-            textColor: colors.text
-        };
-
-        documentPatches[pageNum].patches.push(patchData);
-
-        createReEditHotspot(wrapper, pageNum, pdfCanvas, insetLeft, insetTop, (tightClearW / ratioX), tightBoxHeight, colors, matchedOrig, text);
-        
-        recordAction({
-            undo: () => {
-                documentPatches[pageNum].patches = documentPatches[pageNum].patches.filter(p => p !== patchData);
-                pdfDoc.getPage(pageNum).then(p => {
-                    const vp = p.getViewport({ scale: 2.0 });
-                    p.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: vp });
-                });
-            },
-            redo: () => {
-                documentPatches[pageNum].patches.push(patchData);
-                ctx.save();
-                ctx.translate(insetLeft * ratioX, insetTop * ratioY);
-                ctx.rotate((currentRotation * Math.PI) / 180);
-                ctx.fillStyle = colors.bg.hex;
-                ctx.fillRect(0, 0, tightClearW, tightClearH);
-                ctx.font = `${currentWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
-                ctx.fillStyle = colors.text.hex;
-                ctx.fillText(text, drawX, drawBaselineY);
-                ctx.restore();
-            }
-        });
-
-        showToast("ประทับข้อความลงเอกสารเรียบร้อยแล้วค่ะ");
+        // สร้าง Element ข้อความแบบยกย้ายอิสระ (Draggable Floating Text)
+        createFloatingTextItem(wrapper, pageNum, pdfCanvas, insetLeft, insetTop, finalW, tightBoxHeight, text, fontSize, currentWeight, currentRotation, colors, matchedOrig);
     }
 }
 
-function createReEditHotspot(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig, currentText) {
+// -------------------------------------------------------------
+// Element ข้อความลอย: จับลากย้ายตรงไหนก็ได้ + ปุ่มลบ + ดับเบิลคลิกแก้คำ
+// -------------------------------------------------------------
+function createFloatingTextItem(wrapper, pageNum, pdfCanvas, left, top, width, height, text, fontSize, fontWeight, rotation, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
-    const hotspot = document.createElement('div');
-    hotspot.className = 'canvas-hotspot';
-    hotspot.style.left = left + 'px';
-    hotspot.style.top = top + 'px';
-    hotspot.style.width = width + 'px';
-    hotspot.style.height = height + 'px';
+    const wH = parseFloat(wrapper.style.height);
 
-    hotspot.addEventListener('dblclick', () => {
-        hotspot.remove();
-        createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig);
+    const item = document.createElement('div');
+    item.className = 'floating-patch-text';
+    item.style.position = 'absolute';
+    item.style.left = left + 'px';
+    item.style.top = top + 'px';
+    item.style.minWidth = width + 'px';
+    item.style.height = height + 'px';
+    item.style.background = colors.bg.hex;
+    item.style.color = colors.text.hex;
+    item.style.fontSize = fontSize + 'px';
+    item.style.fontWeight = fontWeight;
+    item.style.transformOrigin = 'center center';
+    item.style.transform = `rotate(${rotation}deg)`;
+    item.style.cursor = 'grab';
+    item.style.zIndex = '98';
+    item.style.display = 'inline-flex';
+    item.style.alignItems = 'center';
+    item.style.padding = '0 2px';
+    item.style.border = '1px dashed var(--accent)';
+    item.style.borderRadius = '3px';
+    item.style.pointerEvents = 'auto';
+    item.innerText = text;
+
+    const delBtn = document.createElement('span');
+    delBtn.innerHTML = '&times;';
+    delBtn.style.cssText = 'position:absolute; top:-7px; right:-7px; width:15px; height:15px; background:#ef4444; color:#fff; border-radius:50%; font-size:10px; display:none; align-items:center; justify-content:center; cursor:pointer; border:1px solid #fff;';
+    item.appendChild(delBtn);
+
+    item.onmouseenter = () => delBtn.style.display = 'flex';
+    item.onmouseleave = () => delBtn.style.display = 'none';
+
+    layer.appendChild(item);
+
+    if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
+
+    const patchData = {
+        boxLeft: left,
+        patchBoxY: wH - (top + height),
+        width: width,
+        height: height,
+        text: text,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        rotation: rotation,
+        bgColor: colors.bg,
+        textColor: colors.text
+    };
+    documentPatches[pageNum].patches.push(patchData);
+
+    function syncPosition() {
+        const curL = parseFloat(item.style.left);
+        const curT = parseFloat(item.style.top);
+        patchData.boxLeft = curL;
+        patchData.patchBoxY = wH - (curT + height);
+    }
+
+    // ลากย้ายตำแหน่งอย่างอิสระ (Drag & Drop)
+    let isDragging = false, startX = 0, startY = 0, origL = left, origT = top;
+    item.addEventListener('pointerdown', (e) => {
+        if (e.target === delBtn) return;
+        isDragging = true;
+        startX = e.clientX; startY = e.clientY;
+        origL = parseFloat(item.style.left);
+        origT = parseFloat(item.style.top);
+        item.style.cursor = 'grabbing';
+        item.setPointerCapture(e.pointerId);
     });
 
-    layer.appendChild(hotspot);
+    item.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = (e.clientX - startX) / currentScale;
+        const dy = (e.clientY - startY) / currentScale;
+        item.style.left = (origL + dx) + 'px';
+        item.style.top = (origT + dy) + 'px';
+        syncPosition();
+    });
+
+    item.addEventListener('pointerup', () => {
+        if (isDragging) {
+            isDragging = false;
+            item.style.cursor = 'grab';
+            syncPosition();
+            showToast("ย้ายตำแหน่งข้อความเรียบร้อยค่ะ");
+        }
+    });
+
+    // ดับเบิลคลิกเพื่อแก้คำ
+    item.addEventListener('dblclick', () => {
+        documentPatches[pageNum].patches = documentPatches[pageNum].patches.filter(p => p !== patchData);
+        item.remove();
+        createInPlaceInputBox(wrapper, pageNum, pdfCanvas, parseFloat(item.style.left), parseFloat(item.style.top), width, height, colors, { ...matchedOrig, text: text, rotation: rotation });
+    });
+
+    // ลบข้อความ
+    delBtn.onclick = (e) => {
+        e.stopPropagation();
+        documentPatches[pageNum].patches = documentPatches[pageNum].patches.filter(p => p !== patchData);
+        item.remove();
+        showToast("ลบข้อความแล้วค่ะ");
+    };
+
+    recordAction({
+        undo: () => {
+            item.style.display = 'none';
+            documentPatches[pageNum].patches = documentPatches[pageNum].patches.filter(p => p !== patchData);
+        },
+        redo: () => {
+            item.style.display = 'inline-flex';
+            documentPatches[pageNum].patches.push(patchData);
+        }
+    });
 }
 
 function bindDrawingEngine(canvas, pageNum) {
@@ -1217,7 +1126,7 @@ function placeSignatureOnDoc() {
 }
 
 // -------------------------------------------------------------
-// ส่งออก Vector PDF (รองรับ Rotation องศาแท้ + ฟอนต์ Bold/Regular)
+// ส่งออก Vector PDF (คมชัด 100% รองรับ Rotation + Sarabun-Bold)
 // -------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; }
@@ -1257,7 +1166,7 @@ async function exportVectorPDF() {
             const targetPage = pages[pIdx];
             const pData = documentPatches[pageNum];
 
-            // 1. เรนเดอร์การแก้ไขคำ (พร้อมระบบหมุนองศา degrees(rotation))
+            // 1. เรนเดอร์กล่องข้อความ (พร้อมคำนวณจุดหมุนในระบบ PDF)
             if (pData.patches) {
                 pData.patches.forEach(pt => {
                     const safeBgR = Math.min(1.0, Math.max(0.0, pt.bgColor.r));
@@ -1272,72 +1181,71 @@ async function exportVectorPDF() {
                     const selectedFont = isBold ? thaiFontBold : thaiFontRegular;
                     const rot = pt.rotation || 0;
 
-                    // 🎯 4. คำนวณพิกัดการวาดหมุนในระบบแกน PDF (Origin: ล่างซ้าย)
                     if (rot === 0) {
                         targetPage.drawRectangle({
                             x: pt.boxLeft,
-                            y: pt.patchBoxY - pt.height,
+                            y: pt.patchBoxY,
                             width: pt.width,
                             height: pt.height,
                             color: rgb(safeBgR, safeBgG, safeBgB),
                         });
                         targetPage.drawText(pt.text, {
-                            x: pt.boxLeft + (pt.offsetX || 0),
-                            y: pt.patchBoxY - (pt.fontSize * 0.88),
+                            x: pt.boxLeft + 2,
+                            y: pt.patchBoxY + 3,
                             size: pt.fontSize,
                             font: selectedFont,
                             color: rgb(safeTxtR, safeTxtG, safeTxtB),
                         });
                     } else if (rot === 90) {
                         targetPage.drawRectangle({
-                            x: pt.boxLeft,
+                            x: pt.boxLeft + pt.width,
                             y: pt.patchBoxY,
                             width: pt.width,
                             height: pt.height,
                             color: rgb(safeBgR, safeBgG, safeBgB),
-                            rotate: degrees(-90)
+                            rotate: degrees(90)
                         });
                         targetPage.drawText(pt.text, {
-                            x: pt.boxLeft + (pt.fontSize * 0.88),
-                            y: pt.patchBoxY - (pt.offsetX || 0),
+                            x: pt.boxLeft + pt.width - 3,
+                            y: pt.patchBoxY + 2,
                             size: pt.fontSize,
                             font: selectedFont,
                             color: rgb(safeTxtR, safeTxtG, safeTxtB),
-                            rotate: degrees(-90)
+                            rotate: degrees(90)
                         });
                     } else if (rot === 180) {
                         targetPage.drawRectangle({
-                            x: pt.boxLeft,
-                            y: pt.patchBoxY,
+                            x: pt.boxLeft + pt.width,
+                            y: pt.patchBoxY + pt.height,
                             width: pt.width,
                             height: pt.height,
                             color: rgb(safeBgR, safeBgG, safeBgB),
-                            rotate: degrees(-180)
+                            rotate: degrees(180)
                         });
                         targetPage.drawText(pt.text, {
-                            x: pt.boxLeft - (pt.offsetX || 0),
-                            y: pt.patchBoxY + (pt.fontSize * 0.88),
+                            x: pt.boxLeft + pt.width - 2,
+                            y: pt.patchBoxY + pt.height - 3,
                             size: pt.fontSize,
                             font: selectedFont,
                             color: rgb(safeTxtR, safeTxtG, safeTxtB),
-                            rotate: degrees(-180)
+                            rotate: degrees(180)
                         });
                     } else if (rot === 270) {
                         targetPage.drawRectangle({
                             x: pt.boxLeft,
-                            y: pt.patchBoxY,
+                            y: pt.patchBoxY + pt.height,
                             width: pt.width,
                             height: pt.height,
                             color: rgb(safeBgR, safeBgG, safeBgB),
-                            rotate: degrees(-270)
+                            rotate: degrees(270)
                         });
                         targetPage.drawText(pt.text, {
-                            x: pt.boxLeft - (pt.fontSize * 0.88),
-                            y: pt.patchBoxY + (pt.offsetX || 0),
+                            x: pt.boxLeft + 3,
+                            y: pt.patchBoxY + pt.height - 2,
                             size: pt.fontSize,
                             font: selectedFont,
                             color: rgb(safeTxtR, safeTxtG, safeTxtB),
-                            rotate: degrees(-270)
+                            rotate: degrees(270)
                         });
                     }
                 });
@@ -1488,7 +1396,7 @@ function selectInkColor(color, el) {
 function zoomDoc(delta) {
     currentScale += delta;
     if (currentScale < 0.4) currentScale = 0.4;
-    if (currentScale > 3.0) currentScale = 3.0;
+    if (currentScale > 3.5) currentScale = 3.5;
     const c = document.getElementById('document-container');
     if (c) c.style.transform = `scale(${currentScale})`;
 }
