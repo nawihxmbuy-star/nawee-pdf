@@ -3,47 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sunita PDF Studio - Pro Engineering Edition</title>
+    <title>Sunita PDF Studio - World-Class Engineering Edition</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- Top Bar: Studio Minimalist Dock -->
+    <!-- Top Bar: Studio Live Ribbon -->
     <header class="top-bar">
         <div class="brand">
             <img src="cat-avatar.png" alt="Logo" class="brand-avatar" onerror="this.style.display='none'">
             <span>Sunita <span class="text-glow">PDF</span></span>
-            <span class="pro-badge">CAD PRO</span>
+            <span class="pro-badge">PRO CAD</span>
         </div>
 
         <div class="top-dock-bar">
-            <!-- Navigation -->
+            <!-- Navigation Tools -->
             <button class="dock-btn" id="tool-pan" title="เลื่อนมุมมอง (Spacebar)"><i class="fa-solid fa-hand"></i></button>
-            <button class="dock-btn" id="btn-zoom-fit" title="พอดีหน้าจอ (Double Middle-Click)"><i class="fa-solid fa-expand"></i></button>
+            <button class="dock-btn" id="btn-zoom-fit" title="พอดีหน้าจอ"><i class="fa-solid fa-expand"></i></button>
             <button class="dock-btn" id="btn-zoom-100" title="ขนาด 100%">1:1</button>
             
             <div class="dock-divider"></div>
 
-            <!-- Engineering Markup -->
+            <!-- Creation Tools -->
             <button class="dock-btn active" id="tool-text" title="ข้อความ / แก้ตัวเลข (T)"><i class="fa-solid fa-font"></i></button>
             <button class="dock-btn" id="tool-rect" title="กรอบสี่เหลี่ยม (R)"><i class="fa-regular fa-square"></i></button>
             <button class="dock-btn" id="tool-cloud" title="เมฆตรวจแบบ Revision Cloud (C)"><i class="fa-solid fa-cloud"></i></button>
-            
-            <div class="dock-divider"></div>
-
-            <!-- Freehand & Signature -->
             <button class="dock-btn" id="tool-pen" title="ปากกาตรวจแบบ (P)"><i class="fa-solid fa-pen-nib"></i></button>
             <button class="dock-btn" id="tool-eraser" title="ยางลบ (E)"><i class="fa-solid fa-eraser"></i></button>
             <button class="dock-btn" id="btn-open-sig" title="ลายเซ็น / ตรายาง"><i class="fa-solid fa-signature"></i></button>
 
-            <div class="dock-divider"></div>
+            <!-- ======================================================== -->
+            <!-- CONTEXTUAL LIVE PROPERTY RIBBON (แสดงสดเมื่อเลือกอ็อบเจกต์) -->
+            <!-- ======================================================== -->
+            
+            <!-- 1. Text Context Ribbon -->
+            <div class="context-ribbon" id="ribbon-text" style="display: none;">
+                <div class="dock-divider"></div>
+                <!-- ขนาดฟอนต์ -->
+                <button class="dock-btn-sm" id="rib-font-dec" title="ลดขนาดฟอนต์"><i class="fa-solid fa-minus"></i></button>
+                <input type="number" id="rib-font-size" class="rib-input-num" value="10" min="4" max="120" title="ขนาดฟอนต์ (pt)">
+                <button class="dock-btn-sm" id="rib-font-inc" title="เพิ่มขนาดฟอนต์"><i class="fa-solid fa-plus"></i></button>
+                
+                <button class="dock-btn-sm" id="rib-font-bold" title="ตัวหนา (B)"><strong>B</strong></button>
+                
+                <!-- สีตัวหนังสือ -->
+                <div class="rib-color-wrap" title="สีตัวหนังสือ">
+                    <i class="fa-solid fa-font"></i>
+                    <input type="color" id="rib-text-color" value="#111827">
+                </div>
 
-            <!-- Active Color Picker -->
-            <div class="color-picker-wrap">
-                <input type="color" id="active-color-input" value="#ef4444" title="เลือกสีมาร์กอัป">
+                <div class="dock-divider-sub"></div>
+
+                <!-- พื้นหลัง: สลับ โปร่งใส / ทึบแสง -->
+                <button class="dock-btn-sm" id="rib-bg-toggle" title="เปิด/ปิด การถมพื้นหลัง">
+                    <i class="fa-solid fa-fill-drip"></i>
+                </button>
+                <div class="rib-color-wrap" id="rib-bg-color-wrap" title="เลือกสีพื้นหลังที่ต้องการถม">
+                    <input type="color" id="rib-bg-color" value="#ffffff">
+                </div>
+
+                <div class="dock-divider-sub"></div>
+
+                <!-- การหมุนองศา -->
+                <button class="dock-btn-sm" id="rib-rot-90" title="หมุนฉาก 90°"><i class="fa-solid fa-rotate-right"></i></button>
+                <input type="number" id="rib-rot-deg" class="rib-input-num" value="0" min="0" max="359" title="องศา">
+                <span class="rib-unit">°</span>
+
+                <button class="dock-btn-sm btn-rib-commit" id="rib-text-commit" title="ล็อกบันทึก (Enter)"><i class="fa-solid fa-check"></i></button>
+                <button class="dock-btn-sm btn-rib-del" id="rib-text-delete" title="ลบ (Delete)"><i class="fa-solid fa-trash-can"></i></button>
             </div>
+
+            <!-- 2. Shape / Cloud Context Ribbon -->
+            <div class="context-ribbon" id="ribbon-shape" style="display: none;">
+                <div class="dock-divider"></div>
+                <!-- ความหนาเส้น -->
+                <span class="rib-label">เส้น:</span>
+                <input type="number" id="rib-stroke-width" class="rib-input-num" value="2" min="1" max="20" title="ความหนาเส้น">
+                
+                <!-- สีเส้นขอบ -->
+                <div class="rib-color-wrap" title="สีเส้นขอบ">
+                    <i class="fa-solid fa-pen"></i>
+                    <input type="color" id="rib-shape-stroke" value="#ef4444">
+                </div>
+
+                <!-- สีถมด้านใน -->
+                <button class="dock-btn-sm" id="rib-shape-fill-toggle" title="เปิด/ปิด สีถมในก้อนเมฆ">
+                    <i class="fa-solid fa-brush"></i>
+                </button>
+                <div class="rib-color-wrap" id="rib-shape-fill-wrap" style="display: none;" title="เลือกสีถมภายใน">
+                    <input type="color" id="rib-shape-fill" value="#fef08a">
+                </div>
+
+                <button class="dock-btn-sm btn-rib-commit" id="rib-shape-commit" title="ล็อกบันทึก (Enter)"><i class="fa-solid fa-check"></i></button>
+                <button class="dock-btn-sm btn-rib-del" id="rib-shape-delete" title="ลบรูปทรงนี้"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+
+            <div class="dock-divider"></div>
 
             <!-- History Actions -->
             <button class="dock-btn" id="btn-undo" title="ย้อนกลับ (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
@@ -65,7 +122,7 @@
                     <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\\'welcome-icon\\'><i class=\\'fa-solid fa-drafting-compass\\'></i></div>'">
                 </div>
                 <h2>Sunita Studio CAD Engine</h2>
-                <p>ดับเบิลคลิกเพื่อแก้คำสดบนแบบ • หมุนอิสระ 360° • เมฆตรวจแบบ Revision Cloud • Vector PDF 100%</p>
+                <p>ปรับฟอนต์ สีพื้นหลัง และรูปทรงเมฆตรวจแบบสดๆ บน Top Ribbon ก่อนกด Enter • Vector PDF 100%</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
