@@ -179,13 +179,38 @@ body.tool-pen .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-
 .cad-text-node.selected .cad-rot-stem,
 .cad-text-node.selected .cad-rot-handle { display: block; }
 
-/* จุดจับยืดขยายขนาดกล่องข้อความ (East Handle) */
-.cad-resize-handle {
-    position: absolute; right: -5px; top: 50%; transform: translateY(-50%);
-    width: 6px; height: 14px; background: #fff; border: 1.5px solid var(--accent);
-    border-radius: 2px; cursor: ew-resize; display: none; z-index: 10;
+/* ขอบเซนเซอร์รับการปรับขนาด (ซ่อนรูป ไม่แสดงจุดสี่เหลี่ยม แค่ชี้ขอบก็ปรับได้) */
+.cad-edge-resize {
+    position: absolute;
+    box-sizing: border-box;
+    z-index: 10;
 }
-.cad-text-node.selected .cad-resize-handle { display: block; }
+
+/* ขอบขวา-ซ้าย (ปรับกว้าง) */
+.cad-edge-e {
+    right: -4px; top: 0; width: 8px; height: 100%;
+    cursor: ew-resize;
+}
+.cad-edge-w {
+    left: -4px; top: 0; width: 8px; height: 100%;
+    cursor: ew-resize;
+}
+
+/* ขอบล่าง-บน (ปรับสูง) */
+.cad-edge-s {
+    bottom: -4px; left: 0; width: 100%; height: 8px;
+    cursor: ns-resize;
+}
+.cad-edge-n {
+    top: -4px; left: 0; width: 100%; height: 8px;
+    cursor: ns-resize;
+}
+
+/* มุมขวาล่าง (ปรับกว้าง + สูง พร้อมกัน) */
+.cad-edge-se {
+    right: -4px; bottom: -4px; width: 10px; height: 10px;
+    cursor: nwse-resize;
+}
 
 /* In-place Editable Input */
 .cad-inline-editor {
