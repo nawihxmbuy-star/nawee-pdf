@@ -113,7 +113,7 @@ function resetApp() {
                     <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\\'welcome-icon\\'><i class=\\'fa-solid fa-drafting-compass\\'></i></div>'">
                 </div>
                 <h2>Sunita Studio CAD Engine</h2>
-                <p>ดับเบิลคลิกเพื่อแก้คำสดบนแบบ • หมุนอิสระ 360° • เมฆตรวจแบบ Revision Cloud • Vector PDF 100%</p>
+                <p>ดับเบิลคลิกเพื่อแก้คำสดบนแบบ • หมุนอิสระ 360° • ตรวจจับระนาบ Baseline แท้ • Vector PDF 100%</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
@@ -147,6 +147,9 @@ async function handleFileOpen(e) {
     showToast(`เปิดเอกสารสำเร็จ (${pdfDoc.numPages} หน้า) - ดับเบิลคลิกเพื่อแก้คำได้เลยค่ะ`);
 }
 
+// --------------------------------------------------------------------------
+// 1. ENGINE RENDER & MATRIX DECONSTRUCTION (สกัด Baseline และสเกลจริง)
+// --------------------------------------------------------------------------
 async function renderPage(pageNum, container) {
     const page = await pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale: 2.0 });
@@ -189,24 +192,34 @@ async function renderPage(pageNum, container) {
     const displayViewport = page.getViewport({ scale: 1.0 });
 
     const pageTextMetadata = textContent.items.map(item => {
+        // ถอดรหัส Affine Transformation Matrix 6 ตัว [a, b, c, d, e, f]
         const tx = pdfjsLib.Util.transform(displayViewport.transform, item.transform);
-        const fontHeight = Math.hypot(tx[2], tx[3]);
-        const [left, top] = displayViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+        const a = tx[0], b = tx[1], c = tx[2], d = tx[3], e = tx[4], f = tx[5];
 
-        const angleRad = Math.atan2(item.transform[1], item.transform[0]);
+        const fontHeight = Math.hypot(c, d);
+        const fontWidth = Math.hypot(a, b);
+        const angleRad = Math.atan2(b, a);
         let angleDeg = Math.round(angleRad * (180 / Math.PI));
         if (angleDeg < 0) angleDeg += 360;
 
         const isBold = item.fontName ? (/bold|black|heavy|medium|semibold/i.test(item.fontName)) : false;
         const textLen = Math.max(12, item.width);
 
-        // คำนวณจุดกึ่งกลางของข้อความจริง
+        // คำนวณชดเชยค่า Ascender Ratio (~0.78) เพื่อให้ระนาบตัวเลขวางแนบสนิทบน Baseline เดิม
+        const ascenderOffset = fontHeight * 0.78;
         const rad = (angleDeg * Math.PI) / 180;
-        const centerX = left + (textLen / 2) * Math.cos(rad);
-        const centerY = (top - fontHeight / 2) + (textLen / 2) * Math.sin(rad);
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        // พิกัดจุดศูนย์กลางตามระนาบองศาจริง
+        const centerX = e + (textLen / 2) * cos - (ascenderOffset - fontHeight / 2) * sin;
+        const centerY = f + (textLen / 2) * sin + (ascenderOffset - fontHeight / 2) * cos;
 
         return {
-            centerX, centerY,
+            baselineX: e,
+            baselineY: f,
+            centerX: centerX,
+            centerY: centerY,
             left: centerX - textLen / 2,
             top: centerY - fontHeight / 2,
             width: textLen,
@@ -223,9 +236,57 @@ async function renderPage(pageNum, container) {
     bindShapeEngine(wrapper, pageNum, svgLayer);
 }
 
-// -------------------------------------------------------------
-// IN-PLACE UNIVERSAL TEXT ENGINE (ดับเบิลคลิกพิมพ์สดบนกระดาษ)
-// -------------------------------------------------------------
+// --------------------------------------------------------------------------
+// 2. DYNAMIC 8-DIRECTION PERIMETER SAMPLING (ดูดสีพื้นหลังจริงรอบทิศทาง)
+// --------------------------------------------------------------------------
+function samplePerimeterBackground(canvas, cx, cy, w, h, rad) {
+    const ctx = canvas.getContext('2d');
+    const scaleFactorX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
+    const scaleFactorY = canvas.height / parseFloat(canvas.style.height || (canvas.height / 2));
+
+    const sCX = cx * scaleFactorX;
+    const sCY = cy * scaleFactorY;
+    const sHalfW = (w * scaleFactorX) / 2 + 4;
+    const sHalfH = (h * scaleFactorY) / 2 + 4;
+
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // สุ่มเก็บ 8 จุดรอบขอบนอกรัศมี Bounding Box
+    const sampleOffsets = [
+        { x: -sHalfW, y: -sHalfH }, { x: 0, y: -sHalfH }, { x: sHalfW, y: -sHalfH },
+        { x: sHalfW, y: 0 },
+        { x: sHalfW, y: sHalfH }, { x: 0, y: sHalfH }, { x: -sHalfW, y: sHalfH },
+        { x: -sHalfW, y: 0 }
+    ];
+
+    let rArr = [], gArr = [], bArr = [];
+    sampleOffsets.forEach(pt => {
+        const rotX = Math.round(sCX + (pt.x * cos - pt.y * sin));
+        const rotY = Math.round(sCY + (pt.x * sin + pt.y * cos));
+        if (rotX >= 0 && rotX < canvas.width && rotY >= 0 && rotY < canvas.height) {
+            const pixel = ctx.getImageData(rotX, rotY, 1, 1).data;
+            rArr.push(pixel[0]);
+            gArr.push(pixel[1]);
+            bArr.push(pixel[2]);
+        }
+    });
+
+    if (rArr.length === 0) return '#ffffff';
+
+    // คำนวณหามัธยฐาน (Median) ตัดสีเส้นบอกขนาดหรือหมึกดำออก
+    const median = arr => {
+        const sorted = [...arr].sort((a, b) => a - b);
+        return sorted[Math.floor(sorted.length / 2)];
+    };
+
+    const toHex = n => Math.min(255, Math.max(0, n)).toString(16).padStart(2, '0');
+    return `#${toHex(median(rArr))}${toHex(median(gArr))}${toHex(median(bArr))}`;
+}
+
+// --------------------------------------------------------------------------
+// 3. IN-PLACE UNIVERSAL TEXT ENGINE (พิมพ์สด ลบสีพื้นหลังเนียน 100%)
+// --------------------------------------------------------------------------
 function bindCadTextEngine(wrapper, pageNum, pdfCanvas, glyphLayer, textMetadata) {
     glyphLayer.innerHTML = '';
 
@@ -303,15 +364,17 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
         const ratioX = pdfCanvas.width / parseFloat(wrapper.style.width);
         const ratioY = pdfCanvas.height / parseFloat(wrapper.style.height);
 
-        // 🎯 ถมสี่เหลี่ยมสีขาวตามพิกัดและมุมหมุนจริงเป๊ะๆ ป้องกันปัญหาตัวหนังสือซ้อนทับกัน
         const rad = (rotation * Math.PI) / 180;
         const cX = (left + (finalW / 2)) * ratioX;
         const cY = (top + (height / 2)) * ratioY;
         const clearW = (finalW * ratioX) + (4 * ratioX);
         const clearH = (height * ratioY) + (4 * ratioY);
 
+        // ดูดสีพื้นหลังจริงรอบขอบ 8 ทิศทาง (แก้ปัญหาถมขาวทับพื้นสีอื่น)
+        const sampledBgColor = samplePerimeterBackground(pdfCanvas, left + finalW / 2, top + height / 2, finalW, height, rad);
+
         let previousImageData = null;
-        const snapBoxSize = Math.ceil(Math.max(clearW, clearH) * 1.5);
+        const snapBoxSize = Math.ceil(Math.max(clearW, clearH) * 1.6);
         const snapX = Math.max(0, Math.floor(cX - snapBoxSize / 2));
         const snapY = Math.max(0, Math.floor(cY - snapBoxSize / 2));
 
@@ -321,12 +384,12 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
             ctx.save();
             ctx.translate(cX, cY);
             ctx.rotate(rad);
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = sampledBgColor;
             ctx.fillRect(-clearW / 2, -clearH / 2, clearW, clearH);
             ctx.restore();
         }
 
-        const cadNode = createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, finalW, height, text, fontSize, fontWeight, rotation);
+        const cadNode = createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, finalW, height, text, fontSize, fontWeight, rotation, sampledBgColor);
 
         recordAction({
             undo: () => {
@@ -341,7 +404,7 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
                     ctx.save();
                     ctx.translate(cX, cY);
                     ctx.rotate(rad);
-                    ctx.fillStyle = '#ffffff';
+                    ctx.fillStyle = sampledBgColor;
                     ctx.fillRect(-clearW / 2, -clearH / 2, clearW, clearH);
                     ctx.restore();
                 }
@@ -358,10 +421,10 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
     input.addEventListener('blur', commit);
 }
 
-// -------------------------------------------------------------
-// BOUNDING BOX + FREE ROTATE HANDLE (ก้านหมุน 360° + ล็อกฉาก SHIFT)
-// -------------------------------------------------------------
-function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height, text, fontSize, fontWeight, rotation) {
+// --------------------------------------------------------------------------
+// 4. BOUNDING BOX + FREE ROTATE HANDLE (ก้านหมุน 360° + ล็อกฉาก SHIFT)
+// --------------------------------------------------------------------------
+function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height, text, fontSize, fontWeight, rotation, bgColor) {
     const layer = wrapper.querySelector('.patch-layer');
     const wH = parseFloat(wrapper.style.height);
 
@@ -374,6 +437,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
     node.style.fontSize = fontSize + 'px';
     node.style.fontWeight = fontWeight;
     node.style.color = '#111827';
+    node.style.background = bgColor || 'transparent';
     node.style.transform = `rotate(${rotation}deg)`;
     node.innerText = text;
 
@@ -425,7 +489,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
         openInPlaceEditor(wrapper, pageNum, pdfCanvas, parseFloat(node.style.left), parseFloat(node.style.top), width, height, text, fontSize, fontWeight, currentRot, false);
     };
 
-    // หมุนอิสระ 360° ด้วยก้านหมุน (กด Shift ค้างเพื่อล็อกมุมฉาก 90°)
+    // หมุนอิสระ 360° ด้วยก้านหมุน (กด Shift ค้างเพื่อล็อกฉาก 90°)
     let isRotating = false;
     rotHandle.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
@@ -443,7 +507,6 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
         let angleDeg = Math.round(angleRad * (180 / Math.PI)) + 90;
         if (angleDeg < 0) angleDeg += 360;
 
-        // กด Shift ค้างเพื่อล็อกฉาก 90°
         if (e.shiftKey) {
             angleDeg = (Math.round(angleDeg / 90) * 90) % 360;
         }
@@ -495,7 +558,7 @@ window.addEventListener('pointerdown', (e) => {
 });
 
 // --------------------------------------------------------------------------
-// REVISION CLOUD & RECTANGLE ENGINE (มาร์กจุดตรวจแบบมาตรฐานระดับ CAD)
+// 5. REVISION CLOUD & RECTANGLE ENGINE (ลอนคลื่นก้อนเมฆมาตรฐาน ISO)
 // --------------------------------------------------------------------------
 function generateCloudPath(x1, y1, x2, y2) {
     const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
@@ -504,28 +567,28 @@ function generateCloudPath(x1, y1, x2, y2) {
 
     if (width < 10 || height < 10) return '';
 
-    const arcRadius = 14; // รัศมีลอนคลื่นก้อนเมฆมาตรฐาน
+    const arcRadius = 14;
     let path = `M ${minX} ${minY}`;
 
-    // ขอบบน (ซ้ายไปขวา)
+    // ขอบบน
     for (let x = minX; x < maxX; x += arcRadius * 1.5) {
         const nextX = Math.min(x + arcRadius * 1.5, maxX);
         const midX = (x + nextX) / 2;
         path += ` Q ${midX} ${minY - arcRadius} ${nextX} ${minY}`;
     }
-    // ขวา (บนลงล่าง)
+    // ขวา
     for (let y = minY; y < maxY; y += arcRadius * 1.5) {
         const nextY = Math.min(y + arcRadius * 1.5, maxY);
         const midY = (y + nextY) / 2;
         path += ` Q ${maxX + arcRadius} ${midY} ${maxX} ${nextY}`;
     }
-    // ล่าง (ขวาไปซ้าย)
+    // ล่าง
     for (let x = maxX; x > minX; x -= arcRadius * 1.5) {
         const nextX = Math.max(x - arcRadius * 1.5, minX);
         const midX = (x + nextX) / 2;
         path += ` Q ${midX} ${maxY + arcRadius} ${nextX} ${maxY}`;
     }
-    // ซ้าย (ล่างขึ้นบน)
+    // ซ้าย
     for (let y = maxY; y > minY; y -= arcRadius * 1.5) {
         const nextY = Math.max(y - arcRadius * 1.5, minY);
         const midY = (y + nextY) / 2;
@@ -580,9 +643,9 @@ function bindShapeEngine(wrapper, pageNum, svgLayer) {
     });
 }
 
-// -------------------------------------------------------------
-// PANNING & DRAWING ENGINE
-// -------------------------------------------------------------
+// --------------------------------------------------------------------------
+// 6. DRAWING & PANNING
+// --------------------------------------------------------------------------
 function bindDrawingEngine(canvas, pageNum) {
     const ctx = canvas.getContext('2d');
     let isDrawing = false, lastX = 0, lastY = 0;
@@ -626,12 +689,11 @@ function bindDrawingEngine(canvas, pageNum) {
     window.addEventListener('pointerup', () => { isDrawing = false; });
 }
 
-// Spacebar / Middle-Click Pan System
 const wsEl = document.querySelector('.workspace');
 let isPanning = false, panStartX = 0, panStartY = 0, scrollStartL = 0, scrollStartT = 0;
 
 wsEl.addEventListener('pointerdown', (e) => {
-    if (isSpacePressed || currentTool === 'pan' || e.button === 1) { // 1 = Middle Click
+    if (isSpacePressed || currentTool === 'pan' || e.button === 1) {
         isPanning = true;
         panStartX = e.clientX; panStartY = e.clientY;
         scrollStartL = wsEl.scrollLeft; scrollStartT = wsEl.scrollTop;
@@ -662,9 +724,9 @@ function getPageAccurateCoords(e, wrapper) {
     };
 }
 
-// -------------------------------------------------------------
-// SIGNATURE MODAL HANDLERS
-// -------------------------------------------------------------
+// --------------------------------------------------------------------------
+// 7. SIGNATURE HANDLERS
+// --------------------------------------------------------------------------
 function openSignatureModal() {
     document.getElementById('sig-modal').style.display = 'flex';
     clearSigCanvas();
@@ -728,9 +790,9 @@ function placeSignatureOnDoc() {
     showToast("วางลายเซ็นเรียบร้อยแล้วค่ะ");
 }
 
-// -------------------------------------------------------------
-// VECTOR PDF EXPORT (คมชัด 100%)
-// -------------------------------------------------------------
+// --------------------------------------------------------------------------
+// 8. 100% VECTOR PDF EXPORT
+// --------------------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) return alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!");
 
@@ -775,7 +837,6 @@ async function exportVectorPDF() {
             }
         }
 
-        // Render Canvas Freehand Annotation
         const wrappers = document.querySelectorAll('.page-wrapper');
         for (let i = 0; i < wrappers.length; i++) {
             const c = wrappers[i].querySelector('.annotation-canvas');
