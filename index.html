@@ -3,124 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sunita PDF Studio</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="cat-avatar.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- Core PDF Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <script src="https://unpkg.com/@pdf-lib/fontkit@0.0.4/dist/fontkit.umd.min.js"></script>
-    
+    <title>Sunita PDF Studio - Pro Engineering Edition</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- TOP NAVIGATION BAR (ความสูง 56px คงเดิม ผสานบาร์เครื่องมือตรงกลาง) -->
+
+    <!-- Top Bar: Studio Minimalist Dock -->
     <header class="top-bar">
         <div class="brand">
-            <img src="cat-avatar.png" alt="Cat Logo" class="brand-avatar" onerror="this.parentElement.innerHTML='<div class=\'brand-fallback\'><i class=\'fa-solid fa-cat\'></i></div>'">
-            <span>Sunita PDF <small class="pro-badge">PRO</small></span>
+            <img src="cat-avatar.png" alt="Logo" class="brand-avatar" onerror="this.style.display='none'">
+            <span>Sunita <span class="text-glow">PDF</span></span>
+            <span class="pro-badge">CAD PRO</span>
         </div>
 
-        <!-- บาร์เครื่องมือฝังตัวใน Top Bar -->
         <div class="top-dock-bar">
-            <!-- เลื่อนดูเอกสาร -->
-            <button onclick="setTool('pan')" id="tool-pan" class="dock-btn" title="เลื่อนดูเอกสาร">
-                <i class="fa-solid fa-hand"></i>
-            </button>
+            <!-- Navigation -->
+            <button class="dock-btn" id="tool-pan" title="เลื่อนมุมมอง (Spacebar)"><i class="fa-solid fa-hand"></i></button>
+            <button class="dock-btn" id="btn-zoom-fit" title="พอดีหน้าจอ (Double Middle-Click)"><i class="fa-solid fa-expand"></i></button>
+            <button class="dock-btn" id="btn-zoom-100" title="ขนาด 100%">1:1</button>
+            
             <div class="dock-divider"></div>
 
-            <!-- แก้ไขคำแนบเนียน -->
-            <button onclick="setTool('patch')" id="tool-patch" class="dock-btn active" title="ลบคำผิดและพิมพ์ทับ">
-                <i class="fa-solid fa-i-cursor"></i>
-            </button>
+            <!-- Engineering Markup -->
+            <button class="dock-btn active" id="tool-text" title="ข้อความ / แก้ตัวเลข (T)"><i class="fa-solid fa-font"></i></button>
+            <button class="dock-btn" id="tool-rect" title="กรอบสี่เหลี่ยม (R)"><i class="fa-regular fa-square"></i></button>
+            <button class="dock-btn" id="tool-cloud" title="เมฆตรวจแบบ Revision Cloud (C)"><i class="fa-solid fa-cloud"></i></button>
+            
+            <div class="dock-divider"></div>
 
-            <!-- กรอบสี่เหลี่ยม -->
-            <button onclick="setTool('rect')" id="tool-rect" class="dock-btn" title="วาดกรอบสี่เหลี่ยมชี้เป้า">
-                <i class="fa-regular fa-square"></i>
-            </button>
-
-            <!-- วงกลม/วงรี -->
-            <button onclick="setTool('circle')" id="tool-circle" class="dock-btn" title="วาดวงกลม/วงรีชี้เป้า">
-                <i class="fa-regular fa-circle"></i>
-            </button>
-
-            <!-- ปากกาฟรีแฮนด์ -->
-            <button onclick="setTool('pen')" id="tool-pen" class="dock-btn" title="ปากกาเซ็นชื่อ/เขียนโน้ต">
-                <i class="fa-solid fa-pen-nib"></i>
-            </button>
-
-            <!-- ไฮไลต์ -->
-            <button onclick="setTool('highlighter')" id="tool-highlighter" class="dock-btn" title="ปากกาไฮไลต์เรืองแสง">
-                <i class="fa-solid fa-highlighter"></i>
-            </button>
-
-            <!-- ยางลบ -->
-            <button onclick="setTool('eraser')" id="tool-eraser" class="dock-btn" title="ยางลบเส้นวาด">
-                <i class="fa-solid fa-eraser"></i>
-            </button>
-
-            <!-- ตรายาง / ลายเซ็น -->
-            <button onclick="openSignatureModal()" id="tool-signature" class="dock-btn" title="เซ็นลายเซ็น / แปะรูปตราประทับ">
-                <i class="fa-solid fa-signature"></i>
-            </button>
+            <!-- Freehand & Signature -->
+            <button class="dock-btn" id="tool-pen" title="ปากกาตรวจแบบ (P)"><i class="fa-solid fa-pen-nib"></i></button>
+            <button class="dock-btn" id="tool-eraser" title="ยางลบ (E)"><i class="fa-solid fa-eraser"></i></button>
+            <button class="dock-btn" id="btn-open-sig" title="ลายเซ็น / ตรายาง"><i class="fa-solid fa-signature"></i></button>
 
             <div class="dock-divider"></div>
 
-            <!-- จานสี -->
-            <div class="color-dock-group">
-                <div class="color-circle active" data-color="#ef4444" style="background: #ef4444;" title="สีแดง" onclick="selectInkColor('#ef4444', this)"></div>
-                <div class="color-circle" data-color="#0033aa" style="background: #0033aa;" title="สีน้ำเงิน" onclick="selectInkColor('#0033aa', this)"></div>
-                <div class="color-circle" data-color="#111827" style="background: #111827;" title="สีดำ" onclick="selectInkColor('#111827', this)"></div>
-                <div class="color-circle" data-color="#10b981" style="background: #10b981;" title="สีเขียว" onclick="selectInkColor('#10b981', this)"></div>
+            <!-- Active Color Picker -->
+            <div class="color-picker-wrap">
+                <input type="color" id="active-color-input" value="#ef4444" title="เลือกสีมาร์กอัป">
             </div>
 
-            <div class="dock-divider"></div>
-
-            <!-- Undo, Redo, Zoom -->
-            <button onclick="undoAction()" class="dock-btn" title="ย้อนกลับ (Ctrl+Z)">
-                <i class="fa-solid fa-rotate-left"></i>
-            </button>
-            <button onclick="redoAction()" class="dock-btn" title="ทำซ้ำ (Ctrl+Y)">
-                <i class="fa-solid fa-rotate-right"></i>
-            </button>
-            <button onclick="zoomDoc(0.15)" class="dock-btn" title="ขยาย">
-                <i class="fa-solid fa-magnifying-glass-plus"></i>
-            </button>
-            <button onclick="zoomDoc(-0.15)" class="dock-btn" title="ย่อ">
-                <i class="fa-solid fa-magnifying-glass-minus"></i>
-            </button>
+            <!-- History Actions -->
+            <button class="dock-btn" id="btn-undo" title="ย้อนกลับ (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+            <button class="dock-btn" id="btn-redo" title="ทำซ้ำ (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
         </div>
 
-        <!-- กลุ่มปุ่มเปิดและส่งออกไฟล์ -->
         <div class="action-buttons">
-            <button onclick="resetApp()" class="btn-secondary" title="เริ่มเอกสารใหม่">
-                <i class="fa-solid fa-rotate-left"></i> <span class="btn-text">เริ่มใหม่</span>
-            </button>
-            <button onclick="document.getElementById('upload-pdf').click()" class="btn-secondary" title="เปิดไฟล์ PDF">
-                <i class="fa-solid fa-folder-open"></i> <span class="btn-text">เปิดไฟล์</span>
-            </button>
-            <button onclick="exportVectorPDF()" class="btn-primary" title="บันทึก PDF เวกเตอร์แท้ คมชัด 100%">
-                <i class="fa-solid fa-arrow-down-to-bracket"></i> <span class="btn-text">ส่งออก PDF</span>
-            </button>
+            <button class="btn-secondary" onclick="resetApp()" title="เปิดเอกสารใหม่"><i class="fa-solid fa-folder-open"></i> <span class="btn-text">เปิดไฟล์</span></button>
+            <button class="btn-primary" onclick="exportVectorPDF()" title="ส่งออกเวกเตอร์ PDF"><i class="fa-solid fa-file-export"></i> <span class="btn-text">Export PDF</span></button>
         </div>
+        <input type="file" id="upload-pdf" accept="application/pdf" style="display: none;">
     </header>
 
-    <input type="file" id="upload-pdf" accept="application/pdf" style="display:none;">
-
-    <!-- WORKSPACE AREA -->
-    <main class="workspace">
+    <!-- Workspace -->
+    <main class="workspace" id="workspace">
         <div id="document-container">
             <div class="welcome-box">
                 <div class="welcome-avatar-wrap">
-                    <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\'welcome-icon\'><i class=\'fa-solid fa-file-pdf\'></i></div>'">
+                    <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\\'welcome-icon\\'><i class=\\'fa-solid fa-drafting-compass\\'></i></div>'">
                 </div>
-                <h2>ยินดีต้อนรับสู่ Sunita PDF Studio</h2>
-                <p>เครื่องมือตรวจแก้เอกสารและใบเสนอราคาฉบับพิเศษสำหรับ Sunita ลบคำผิด ดูดสีเนียนสนิท วาดกรอบสี่เหลี่ยม วงรี ชี้เป้าแก้ไข และส่งออกคมชัดระดับเวกเตอร์</p>
+                <h2>Sunita Studio CAD Engine</h2>
+                <p>ดับเบิลคลิกเพื่อแก้คำสดบนแบบ • หมุนอิสระ 360° • เมฆตรวจแบบ Revision Cloud • Vector PDF 100%</p>
                 <button onclick="document.getElementById('upload-pdf').click()" class="btn-open-file">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> เลือกไฟล์ PDF เพื่อเริ่มงาน
                 </button>
@@ -128,46 +73,51 @@
         </div>
     </main>
 
-    <!-- SIGNATURE MODAL -->
-    <div id="sig-modal" class="modal-backdrop" style="display: none;">
+    <!-- Signature Modal -->
+    <div class="modal-backdrop" id="sig-modal" style="display: none;">
         <div class="modal-box">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-signature text-glow"></i> แปะลายเซ็นหรือตราประทับ</h3>
-                <button onclick="closeSignatureModal()" class="btn-close">&times;</button>
+                <h3>เพิ่มลายเซ็นหรือตรายางตรวจแบบ</h3>
+                <button class="btn-close" onclick="closeSignatureModal()">&times;</button>
             </div>
             <div class="modal-tabs">
-                <button id="tab-draw" class="active" onclick="switchSigTab('draw')">วาดลายเซ็นสด</button>
-                <button id="tab-upload" onclick="switchSigTab('upload')">อัปโหลดรูปภาพ PNG</button>
+                <button class="active" id="tab-draw" onclick="switchSigTab('draw')">วาดลายเซ็น</button>
+                <button id="tab-upload" onclick="switchSigTab('upload')">อัปโหลดรูปภาพ</button>
             </div>
             <div class="modal-body">
                 <div id="pane-draw">
-                    <canvas id="sig-canvas" width="400" height="180"></canvas>
+                    <canvas id="sig-canvas"></canvas>
                     <div class="sig-tools">
-                        <button onclick="clearSigCanvas()" class="btn-mini"><i class="fa-solid fa-trash-can"></i> ล้าง</button>
+                        <button class="btn-mini" onclick="clearSigCanvas()"><i class="fa-solid fa-trash-can"></i> ล้าง</button>
                         <div class="sig-color-pick">
                             <span class="dot-pick" style="background:#0033aa" onclick="setSigInkColor('#0033aa')"></span>
-                            <span class="dot-pick" style="background:#000000" onclick="setSigInkColor('#000000')"></span>
+                            <span class="dot-pick" style="background:#111827" onclick="setSigInkColor('#111827')"></span>
+                            <span class="dot-pick" style="background:#ef4444" onclick="setSigInkColor('#ef4444')"></span>
                         </div>
                     </div>
                 </div>
                 <div id="pane-upload" style="display: none;">
-                    <div class="drop-zone" onclick="document.getElementById('sig-image-file').click()">
-                        <i class="fa-solid fa-image" style="font-size: 32px; color: var(--accent);"></i>
-                        <p>แตะเพื่อเลือกไฟล์รูปภาพโปร่งใส PNG / JPG</p>
-                        <input type="file" id="sig-image-file" accept="image/*" style="display:none;" onchange="handleSigUpload(event)">
+                    <div class="drop-zone" onclick="document.getElementById('sig-file').click()">
+                        <i class="fa-solid fa-cloud-arrow-up" style="font-size:32px; color:var(--accent);"></i>
+                        <p style="margin-top:8px; font-size:13px;">แตะเพื่อเลือกรูปภาพ PNG ตราประทับ / ลายเซ็น</p>
                     </div>
-                    <div id="preview-upload-box" style="display:none; text-align:center; margin-top: 10px;">
-                        <img id="img-preview" style="max-height: 120px; border-radius: 6px;">
+                    <input type="file" id="sig-file" accept="image/png, image/jpeg" style="display:none;" onchange="handleSigUpload(event)">
+                    <div id="preview-upload-box" style="display:none; margin-top:10px; text-align:center;">
+                        <img id="img-preview" style="max-height:80px; border:1px dashed var(--accent);">
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button onclick="closeSignatureModal()" class="btn-cancel">ยกเลิก</button>
-                <button onclick="placeSignatureOnDoc()" class="btn-primary">วางลงบนเอกสาร</button>
+                <button class="btn-cancel" onclick="closeSignatureModal()">ยกเลิก</button>
+                <button class="btn-primary" onclick="placeSignatureOnDoc()"><i class="fa-solid fa-check"></i> นำไปวางบนแบบ</button>
             </div>
         </div>
     </div>
 
+    <!-- Core Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
