@@ -24,7 +24,7 @@ body {
 }
 
 /* ==========================================================================
-   TOP BAR & CONTEXT RIBBON
+   TOP BAR & FIXED DOCK RIBBON
    ========================================================================== */
 .top-bar {
     position: fixed;
@@ -50,10 +50,14 @@ body {
 
 .top-dock-bar {
     display: flex; align-items: center;
-    background: rgba(30, 41, 59, 0.85);
+    background: rgba(30, 41, 59, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 10px; padding: 2px 6px; gap: 3px;
     backdrop-filter: blur(8px);
+}
+
+.dock-group {
+    display: flex; align-items: center; gap: 3px;
 }
 
 .dock-btn {
@@ -68,22 +72,8 @@ body {
     box-shadow: 0 1px 6px var(--accent-glow);
 }
 
-.dock-divider { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); margin: 0 4px; flex-shrink: 0; }
+.dock-divider { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.15); margin: 0 4px; flex-shrink: 0; }
 .dock-divider-sub { width: 1px; height: 14px; background: rgba(255, 255, 255, 0.1); margin: 0 3px; flex-shrink: 0; }
-
-/* Context Ribbon Sub-tools */
-.context-ribbon {
-    display: flex; align-items: center; gap: 4px;
-    background: rgba(15, 23, 42, 0.7);
-    border-radius: 8px; padding: 2px 6px;
-    border: 1px solid rgba(14, 165, 233, 0.35);
-    animation: slideInRibbon 0.15s ease-out;
-}
-
-@keyframes slideInRibbon {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-}
 
 .dock-btn-sm {
     background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1);
@@ -100,13 +90,12 @@ body {
     text-align: center; font-size: 11px; font-weight: 600; outline: none;
 }
 .rib-unit { font-size: 11px; color: #64748b; margin-left: -2px; margin-right: 2px; }
-.rib-label { font-size: 11px; color: var(--text-muted); padding: 0 2px; }
 
 .rib-color-wrap {
     display: flex; align-items: center; gap: 3px; color: #94a3b8; font-size: 11px; cursor: pointer; padding: 0 2px;
 }
 .rib-color-wrap input[type="color"] {
-    -webkit-appearance: none; width: 20px; height: 20px;
+    -webkit-appearance: none; width: 22px; height: 22px;
     border: 1.5px solid #fff; border-radius: 4px; background: none; cursor: pointer; padding: 0;
 }
 
@@ -166,7 +155,7 @@ body.tool-pen .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-
 }
 
 /* ==========================================================================
-   CAD LIVE NODES
+   CAD LIVE NODES & RESIZE HANDLES
    ========================================================================== */
 .cad-text-node {
     position: absolute; box-sizing: border-box; user-select: none;
@@ -189,6 +178,14 @@ body.tool-pen .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-
 }
 .cad-text-node.selected .cad-rot-stem,
 .cad-text-node.selected .cad-rot-handle { display: block; }
+
+/* จุดจับยืดขยายขนาดกล่องข้อความ (East Handle) */
+.cad-resize-handle {
+    position: absolute; right: -5px; top: 50%; transform: translateY(-50%);
+    width: 6px; height: 14px; background: #fff; border: 1.5px solid var(--accent);
+    border-radius: 2px; cursor: ew-resize; display: none; z-index: 10;
+}
+.cad-text-node.selected .cad-resize-handle { display: block; }
 
 /* In-place Editable Input */
 .cad-inline-editor {
