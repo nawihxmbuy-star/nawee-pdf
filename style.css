@@ -1,6 +1,6 @@
 :root {
     --bg-main: #0b0f19;
-    --dock-bg: rgba(17, 24, 39, 0.88);
+    --dock-bg: rgba(17, 24, 39, 0.92);
     --accent: #0ea5e9;
     --accent-glow: rgba(14, 165, 233, 0.35);
     --text-light: #f8fafc;
@@ -26,85 +26,59 @@ body {
 }
 
 /* ==========================================================================
-   TOP BAR & BRAND AVATAR (ความสูง 56px คงเดิม สวยหรู กะทัดรัด)
+   TOP BAR & STUDIO DOCK
    ========================================================================== */
 .top-bar {
     position: fixed;
-    top: 0; left: 0; width: 100%; height: 56px;
+    top: 0; left: 0; width: 100%; height: 54px;
     background: #111827;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     display: flex; 
     justify-content: space-between; 
     align-items: center;
     padding: 0 16px;
-    gap: 10px;
+    gap: 8px;
     z-index: 1000;
 }
 .brand {
     display: flex; align-items: center; gap: 8px;
-    font-size: 16px; font-weight: 700; color: #fff;
+    font-size: 15px; font-weight: 700; color: #fff;
     flex-shrink: 0;
 }
 .brand-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid var(--accent);
-    box-shadow: 0 0 8px var(--accent-glow);
-}
-.brand-fallback {
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    background: rgba(14, 165, 233, 0.15);
-    color: var(--accent);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px;
-    border: 2px solid var(--accent);
+    width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
+    border: 2px solid var(--accent); box-shadow: 0 0 8px var(--accent-glow);
 }
 .text-glow { color: var(--accent); }
 .pro-badge {
     background: linear-gradient(135deg, #0284c7, #38bdf8);
-    color: #0f172a; font-size: 9px; font-weight: 800;
-    padding: 2px 5px; border-radius: 4px;
+    color: #0f172a; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 4px;
 }
 
-/* ==========================================================================
-   TOP DOCK BAR (แถบเครื่องมือฝังตัวใน Header ระดับความสูง 38px)
-   ========================================================================== */
 .top-dock-bar {
     display: flex;
     align-items: center;
     background: rgba(30, 41, 59, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 12px;
-    padding: 3px 8px;
-    gap: 4px;
-    max-height: 42px;
-    overflow-x: auto;
+    border-radius: 10px;
+    padding: 2px 6px;
+    gap: 3px;
     backdrop-filter: blur(8px);
 }
-.top-dock-bar::-webkit-scrollbar { display: none; }
 
 .dock-btn {
     background: transparent;
     border: none;
     color: var(--text-muted);
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
+    width: 32px; height: 32px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
     transition: all 0.12s ease;
     flex-shrink: 0;
 }
-.dock-btn:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.08);
-}
+.dock-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
 .dock-btn.active {
     background: var(--accent);
     color: #0f172a;
@@ -112,62 +86,41 @@ body {
 }
 
 .dock-divider {
-    width: 1px;
-    height: 18px;
-    background: rgba(255, 255, 255, 0.14);
-    margin: 0 4px;
-    flex-shrink: 0;
+    width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); margin: 0 4px; flex-shrink: 0;
 }
 
-.color-dock-group {
-    display: flex;
-    gap: 5px;
-    align-items: center;
-    flex-shrink: 0;
+.color-picker-wrap {
+    display: flex; align-items: center; justify-content: center; padding: 0 2px;
 }
-.color-circle {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 1.5px solid rgba(255, 255, 255, 0.25);
-    transition: transform 0.1s ease;
+#active-color-input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 22px; height: 22px;
+    background: none; border: none; cursor: pointer; border-radius: 50%;
 }
-.color-circle:hover { transform: scale(1.15); }
-.color-circle.active {
-    transform: scale(1.25);
-    border-color: #fff;
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+#active-color-input::-webkit-color-swatch {
+    border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 4px rgba(0,0,0,0.5);
 }
 
-.action-buttons { 
-    display: flex; 
-    gap: 8px; 
-    align-items: center; 
-    flex-shrink: 0;
-}
+.action-buttons { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 .btn-secondary {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--text-light);
-    padding: 7px 12px; border-radius: 8px; cursor: pointer;
-    font-size: 13px; display: flex; align-items: center; gap: 6px;
-    transition: all 0.15s;
+    background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-light); padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 13px; display: flex; align-items: center; gap: 6px; transition: all 0.15s;
 }
 .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
 .btn-primary {
     background: linear-gradient(135deg, #0284c7, #38bdf8);
     color: #0f172a; border: none; font-weight: 700;
-    padding: 7px 15px; border-radius: 8px; cursor: pointer;
+    padding: 6px 14px; border-radius: 6px; cursor: pointer;
     font-size: 13px; display: flex; align-items: center; gap: 6px;
-    box-shadow: 0 2px 10px var(--accent-glow);
-    transition: all 0.15s;
+    box-shadow: 0 2px 10px var(--accent-glow); transition: all 0.15s;
 }
 .btn-primary:hover { transform: translateY(-1px); }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
     .btn-text { display: none; }
-    .top-dock-bar { max-width: 50vw; }
 }
 
 /* ==========================================================================
@@ -176,393 +129,169 @@ body {
 .workspace {
     width: 100vw; height: 100vh;
     overflow: auto;
-    padding: 72px 20px 30px 20px;
+    padding: 68px 20px 30px 20px;
     display: flex; flex-direction: column; align-items: center;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-x pan-y;
+    touch-action: none;
 }
 .welcome-box {
-    background: #1e293b;
-    border: 1px dashed rgba(255, 255, 255, 0.15);
-    border-radius: 16px;
-    padding: 40px 30px;
-    max-width: 480px;
-    margin: 40px auto;
-    text-align: center;
+    background: #1e293b; border: 1px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 14px; padding: 36px 28px; max-width: 480px; margin: 40px auto; text-align: center;
 }
-.welcome-avatar-wrap {
-    margin-bottom: 16px;
-}
+.welcome-avatar-wrap { margin-bottom: 14px; }
 .welcome-cat-avatar {
-    width: 84px;
-    height: 84px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid var(--accent);
-    box-shadow: 0 4px 16px var(--accent-glow);
+    width: 76px; height: 76px; border-radius: 50%; object-fit: cover;
+    border: 3px solid var(--accent); box-shadow: 0 4px 16px var(--accent-glow);
 }
-.welcome-icon { font-size: 48px; color: var(--accent); margin-bottom: 12px; }
-.welcome-box h2 { font-size: 20px; margin-bottom: 8px; }
+.welcome-icon { font-size: 42px; color: var(--accent); margin-bottom: 12px; }
+.welcome-box h2 { font-size: 18px; margin-bottom: 8px; }
 .welcome-box p { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
 .btn-open-file {
     background: var(--accent); color: #0f172a; border: none;
-    padding: 10px 20px; border-radius: 10px; font-weight: 700;
-    cursor: pointer; font-size: 14px;
+    padding: 9px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px;
 }
 
 #document-container {
     margin: 0 auto;
     transform-origin: top center;
-    transition: transform 0.04s ease-out;
+    transition: transform 0.02s linear;
 }
 .page-wrapper {
-    position: relative;
-    margin-bottom: 24px;
-    background: #fff;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
-    touch-action: none;
+    position: relative; margin-bottom: 24px; background: #fff;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6); touch-action: none;
 }
 .pdf-page-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: block; }
 .annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
-body.tool-pen .annotation-canvas, body.tool-highlighter .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-events: auto; }
+body.tool-pen .annotation-canvas, body.tool-eraser .annotation-canvas { pointer-events: auto; }
 
 .patch-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+.glyph-interactive-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
+.vector-shapes-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
 
-/* SVG Canvas สำหรับวาดเส้นโยง Leader Line */
-.leader-lines-svg {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 4;
-    pointer-events: none;
-}
-
-/* ==========================================================================
-   INTERACTIVE GLYPH LAYER (ตรวจจับคลิกตัวอักษรแบบ Native Acrobat)
-   ========================================================================== */
-.glyph-interactive-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 40;
-    pointer-events: none;
-}
-
+/* Hitbox ไฮไลต์ตรวจจับตัวอักษรเดิม */
 .glyph-hitbox {
-    position: absolute;
-    cursor: text;
-    pointer-events: auto;
-    border-radius: 2px;
-    box-sizing: border-box;
-    transition: background 0.15s ease, border-color 0.15s ease;
+    position: absolute; cursor: text; pointer-events: auto;
+    border-radius: 2px; box-sizing: border-box;
+    transition: background 0.12s ease;
 }
-
-/* เมื่อเลื่อนเมาส์ผ่าน จะขึ้นกรอบสีฟ้าอ่อนให้รู้ว่าคลิกแก้ไขได้ทันที */
 .glyph-hitbox:hover {
-    background: rgba(14, 165, 233, 0.18);
-    border: 1px dashed rgba(14, 165, 233, 0.85);
+    background: rgba(14, 165, 233, 0.16);
+    outline: 1px dashed rgba(14, 165, 233, 0.8);
 }
 
 /* ==========================================================================
-   SMART PATCH & NUDGE TOOLBAR (ระบบหมุนกึ่งกลาง + ทูลบาร์แนวนอนนิ่ง)
+   CAD-GRADE IN-PLACE TEXT & BOUNDING BOX
    ========================================================================== */
-.active-patch-container {
+.cad-text-node {
     position: absolute;
-    z-index: 100;
-    pointer-events: auto !important;
-}
-
-.active-patch-node {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-    border: 1.5px solid var(--accent);
-    padding: 0 2px;
-    box-sizing: border-box;
-    transform-origin: center center !important;
-    transition: width 0.05s ease-out;
-}
-
-.patch-input-inline {
-    border: none;
-    outline: none;
-    font-family: 'Sarabun', sans-serif !important;
-    background: transparent;
-    padding: 0;
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    line-height: 1.15;
-    vertical-align: middle;
-    letter-spacing: -0.01em;
-    text-rendering: optimizeLegibility !important;
-    -webkit-font-smoothing: antialiased !important;
-    -moz-osx-font-smoothing: grayscale !important;
-}
-
-/* แถบ Nudge Toolbar: วางแนวนอนระดับสายตาเสมอ */
-.nudge-toolbar {
-    display: flex;
-    gap: 4px;
-    background: #1e293b;
-    padding: 4px 6px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-    z-index: 1000;
-}
-
-.nudge-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border: none;
-    color: var(--text-muted);
-    font-size: 11px;
-    padding: 4px 7px;
-    cursor: pointer;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    white-space: nowrap;
-    transition: all 0.12s ease;
-}
-.nudge-btn:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.18);
-}
-.nudge-btn.active {
-    background: var(--accent);
-    color: #0f172a;
-    font-weight: 700;
-}
-.nudge-btn.btn-done {
-    background: #0ea5e9;
-    color: #0f172a;
-    font-weight: 700;
-    padding: 4px 9px;
-}
-.nudge-btn.btn-done:hover {
-    background: #38bdf8;
-}
-
-/* ==========================================================================
-   FLOATING TEXT ITEM (โหนดข้อความลอยแบบลากย้ายอิสระ)
-   ========================================================================== */
-.floating-patch-text {
     box-sizing: border-box;
     user-select: none;
-    touch-action: none;
-    transition: box-shadow 0.1s ease;
-    transform-origin: center center !important;
-}
-.floating-patch-text:hover {
-    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.45);
-}
-
-/* ==========================================================================
-   INTERACTIVE VECTOR SHAPES & DRAGGABLE CALLOUT BOX
-   ========================================================================== */
-.shape-interactive-node {
-    position: absolute;
-    box-sizing: border-box;
     cursor: move;
-    touch-action: none;
-    z-index: 95;
     pointer-events: auto !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 2px;
+    white-space: nowrap;
+    transform-origin: center center !important;
+    border: 1px solid transparent;
 }
 
-.shape-interactive-node.shape-rect {
-    border: 2.5px solid var(--shape-color, #ef4444);
-    border-radius: 4px;
+.cad-text-node.selected {
+    border: 1.5px solid var(--accent);
 }
 
-.shape-interactive-node.shape-circle {
-    border: 2.5px solid var(--shape-color, #ef4444);
-    border-radius: 50%;
-}
-
-.shape-handle {
+/* Rotation Handle (Lollipop Stem) */
+.cad-rot-stem {
     position: absolute;
-    width: 14px;
-    height: 14px;
-    background: #ffffff;
-    border: 2.5px solid #0ea5e9;
-    border-radius: 50%;
-    z-index: 105;
-}
-.shape-handle.handle-tl { top: -7px; left: -7px; cursor: nwse-resize; }
-.shape-handle.handle-tr { top: -7px; right: -7px; cursor: nesw-resize; }
-.shape-handle.handle-bl { bottom: -7px; left: -7px; cursor: nesw-resize; }
-.shape-handle.handle-br { bottom: -7px; right: -7px; cursor: nwse-resize; }
-
-.shape-quick-toolbar {
-    position: absolute;
-    top: -42px;
+    top: -20px;
     left: 50%;
     transform: translateX(-50%);
-    background: #1e293b;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    padding: 4px 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-    z-index: 110;
+    width: 1px;
+    height: 20px;
+    background: var(--accent);
+    display: none;
 }
-.shape-color-dot {
-    width: 18px;
-    height: 18px;
+.cad-rot-handle {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border: 2px solid var(--accent);
     border-radius: 50%;
-    cursor: pointer;
-    border: 1.5px solid #fff;
-    transition: transform 0.1s;
-}
-.shape-color-dot:hover { transform: scale(1.2); }
-
-.shape-note-input {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
-    font-family: 'Sarabun', sans-serif;
-    font-size: 12px;
-    padding: 3px 8px;
-    border-radius: 6px;
-    outline: none;
-    width: 120px;
-}
-.shape-note-input::placeholder {
-    color: #94a3b8;
-}
-
-.shape-confirm-btn {
-    background: #0ea5e9;
-    color: #0f172a;
-    border: none;
-    border-radius: 6px;
-    padding: 3px 9px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    white-space: nowrap;
-}
-.shape-confirm-btn:hover { background: #38bdf8; }
-
-.shape-del-btn {
-    background: none;
-    border: none;
-    color: #ef4444;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 2px 6px;
-    display: flex;
-    align-items: center;
-}
-
-/* กล่องคอมเมนต์สีแดง (Draggable Callout Box) ที่ลากไปไหนก็ได้ */
-.shape-callout-bubble {
-    position: absolute;
-    background: var(--shape-color, #ef4444);
-    color: #ffffff;
-    font-family: 'Sarabun', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 6px;
-    white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     cursor: grab;
-    user-select: none;
-    touch-action: none;
-    z-index: 106;
-    pointer-events: auto !important;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border: 1.5px solid rgba(255, 255, 255, 0.6);
+    display: none;
 }
-.shape-callout-bubble:active {
-    cursor: grabbing;
-}
-.shape-callout-bubble .callout-text {
-    pointer-events: none;
-}
-.shape-callout-bubble .callout-edit-icon {
-    font-size: 10px;
-    opacity: 0.8;
-    cursor: pointer;
+.cad-text-node.selected .cad-rot-stem,
+.cad-text-node.selected .cad-rot-handle {
+    display: block;
 }
 
-/* ==========================================================================
-   SIGNATURE / DRAGGABLE NODE
-   ========================================================================== */
-.custom-draggable-sig {
+/* Delete badge */
+.cad-del-badge {
     position: absolute;
-    cursor: move;
-    user-select: none;
-    touch-action: none;
-    z-index: 105;
-    transform: translate(-50%, -50%);
-    border: 1.5px dashed var(--accent);
-}
-.custom-draggable-sig img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.btn-del-sig {
-    position: absolute; top: -10px; right: -10px;
-    background: #ef4444; color: #fff; border-radius: 50%;
-    width: 22px; height: 22px; font-size: 13px;
-    display: flex; align-items: center; justify-content: center;
+    top: -8px; right: -8px;
+    width: 16px; height: 16px;
+    background: #ef4444; color: #fff;
+    border-radius: 50%; font-size: 11px;
+    display: none; align-items: center; justify-content: center;
     cursor: pointer; border: 1.5px solid #fff;
 }
+.cad-text-node:hover .cad-del-badge { display: flex; }
 
-/* ==========================================================================
-   MODAL
-   ========================================================================== */
+/* In-place Editable Input */
+.cad-inline-editor {
+    position: absolute;
+    border: 1.5px solid var(--accent);
+    outline: none;
+    background: #fff;
+    font-family: 'Sarabun', sans-serif !important;
+    padding: 0 2px;
+    margin: 0;
+    line-height: 1.15;
+    z-index: 200;
+    transform-origin: center center !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Modal */
 .modal-backdrop {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
     background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    padding: 16px; z-index: 10050;
+    display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10050;
 }
 .modal-box {
     background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px; width: 100%; max-width: 440px; overflow: hidden;
+    border-radius: 14px; width: 100%; max-width: 420px; overflow: hidden;
 }
 .modal-header {
-    background: #0f172a; padding: 14px 18px; display: flex;
-    justify-content: space-between; align-items: center;
+    background: #0f172a; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-.btn-close { background: none; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; }
-.modal-tabs { display: flex; gap: 6px; padding: 12px 18px 0 18px; }
+.btn-close { background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer; }
+.modal-tabs { display: flex; gap: 6px; padding: 10px 16px 0 16px; }
 .modal-tabs button {
-    flex: 1; padding: 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted);
-    font-size: 13px; cursor: pointer;
+    flex: 1; padding: 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted); font-size: 13px; cursor: pointer;
 }
 .modal-tabs button.active { background: var(--accent); color: #0f172a; font-weight: 700; }
-.modal-body { padding: 14px 18px; }
-#sig-canvas {
-    width: 100%; height: 180px; background: #ffffff;
-    border-radius: 10px; cursor: crosshair; touch-action: none;
-}
-.sig-tools { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-.btn-mini { background: rgba(255,255,255,0.06); border: none; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-.sig-color-pick { display: flex; gap: 8px; }
-.dot-pick { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 1.5px solid #fff; }
-.drop-zone {
-    border: 2px dashed rgba(14, 165, 233, 0.4); border-radius: 12px;
-    padding: 30px 15px; text-align: center; cursor: pointer;
-}
+.modal-body { padding: 12px 16px; }
+#sig-canvas { width: 100%; height: 160px; background: #ffffff; border-radius: 8px; cursor: crosshair; touch-action: none; }
+.sig-tools { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.btn-mini { background: rgba(255,255,255,0.06); border: none; color: #fff; padding: 5px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+.sig-color-pick { display: flex; gap: 6px; }
+.dot-pick { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 1.5px solid #fff; }
+.drop-zone { border: 2px dashed rgba(14, 165, 233, 0.4); border-radius: 10px; padding: 24px 12px; text-align: center; cursor: pointer; }
 .modal-footer {
-    padding: 14px 18px; background: #0f172a; display: flex;
-    justify-content: flex-end; gap: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 12px 16px; background: #0f172a; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
-.btn-cancel { background: transparent; border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+.btn-cancel { background: transparent; border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
 
 .custom-toast {
     position: fixed; top: 16px; right: 16px; background: #1e293b; color: #fff;
-    padding: 12px 20px; border-radius: 10px; border-left: 4px solid var(--accent);
-    font-size: 14px; z-index: 99999; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    padding: 10px 16px; border-radius: 8px; border-left: 4px solid var(--accent);
+    font-size: 13px; z-index: 99999; box-shadow: 0 4px 14px rgba(0,0,0,0.4);
 }
