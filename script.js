@@ -418,7 +418,7 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
 }
 
 // --------------------------------------------------------------------------
-// 4. CAD TEXT NODE, RESIZE HANDLE & LIVE RIBBON
+// 4. CAD TEXT NODE & EDGE RESIZE ENGINE (ขอบสัมผัสปรับกว้าง-สูง ไร้จุดกวนสายตา)
 // --------------------------------------------------------------------------
 function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height, text, fontSize, fontWeight, rotation, bgColor, hasSolidBg) {
     const layer = wrapper.querySelector('.patch-layer');
@@ -465,7 +465,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
     documentPatches[pageNum].patches.push(patchData);
     node.patchData = patchData;
 
-    // ติดตั้งจุด Resize Handle ที่ขอบขวาเพื่อคลิกลากปรับขนาดกล่องได้
+    // ติดตั้งขอบสัมผัสปรับขนาด (กว้าง & สูง)
     attachResizeHandle(node, patchData);
 
     node.deleteSelf = () => {
@@ -511,7 +511,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
     // ลากย้ายตำแหน่ง
     let isDragging = false, startX = 0, startY = 0, origL = left, origT = top;
     node.addEventListener('pointerdown', (e) => {
-        if (e.target === rotHandle || e.target.classList.contains('cad-resize-handle')) return;
+        if (e.target === rotHandle || e.target.classList.contains('cad-edge-resize')) return;
         selectTextNode(node);
         isDragging = true;
         startX = e.clientX; startY = e.clientY;
@@ -537,32 +537,72 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
     return node;
 }
 
-// ระบบ Resize Handle ดึงยืดขยายขนาดกล่องข้อความ
+// ฟังก์ชันขอบสัมผัสปรับขนาด (กว้าง-สูง)
 function attachResizeHandle(node, patchData) {
-    const resizeEl = document.createElement('div');
-    resizeEl.className = 'cad-resize-handle';
-    node.appendChild(resizeEl);
+    const edges = ['e', 'w', 's', 'n', 'se'];
+    const wH = parseFloat(node.parentElement.style.height || 800);
 
-    let isResizing = false, startX = 0, initialW = 0;
+    edges.forEach(edgeType => {
+        const edgeEl = document.createElement('div');
+        edgeEl.className = `cad-edge-resize cad-edge-${edgeType}`;
+        node.appendChild(edgeEl);
 
-    resizeEl.addEventListener('pointerdown', (e) => {
-        e.stopPropagation();
-        isResizing = true;
-        startX = e.clientX;
-        initialW = parseFloat(node.style.minWidth || node.style.width) || patchData.width;
-        resizeEl.setPointerCapture(e.pointerId);
+        let isResizing = false, startX = 0, startY = 0;
+        let initW = 0, initH = 0, initL = 0, initT = 0;
+
+        edgeEl.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            isResizing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            initW = parseFloat(node.style.width || node.style.minWidth) || patchData.width;
+            initH = parseFloat(node.style.height) || patchData.height;
+            initL = parseFloat(node.style.left) || patchData.boxLeft;
+            initT = parseFloat(node.style.top) || patchData.boxTop;
+
+            edgeEl.setPointerCapture(e.pointerId);
+        });
+
+        edgeEl.addEventListener('pointermove', (e) => {
+            if (!isResizing) return;
+            const dx = (e.clientX - startX) / currentScale;
+            const dy = (e.clientY - startY) / currentScale;
+
+            let newW = initW;
+            let newH = initH;
+            let newL = initL;
+            let newT = initT;
+
+            if (edgeType === 'e' || edgeType === 'se') {
+                newW = Math.max(20, initW + dx);
+            } else if (edgeType === 'w') {
+                newW = Math.max(20, initW - dx);
+                newL = initL + (initW - newW);
+            }
+
+            if (edgeType === 's' || edgeType === 'se') {
+                newH = Math.max(12, initH + dy);
+            } else if (edgeType === 'n') {
+                newH = Math.max(12, initH - dy);
+                newT = initT + (initH - newH);
+            }
+
+            node.style.width = newW + 'px';
+            node.style.minWidth = newW + 'px';
+            node.style.height = newH + 'px';
+            node.style.left = newL + 'px';
+            node.style.top = newT + 'px';
+
+            patchData.width = newW;
+            patchData.height = newH;
+            patchData.boxLeft = newL;
+            patchData.boxTop = newT;
+            patchData.patchBoxY = wH - (newT + newH);
+        });
+
+        edgeEl.addEventListener('pointerup', () => { isResizing = false; });
     });
-
-    resizeEl.addEventListener('pointermove', (e) => {
-        if (!isResizing) return;
-        const dx = (e.clientX - startX) / currentScale;
-        const newW = Math.max(20, initialW + dx);
-        node.style.minWidth = newW + 'px';
-        node.style.width = newW + 'px';
-        patchData.width = newW;
-    });
-
-    resizeEl.addEventListener('pointerup', () => { isResizing = false; });
 }
 
 // --------------------------------------------------------------------------
@@ -652,7 +692,7 @@ function bindShapeEngine(wrapper, pageNum, svgLayer) {
 }
 
 // --------------------------------------------------------------------------
-// 6. LIVE RIBBON & COLOR CONTROLLERS (สไลด์เปลี่ยนสีสดทันที oninput)
+// 6. LIVE RIBBON & COLOR CONTROLLERS
 // --------------------------------------------------------------------------
 function selectTextNode(node) {
     commitActiveStages();
@@ -697,7 +737,6 @@ function initLiveRibbonEvents() {
     const fontSizeInput = document.getElementById('rib-font-size');
     const rotInput = document.getElementById('rib-rot-deg');
 
-    // 🎯 สไลด์สีตัวหนังสือ: 'input' เปลี่ยนสีตามนิ้วสดๆ ทันที
     textColorInput.addEventListener('input', (e) => {
         const val = e.target.value;
         currentInkColor = val;
@@ -710,7 +749,6 @@ function initLiveRibbonEvents() {
         }
     });
 
-    // 🎯 สไลด์สีพื้นหลัง: เปลี่ยนสีสดๆ ทันที
     bgColorInput.addEventListener('input', (e) => {
         const val = e.target.value;
         if (activeTextNode) {
@@ -720,7 +758,6 @@ function initLiveRibbonEvents() {
         }
     });
 
-    // 🎯 หลอดดูดสีจากหน้าจอ (EyeDropper API)
     document.getElementById('rib-text-eyedropper').onclick = async () => {
         if (!window.EyeDropper) {
             return showToast("เบราว์เซอร์ไม่รองรับ EyeDropper ให้เลือกสีจากจานสีแทนค่ะ");
@@ -740,7 +777,6 @@ function initLiveRibbonEvents() {
         } catch (e) {}
     };
 
-    // ปุ่มสลับพื้นหลัง ทึบ/โปร่ง
     document.getElementById('rib-bg-toggle').onclick = () => {
         if (!activeTextNode) return;
         const curBg = activeTextNode.style.background;
@@ -751,7 +787,6 @@ function initLiveRibbonEvents() {
         document.getElementById('rib-bg-toggle').classList.toggle('active', isTrans);
     };
 
-    // ปรับขนาดฟอนต์ A+ / A-
     document.getElementById('rib-font-inc').onclick = () => {
         if (!activeTextNode) return;
         activeTextNode.patchData.fontSize += 1;
@@ -801,7 +836,7 @@ function initLiveRibbonEvents() {
 }
 
 // --------------------------------------------------------------------------
-// 7. DRAWING, PANNING & VECTOR PDF EXPORT (แก้ไขเมฆหายและฟอนต์เพี้ยน)
+// 7. EXPORT PDF ENGINE (แก้ WinAnsi Error 100% + ฝังเมฆตรวจแบบครบ)
 // --------------------------------------------------------------------------
 function hexToPdfRgb(hex) {
     if (!hex || hex === 'transparent' || hex === 'none') return null;
@@ -813,38 +848,56 @@ function hexToPdfRgb(hex) {
     return PDFLib.rgb((num >> 16) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255);
 }
 
+async function fetchThaiFontBuffer(urlList) {
+    for (const url of urlList) {
+        try {
+            const res = await fetch(url, { cache: 'force-cache' });
+            if (res.ok) {
+                const buf = await res.arrayBuffer();
+                if (buf && buf.byteLength > 1000) return buf;
+            }
+        } catch (err) {
+            console.warn(`Font fetch fallback for: ${url}`, err);
+        }
+    }
+    return null;
+}
+
 async function exportVectorPDF() {
     if (!originalPdfBytes) return alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!");
 
     try {
         commitActiveStages();
-        showToast("กำลังส่งออกเวกเตอร์ PDF และเมฆตรวจแบบ...");
+        showToast("กำลังประมวลผลเวกเตอร์ PDF และข้อความไทย...");
 
-        const { PDFDocument, rgb, degrees, StandardFonts } = PDFLib;
+        const { PDFDocument, rgb, degrees } = PDFLib;
         const loadedPdf = await PDFDocument.load(originalPdfBytes);
         
-        // 🎯 1. ดึงฟอนต์ Sarabun ผ่าน jsDelivr CDN ที่รองรับ CORS แท้จริง
-        let thaiFontRegular, thaiFontBold;
+        const regularUrls = [
+            'https://cdn.jsdelivr.net/gh/googlefonts/sarabun@main/fonts/ttf/Sarabun-Regular.ttf',
+            'https://raw.githubusercontent.com/googlefonts/sarabun/main/fonts/ttf/Sarabun-Regular.ttf'
+        ];
+        const boldUrls = [
+            'https://cdn.jsdelivr.net/gh/googlefonts/sarabun@main/fonts/ttf/Sarabun-Bold.ttf',
+            'https://raw.githubusercontent.com/googlefonts/sarabun/main/fonts/ttf/Sarabun-Bold.ttf'
+        ];
+
+        let thaiFontRegular = null, thaiFontBold = null;
+        let canEmbedThaiFont = false;
+
         try {
-            loadedPdf.registerFontkit(fontkit);
-            if (!cachedRegularFontBytes) {
-                cachedRegularFontBytes = await fetch('https://cdn.jsdelivr.net/gh/googlefonts/sarabun@main/fonts/ttf/Sarabun-Regular.ttf').then(r => {
-                    if (!r.ok) throw new Error("Font fetch failed");
-                    return r.arrayBuffer();
-                });
+            if (window.fontkit) loadedPdf.registerFontkit(fontkit);
+            if (!cachedRegularFontBytes) cachedRegularFontBytes = await fetchThaiFontBuffer(regularUrls);
+            if (!cachedBoldFontBytes) cachedBoldFontBytes = await fetchThaiFontBuffer(boldUrls);
+
+            if (cachedRegularFontBytes && cachedBoldFontBytes && window.fontkit) {
+                thaiFontRegular = await loadedPdf.embedFont(cachedRegularFontBytes, { subset: false });
+                thaiFontBold = await loadedPdf.embedFont(cachedBoldFontBytes, { subset: false });
+                canEmbedThaiFont = true;
             }
-            if (!cachedBoldFontBytes) {
-                cachedBoldFontBytes = await fetch('https://cdn.jsdelivr.net/gh/googlefonts/sarabun@main/fonts/ttf/Sarabun-Bold.ttf').then(r => {
-                    if (!r.ok) throw new Error("Font fetch failed");
-                    return r.arrayBuffer();
-                });
-            }
-            thaiFontRegular = await loadedPdf.embedFont(cachedRegularFontBytes);
-            thaiFontBold = await loadedPdf.embedFont(cachedBoldFontBytes);
-        } catch (e) {
-            console.warn("ใช้ฟอนต์มาตรฐานสำรอง", e);
-            thaiFontRegular = await loadedPdf.embedFont(StandardFonts.Helvetica);
-            thaiFontBold = await loadedPdf.embedFont(StandardFonts.HelveticaBold);
+        } catch (fontErr) {
+            console.warn("ไม่สามารถฝังฟอนต์ TTF ตรงได้ ใช้ High-Res Canvas Stamp แทน:", fontErr);
+            canEmbedThaiFont = false;
         }
 
         const pages = loadedPdf.getPages();
@@ -862,20 +915,17 @@ async function exportVectorPDF() {
             const scaleX = pageW / nativeW;
             const scaleY = pageH / nativeH;
 
-            // 🎯 2. เรนเดอร์กล่องพื้นหลังทึบ & ข้อความลงใน PDF
+            // 🎯 ก. เรนเดอร์กล่องพื้นหลังทึบ & ข้อความ
             const pData = documentPatches[pageNum];
             if (pData && pData.patches) {
                 for (const pt of pData.patches) {
-                    const isBold = pt.fontWeight === '700';
-                    const font = isBold ? thaiFontBold : thaiFontRegular;
                     const pdfRot = degrees(360 - (pt.rotation || 0));
-
                     const pdfX = pt.boxLeft * scaleX;
                     const pdfY = (nativeH - (pt.boxTop + pt.height)) * scaleY;
                     const pdfW = (pt.width || 40) * scaleX;
                     const pdfH = pt.height * scaleY;
 
-                    // ถมกล่องพื้นหลังทึบปิดทับข้อความเดิม
+                    // ถมกล่องสีพื้นหลังปิดทับข้อความเดิม
                     if (pt.bgColor && pt.bgColor !== 'transparent') {
                         const bgRgb = hexToPdfRgb(pt.bgColor) || rgb(1, 1, 1);
                         targetPage.drawRectangle({
@@ -893,18 +943,47 @@ async function exportVectorPDF() {
                         textColorRgb = hexToPdfRgb(pt.textColor) || textColorRgb;
                     }
 
-                    targetPage.drawText(pt.text, {
-                        x: pdfX + 2,
-                        y: pdfY + (pdfH * 0.22),
-                        size: pt.fontSize * scaleY,
-                        font: font,
-                        color: textColorRgb,
-                        rotate: pdfRot
-                    });
+                    // ตรวจสอบว่ามีตัวอักษรภาษาไทยหรือไม่
+                    const hasThaiChar = /[\u0E00-\u0E7F]/.test(pt.text);
+
+                    if (canEmbedThaiFont) {
+                        const font = (pt.fontWeight === '700') ? thaiFontBold : thaiFontRegular;
+                        targetPage.drawText(pt.text, {
+                            x: pdfX + 2,
+                            y: pdfY + (pdfH * 0.22),
+                            size: pt.fontSize * scaleY,
+                            font: font,
+                            color: textColorRgb,
+                            rotate: pdfRot
+                        });
+                    } else {
+                        // 🎯 หัวใจสำคัญ: เรนเดอร์ข้อความเป็น Canvas ความละเอียดสูง 3 เท่า ป้องกัน WinAnsi Error 100%
+                        const tCanvas = document.createElement('canvas');
+                        const tCtx = tCanvas.getContext('2d');
+                        const dpr = 3;
+                        tCanvas.width = Math.ceil(pt.width * dpr);
+                        tCanvas.height = Math.ceil(pt.height * dpr);
+                        tCtx.scale(dpr, dpr);
+                        tCtx.font = `${pt.fontWeight || '400'} ${pt.fontSize}px 'Sarabun', sans-serif`;
+                        tCtx.fillStyle = pt.textColor || '#111827';
+                        tCtx.textBaseline = 'middle';
+                        tCtx.fillText(pt.text, 2, pt.height / 2);
+
+                        const tImgData = tCanvas.toDataURL('image/png');
+                        const tImgBytes = await fetch(tImgData).then(r => r.arrayBuffer());
+                        const tEmbedded = await loadedPdf.embedPng(tImgBytes);
+                        targetPage.drawImage(tEmbedded, {
+                            x: pdfX,
+                            y: pdfY,
+                            width: pdfW,
+                            height: pdfH,
+                            rotate: pdfRot
+                        });
+                    }
                 }
             }
 
-            // 🎯 3. รวม SVG (ก้อนเมฆ/สี่เหลี่ยม) + Canvas ลายเส้นปากกา ส่งออกไปพร้อมกัน 100%
+            // 🎯 ข. รวม SVG (ก้อนเมฆ/สี่เหลี่ยม) + ลายเส้นปากกาลงใน PDF
             const annotCanvas = wrapper.querySelector('.annotation-canvas');
             const svgLayer = wrapper.querySelector('.vector-shapes-svg');
 
@@ -954,7 +1033,7 @@ async function exportVectorPDF() {
         a.download = `${originalFileName}_CAD_Edited.pdf`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast("ส่งออกไฟล์ PDF เรียบร้อยค่ะ!");
+        showToast("ส่งออกไฟล์ PDF เรียบร้อยแล้วค่ะ!");
 
     } catch (err) {
         console.error(err);
@@ -1043,7 +1122,6 @@ function getPageAccurateCoords(e, wrapper) {
     };
 }
 
-// Modal ลายเซ็น
 function openSignatureModal() {
     document.getElementById('sig-modal').style.display = 'flex';
     clearSigCanvas();
