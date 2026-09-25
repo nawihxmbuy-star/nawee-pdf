@@ -1,5 +1,5 @@
-// 🎯 service-worker.js (v36.0 - Sunita PDF Studio Final Safe Edition)
-const CACHE_NAME = 'sunita-pdf-v36.0';
+// 🎯 service-worker.js (v37.0 - Sunita PDF Studio Final Safe Edition)
+const CACHE_NAME = 'sunita-pdf-v37.0';
 
 const CORE_ASSETS = [
   './',
