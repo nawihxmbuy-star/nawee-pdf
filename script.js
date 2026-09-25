@@ -267,10 +267,11 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
     input.type = 'text';
     input.value = initialText;
     input.className = 'cad-inline-editor';
+    input.style.position = 'absolute';
     input.style.left = left + 'px';
     input.style.top = top + 'px';
-    input.style.minWidth = Math.max(width, 30) + 'px';
-    input.style.height = height + 'px';
+    input.style.width = Math.max(width + 4, 30) + 'px';
+    input.style.height = (height + 2) + 'px';
     input.style.fontSize = fontSize + 'px';
     input.style.fontWeight = fontWeight;
     input.style.transformOrigin = 'center center';
@@ -302,21 +303,24 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
         const ratioX = pdfCanvas.width / parseFloat(wrapper.style.width);
         const ratioY = pdfCanvas.height / parseFloat(wrapper.style.height);
 
-        // Snapshot ลบคำเดิมระดับพิกเซล เพื่อให้ Ctrl+Z นำค่าเดิมกลับมาได้ 100%
+        // 🎯 ถมสี่เหลี่ยมสีขาวตามพิกัดและมุมหมุนจริงเป๊ะๆ ป้องกันปัญหาตัวหนังสือซ้อนทับกัน
+        const rad = (rotation * Math.PI) / 180;
+        const cX = (left + (finalW / 2)) * ratioX;
+        const cY = (top + (height / 2)) * ratioY;
+        const clearW = (finalW * ratioX) + (4 * ratioX);
+        const clearH = (height * ratioY) + (4 * ratioY);
+
         let previousImageData = null;
-        const centerX = (left + (finalW / 2)) * ratioX;
-        const centerY = (top + (height / 2)) * ratioY;
-        const clearW = (finalW * ratioX) + 4;
-        const clearH = (height * ratioY) + 4;
-        const snapX = Math.max(0, Math.floor(centerX - clearW / 2));
-        const snapY = Math.max(0, Math.floor(centerY - clearH / 2));
+        const snapBoxSize = Math.ceil(Math.max(clearW, clearH) * 1.5);
+        const snapX = Math.max(0, Math.floor(cX - snapBoxSize / 2));
+        const snapY = Math.max(0, Math.floor(cY - snapBoxSize / 2));
 
         if (isReplacingOriginal) {
-            previousImageData = ctx.getImageData(snapX, snapY, Math.ceil(clearW), Math.ceil(clearH));
+            previousImageData = ctx.getImageData(snapX, snapY, snapBoxSize, snapBoxSize);
 
             ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.translate(cX, cY);
+            ctx.rotate(rad);
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(-clearW / 2, -clearH / 2, clearW, clearH);
             ctx.restore();
@@ -335,8 +339,8 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
             redo: () => {
                 if (isReplacingOriginal) {
                     ctx.save();
-                    ctx.translate(centerX, centerY);
-                    ctx.rotate((rotation * Math.PI) / 180);
+                    ctx.translate(cX, cY);
+                    ctx.rotate(rad);
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(-clearW / 2, -clearH / 2, clearW, clearH);
                     ctx.restore();
@@ -490,9 +494,47 @@ window.addEventListener('pointerdown', (e) => {
     }
 });
 
-// -------------------------------------------------------------
-// REVISION CLOUD & RECTANGLE ENGINE (มาร์กจุดตรวจแบบมาตรฐาน)
-// -------------------------------------------------------------
+// --------------------------------------------------------------------------
+// REVISION CLOUD & RECTANGLE ENGINE (มาร์กจุดตรวจแบบมาตรฐานระดับ CAD)
+// --------------------------------------------------------------------------
+function generateCloudPath(x1, y1, x2, y2) {
+    const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+    const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+    const width = maxX - minX, height = maxY - minY;
+
+    if (width < 10 || height < 10) return '';
+
+    const arcRadius = 14; // รัศมีลอนคลื่นก้อนเมฆมาตรฐาน
+    let path = `M ${minX} ${minY}`;
+
+    // ขอบบน (ซ้ายไปขวา)
+    for (let x = minX; x < maxX; x += arcRadius * 1.5) {
+        const nextX = Math.min(x + arcRadius * 1.5, maxX);
+        const midX = (x + nextX) / 2;
+        path += ` Q ${midX} ${minY - arcRadius} ${nextX} ${minY}`;
+    }
+    // ขวา (บนลงล่าง)
+    for (let y = minY; y < maxY; y += arcRadius * 1.5) {
+        const nextY = Math.min(y + arcRadius * 1.5, maxY);
+        const midY = (y + nextY) / 2;
+        path += ` Q ${maxX + arcRadius} ${midY} ${maxX} ${nextY}`;
+    }
+    // ล่าง (ขวาไปซ้าย)
+    for (let x = maxX; x > minX; x -= arcRadius * 1.5) {
+        const nextX = Math.max(x - arcRadius * 1.5, minX);
+        const midX = (x + nextX) / 2;
+        path += ` Q ${midX} ${maxY + arcRadius} ${nextX} ${maxY}`;
+    }
+    // ซ้าย (ล่างขึ้นบน)
+    for (let y = maxY; y > minY; y -= arcRadius * 1.5) {
+        const nextY = Math.max(y - arcRadius * 1.5, minY);
+        const midY = (y + nextY) / 2;
+        path += ` Q ${minX - arcRadius} ${midY} ${minX} ${nextY}`;
+    }
+    path += ' Z';
+    return path;
+}
+
 function bindShapeEngine(wrapper, pageNum, svgLayer) {
     let startX = 0, startY = 0;
     let isDrawingShape = false;
@@ -506,34 +548,26 @@ function bindShapeEngine(wrapper, pageNum, svgLayer) {
 
         if (currentTool === 'rect') {
             tempShape = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            tempShape.setAttribute('stroke', currentInkColor);
-            tempShape.setAttribute('stroke-width', '2');
-            tempShape.setAttribute('fill', 'none');
         } else if (currentTool === 'cloud') {
             tempShape = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            tempShape.setAttribute('stroke', currentInkColor);
-            tempShape.setAttribute('stroke-width', '2');
-            tempShape.setAttribute('fill', 'none');
         }
+        tempShape.setAttribute('stroke', currentInkColor);
+        tempShape.setAttribute('stroke-width', '2');
+        tempShape.setAttribute('fill', 'none');
         svgLayer.appendChild(tempShape);
     });
 
     wrapper.addEventListener('pointermove', (e) => {
         if (!isDrawingShape || !tempShape) return;
         const coords = getPageAccurateCoords(e, wrapper);
-        const w = coords.x - startX;
-        const h = coords.y - startY;
 
         if (currentTool === 'rect') {
             tempShape.setAttribute('x', Math.min(startX, coords.x));
             tempShape.setAttribute('y', Math.min(startY, coords.y));
-            tempShape.setAttribute('width', Math.abs(w));
-            tempShape.setAttribute('height', Math.abs(h));
+            tempShape.setAttribute('width', Math.abs(coords.x - startX));
+            tempShape.setAttribute('height', Math.abs(coords.y - startY));
         } else if (currentTool === 'cloud') {
-            // สร้างเส้นส่วนโค้งก้อนเมฆตรวจแบบ (Arc Revision Cloud)
-            const x1 = Math.min(startX, coords.x), y1 = Math.min(startY, coords.y);
-            const x2 = Math.max(startX, coords.x), y2 = Math.max(startY, coords.y);
-            const d = `M ${x1} ${y1} Q ${x1+15} ${y1-12} ${x1+30} ${y1} Q ${x2-15} ${y1-12} ${x2} ${y1} Q ${x2+12} ${y1+15} ${x2} ${y1+30} Q ${x2+12} ${y2-15} ${x2} ${y2} Q ${x2-15} ${y2+12} ${x2-30} ${y2} Q ${x1+15} ${y2+12} ${x1} ${y2} Q ${x1-12} ${y2-15} ${x1} ${y2-30} Z`;
+            const d = generateCloudPath(startX, startY, coords.x, coords.y);
             tempShape.setAttribute('d', d);
         }
     });
@@ -541,7 +575,7 @@ function bindShapeEngine(wrapper, pageNum, svgLayer) {
     wrapper.addEventListener('pointerup', () => {
         if (isDrawingShape) {
             isDrawingShape = false;
-            showToast(currentTool === 'cloud' ? "วาดเมฆตรวจแบบเรียบร้อยค่ะ" : "วาดกรอบสี่เหลี่ยมเรียบร้อยค่ะ");
+            showToast(currentTool === 'cloud' ? "วาด Revision Cloud เรียบร้อยค่ะ" : "วาดกรอบสี่เหลี่ยมเรียบร้อยค่ะ");
         }
     });
 }
@@ -626,6 +660,72 @@ function getPageAccurateCoords(e, wrapper) {
         x: ((e.clientX - rect.left) / rect.width) * nativeW,
         y: ((e.clientY - rect.top) / rect.height) * nativeH
     };
+}
+
+// -------------------------------------------------------------
+// SIGNATURE MODAL HANDLERS
+// -------------------------------------------------------------
+function openSignatureModal() {
+    document.getElementById('sig-modal').style.display = 'flex';
+    clearSigCanvas();
+}
+function closeSignatureModal() {
+    document.getElementById('sig-modal').style.display = 'none';
+}
+function switchSigTab(tab) {
+    document.getElementById('tab-draw').className = tab === 'draw' ? 'active' : '';
+    document.getElementById('tab-upload').className = tab === 'upload' ? 'active' : '';
+    document.getElementById('pane-draw').style.display = tab === 'draw' ? 'block' : 'none';
+    document.getElementById('pane-upload').style.display = tab === 'upload' ? 'block' : 'none';
+}
+function clearSigCanvas() {
+    if (sigCtx && sigCanvas) sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+}
+function setSigInkColor(c) { sigColor = c; }
+
+function handleSigUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        uploadedSigBase64 = ev.target.result;
+        document.getElementById('img-preview').src = uploadedSigBase64;
+        document.getElementById('preview-upload-box').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+function placeSignatureOnDoc() {
+    let dataUrl = null;
+    const isDraw = document.getElementById('tab-draw').classList.contains('active');
+    dataUrl = isDraw ? sigCanvas.toDataURL('image/png') : uploadedSigBase64;
+
+    if (!dataUrl) return alert("กรุณาวาดลายเซ็นหรือเลือกรูปภาพก่อนค่ะ!");
+
+    const firstPage = document.querySelector('.page-wrapper');
+    if (!firstPage) return;
+    const layer = firstPage.querySelector('.patch-layer');
+
+    const sigNode = document.createElement('div');
+    sigNode.className = 'custom-draggable-sig';
+    sigNode.style.width = '140px';
+    sigNode.style.height = '60px';
+    sigNode.style.left = '50%';
+    sigNode.style.top = '50%';
+
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    sigNode.appendChild(img);
+
+    const del = document.createElement('div');
+    del.className = 'btn-del-sig';
+    del.innerHTML = '&times;';
+    del.onclick = () => sigNode.remove();
+    sigNode.appendChild(del);
+
+    layer.appendChild(sigNode);
+    closeSignatureModal();
+    showToast("วางลายเซ็นเรียบร้อยแล้วค่ะ");
 }
 
 // -------------------------------------------------------------
@@ -730,6 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tool-cloud').onclick = () => setTool('cloud');
     document.getElementById('tool-pen').onclick = () => setTool('pen');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
+    document.getElementById('btn-open-sig').onclick = openSignatureModal;
     
     document.getElementById('btn-undo').onclick = undoAction;
     document.getElementById('btn-redo').onclick = redoAction;
@@ -739,4 +840,31 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('active-color-input').onchange = (e) => {
         currentInkColor = e.target.value;
     };
+
+    sigCanvas = document.getElementById('sig-canvas');
+    if (sigCanvas) {
+        sigCtx = sigCanvas.getContext('2d');
+        sigCtx.lineWidth = 2.5;
+        sigCtx.lineCap = 'round';
+        
+        function getCoords(e) {
+            const r = sigCanvas.getBoundingClientRect();
+            return { x: e.clientX - r.left, y: e.clientY - r.top };
+        }
+        sigCanvas.addEventListener('pointerdown', (e) => {
+            isDrawingSig = true;
+            const c = getCoords(e);
+            sigCtx.beginPath();
+            sigCtx.moveTo(c.x, c.y);
+            sigCanvas.setPointerCapture(e.pointerId);
+        });
+        sigCanvas.addEventListener('pointermove', (e) => {
+            if (!isDrawingSig) return;
+            const c = getCoords(e);
+            sigCtx.strokeStyle = sigColor;
+            sigCtx.lineTo(c.x, c.y);
+            sigCtx.stroke();
+        });
+        window.addEventListener('pointerup', () => isDrawingSig = false);
+    }
 });
