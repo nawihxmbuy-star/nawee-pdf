@@ -163,6 +163,13 @@ async function renderPage(pageNum, container) {
         const fontHeight = Math.hypot(tx[2], tx[3]);
         const [left, top] = displayViewport.convertToViewportPoint(item.transform[4], item.transform[5]);
 
+        // 🎯 1. คำนวณหามุมหมุนจริงของตัวอักษรจาก Transform Matrix [a, b, c, d, e, f]
+        const angleRad = Math.atan2(item.transform[1], item.transform[0]);
+        let angleDeg = Math.round(angleRad * (180 / Math.PI));
+        if (angleDeg < 0) angleDeg += 360;
+        // ปรับ Snap ให้ตรงกับทิศหลัก 0, 90, 180, 270 องศา
+        const snappedRotation = (Math.round(angleDeg / 90) * 90) % 360;
+
         return {
             x: left,
             y: top - fontHeight,
@@ -173,7 +180,8 @@ async function renderPage(pageNum, container) {
             fontName: item.fontName || '',
             pdfX: item.transform[4],
             pdfY: item.transform[5],
-            viewportY: top
+            viewportY: top,
+            rotation: snappedRotation // เก็บองศาของตัวหนังสือ
         };
     });
 
@@ -343,14 +351,16 @@ function getMatchedOriginalText(boxLeft, boxTop, boxWidth, boxHeight, textMetada
             origPdfY: target.pdfY,
             origWidth: target.width,
             fontWeight: isBold ? '700' : '400',
-            text: target.text
+            text: target.text,
+            rotation: target.rotation || 0 // ส่งค่ามุมหมุนต่อให้กล่อง Input
         };
     }
 
     return {
         fontSize: 9,
         fontWeight: '400',
-        text: ''
+        text: '',
+        rotation: 0
     };
 }
 
@@ -743,31 +753,37 @@ function createInteractiveShape(wrapper, pageNum, left, top, width, height, type
 }
 
 // -------------------------------------------------------------
-// กล่อง Input แก้คำ: ล็อกพิกัดตรงจุด ไม่กระโดด ไม่แลบกินขอบตาราง
+// กล่อง Input: หมุนองศาอิสระ + กระชับแนบชิด ไม่กินเส้นแบบ/ตาราง
 // -------------------------------------------------------------
 function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, height, colors, matchedOrig) {
     const layer = wrapper.querySelector('.patch-layer');
 
     const fontSize = matchedOrig && matchedOrig.fontSize ? matchedOrig.fontSize : 9;
     let currentWeight = matchedOrig && matchedOrig.fontWeight ? matchedOrig.fontWeight : '400';
+    let currentRotation = matchedOrig && matchedOrig.rotation !== undefined ? matchedOrig.rotation : 0;
     
     const insetLeft = left;
     const insetTop = top;
     let insetWidth = Math.max(16, width);
-    const insetHeight = Math.max(fontSize + 2, Math.round(height));
+    // 🎯 2. บีบความสูงกล่องถมสีพื้นให้พอดีกับความสูงฟอนต์จริง ไม่แลบไปทับเส้นแบบ
+    const tightBoxHeight = Math.max(fontSize + 1, Math.round(fontSize * 1.15));
 
     const node = document.createElement('div');
     node.className = 'active-patch-node';
     node.style.left = insetLeft + 'px';
     node.style.top = insetTop + 'px';
     node.style.width = insetWidth + 'px';
-    node.style.height = insetHeight + 'px';
+    node.style.height = tightBoxHeight + 'px';
     node.style.background = colors.bg.hex;
+    node.style.transformOrigin = 'left top';
+    node.style.transform = `rotate(${currentRotation}deg)`;
 
     const nudgeBar = document.createElement('div');
     nudgeBar.className = 'nudge-toolbar';
+    // 🎯 เพิ่มปุ่มหมุนข้อความ (nb-rotate) บน Nudge Toolbar
     nudgeBar.innerHTML = `
         <button type="button" class="nudge-btn ${currentWeight === '700' ? 'active' : ''}" id="nb-bold" title="สลับตัวหนา/ตัวปกติ"><strong>B</strong></button>
+        <button type="button" class="nudge-btn" id="nb-rotate" title="หมุนองศาข้อความทีละ 90°"><i class="fa-solid fa-rotate"></i> <span id="rot-deg">${currentRotation}°</span></button>
         <button type="button" class="nudge-btn" id="nb-left" title="ชิดซ้าย"><i class="fa-solid fa-align-left"></i></button>
         <button type="button" class="nudge-btn" id="nb-center" title="กึ่งกลาง"><i class="fa-solid fa-align-center"></i></button>
         <button type="button" class="nudge-btn" id="nb-right" title="ชิดขวา"><i class="fa-solid fa-align-right"></i></button>
@@ -806,7 +822,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         tempSpan.style.position = 'absolute';
         tempSpan.innerText = input.value || input.placeholder;
         document.body.appendChild(tempSpan);
-        const textW = tempSpan.offsetWidth + 8;
+        const textW = tempSpan.offsetWidth + 4;
         tempSpan.remove();
 
         if (textW > insetWidth) {
@@ -834,6 +850,15 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         input.style.fontWeight = currentWeight;
         textPreview.style.fontWeight = currentWeight;
         nudgeBar.querySelector('#nb-bold').classList.toggle('active', currentWeight === '700');
+    };
+
+    // 🎯 ฟังก์ชันคลิกปุ่มหมุนข้อความ
+    nudgeBar.querySelector('#nb-rotate').onclick = (e) => {
+        e.stopPropagation();
+        currentRotation = (currentRotation + 90) % 360;
+        node.style.transform = `rotate(${currentRotation}deg)`;
+        nudgeBar.querySelector('#rot-deg').innerText = `${currentRotation}°`;
+        showToast(`หมุนข้อความ ${currentRotation}° แล้วค่ะ`);
     };
 
     nudgeBar.querySelector('#nb-step-left').onclick = (e) => {
@@ -889,7 +914,7 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         textPreview.style.display = 'block';
         updatePreviewPosition();
 
-        showToast("ขยับซ้าย-ขวาเพื่อจัดแนว แล้วกด Enter หรือแตะ 'เสร็จ'");
+        showToast("ขยับซ้าย-ขวา หรือหมุนองศา แล้วแตะ 'เสร็จ'");
     }
 
     function handleKeyNudge(e) {
@@ -936,29 +961,39 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
         const metrics = ctx.measureText(text);
         const textWidthOnCanvas = metrics.width;
         
+        // 🎯 3. บีบขนาดกล่องถมสีพื้นให้พอดีตัวอักษรจริง ไม่บวก Padding จนล้นไปกินเส้นแบบ
         const finalBoxW = parseFloat(node.style.width) || insetWidth;
-        const clearWidth = Math.max(finalBoxW * ratioX, textWidthOnCanvas + (4 * ratioX));
+        const tightClearW = Math.max(finalBoxW * ratioX, textWidthOnCanvas + (2 * ratioX));
+        const tightClearH = tightBoxHeight * ratioY;
 
+        ctx.save();
+        // หมุน Context ของ Canvas เพื่อแสดงผลพรีวิวตามมุมหมุน
+        ctx.translate(insetLeft * ratioX, insetTop * ratioY);
+        ctx.rotate((currentRotation * Math.PI) / 180);
+
+        // วาดกล่องถมสีพื้น
         ctx.fillStyle = colors.bg.hex;
-        ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
+        ctx.fillRect(0, 0, tightClearW, tightClearH);
 
-        let drawX = (insetLeft + currentOffsetX) * ratioX;
+        let drawX = currentOffsetX * ratioX;
         if (currentAlign === 'right') {
-            drawX = (insetLeft * ratioX) + clearWidth - textWidthOnCanvas - (2 * ratioX);
+            drawX = tightClearW - textWidthOnCanvas - (2 * ratioX);
         } else if (currentAlign === 'center') {
-            drawX = (insetLeft * ratioX) + ((clearWidth - textWidthOnCanvas) / 2);
+            drawX = (tightClearW - textWidthOnCanvas) / 2;
         }
 
-        const drawBaselineY = (insetTop + (fontSize * 0.88)) * ratioY;
+        const drawBaselineY = (fontSize * 0.88) * ratioY;
 
         ctx.fillStyle = colors.text.hex;
         ctx.textBaseline = 'alphabetic';
         ctx.fillText(text, drawX, drawBaselineY);
+        ctx.restore();
 
         const wrapperHeight = parseFloat(wrapper.style.height);
-        const finalPdfX = drawX / ratioX;
-        const finalPdfY = wrapperHeight - insetTop - (fontSize * 0.88);
-        const finalBoxY = wrapperHeight - (insetTop + insetHeight);
+        
+        // พิกัดสำหรับส่งออกเวกเตอร์ PDF
+        const finalPdfX = insetLeft;
+        const finalPdfY = wrapperHeight - insetTop;
 
         if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
         
@@ -966,19 +1001,22 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             x: finalPdfX,
             boxLeft: insetLeft,
             y: finalPdfY,
-            patchBoxY: finalBoxY,
-            width: (clearWidth / ratioX),
-            height: insetHeight,
+            patchBoxY: finalPdfY,
+            width: (tightClearW / ratioX),
+            height: tightBoxHeight,
             text: text,
             fontSize: fontSize,
             fontWeight: currentWeight,
+            rotation: currentRotation, // บันทึกมุมหมุนสำหรับ PDF
+            offsetX: currentOffsetX,
+            align: currentAlign,
             bgColor: colors.bg,
             textColor: colors.text
         };
 
         documentPatches[pageNum].patches.push(patchData);
 
-        createReEditHotspot(wrapper, pageNum, pdfCanvas, insetLeft, insetTop, (clearWidth / ratioX), insetHeight, colors, matchedOrig, text);
+        createReEditHotspot(wrapper, pageNum, pdfCanvas, insetLeft, insetTop, (tightClearW / ratioX), tightBoxHeight, colors, matchedOrig, text);
         
         recordAction({
             undo: () => {
@@ -990,11 +1028,15 @@ function createInPlaceInputBox(wrapper, pageNum, pdfCanvas, left, top, width, he
             },
             redo: () => {
                 documentPatches[pageNum].patches.push(patchData);
+                ctx.save();
+                ctx.translate(insetLeft * ratioX, insetTop * ratioY);
+                ctx.rotate((currentRotation * Math.PI) / 180);
                 ctx.fillStyle = colors.bg.hex;
-                ctx.fillRect(insetLeft * ratioX, insetTop * ratioY, clearWidth, insetHeight * ratioY);
+                ctx.fillRect(0, 0, tightClearW, tightClearH);
                 ctx.font = `${currentWeight} ${canvasFontSize}px 'Sarabun', sans-serif`;
                 ctx.fillStyle = colors.text.hex;
                 ctx.fillText(text, drawX, drawBaselineY);
+                ctx.restore();
             }
         });
 
@@ -1175,14 +1217,14 @@ function placeSignatureOnDoc() {
 }
 
 // -------------------------------------------------------------
-// ส่งออก Vector PDF (รองรับทั้ง Sarabun-Bold และ Regular 100%)
+// ส่งออก Vector PDF (รองรับ Rotation องศาแท้ + ฟอนต์ Bold/Regular)
 // -------------------------------------------------------------
 async function exportVectorPDF() {
     if (!originalPdfBytes) { alert("กรุณาเปิดไฟล์ PDF ก่อนค่ะ!"); return; }
 
     try {
         showToast("กำลังสร้างไฟล์ PDF คมชัดระดับเวกเตอร์...");
-        const { PDFDocument, rgb, StandardFonts } = PDFLib;
+        const { PDFDocument, rgb, degrees, StandardFonts } = PDFLib;
         const loadedPdf = await PDFDocument.load(originalPdfBytes);
         
         let thaiFontRegular = null;
@@ -1215,7 +1257,7 @@ async function exportVectorPDF() {
             const targetPage = pages[pIdx];
             const pData = documentPatches[pageNum];
 
-            // 1. เรนเดอร์การแก้ไขคำในตาราง (เลือกฟอนต์ Regular หรือ Bold ตามจริง)
+            // 1. เรนเดอร์การแก้ไขคำ (พร้อมระบบหมุนองศา degrees(rotation))
             if (pData.patches) {
                 pData.patches.forEach(pt => {
                     const safeBgR = Math.min(1.0, Math.max(0.0, pt.bgColor.r));
@@ -1226,25 +1268,78 @@ async function exportVectorPDF() {
                     const safeTxtG = Math.min(1.0, Math.max(0.0, pt.textColor.g));
                     const safeTxtB = Math.min(1.0, Math.max(0.0, pt.textColor.b));
 
-                    // 🎯 สลับใช้ฟอนต์ตัวหนาจริงเมื่อตั้งสถานะเป็น bold หรือ 700
                     const isBold = (pt.fontWeight === '700' || pt.fontWeight === 'bold');
                     const selectedFont = isBold ? thaiFontBold : thaiFontRegular;
+                    const rot = pt.rotation || 0;
 
-                    targetPage.drawRectangle({
-                        x: pt.boxLeft,
-                        y: pt.patchBoxY,
-                        width: pt.width,
-                        height: pt.height,
-                        color: rgb(safeBgR, safeBgG, safeBgB),
-                    });
-
-                    targetPage.drawText(pt.text, {
-                        x: pt.x,
-                        y: pt.y,
-                        size: pt.fontSize,
-                        font: selectedFont,
-                        color: rgb(safeTxtR, safeTxtG, safeTxtB),
-                    });
+                    // 🎯 4. คำนวณพิกัดการวาดหมุนในระบบแกน PDF (Origin: ล่างซ้าย)
+                    if (rot === 0) {
+                        targetPage.drawRectangle({
+                            x: pt.boxLeft,
+                            y: pt.patchBoxY - pt.height,
+                            width: pt.width,
+                            height: pt.height,
+                            color: rgb(safeBgR, safeBgG, safeBgB),
+                        });
+                        targetPage.drawText(pt.text, {
+                            x: pt.boxLeft + (pt.offsetX || 0),
+                            y: pt.patchBoxY - (pt.fontSize * 0.88),
+                            size: pt.fontSize,
+                            font: selectedFont,
+                            color: rgb(safeTxtR, safeTxtG, safeTxtB),
+                        });
+                    } else if (rot === 90) {
+                        targetPage.drawRectangle({
+                            x: pt.boxLeft,
+                            y: pt.patchBoxY,
+                            width: pt.width,
+                            height: pt.height,
+                            color: rgb(safeBgR, safeBgG, safeBgB),
+                            rotate: degrees(-90)
+                        });
+                        targetPage.drawText(pt.text, {
+                            x: pt.boxLeft + (pt.fontSize * 0.88),
+                            y: pt.patchBoxY - (pt.offsetX || 0),
+                            size: pt.fontSize,
+                            font: selectedFont,
+                            color: rgb(safeTxtR, safeTxtG, safeTxtB),
+                            rotate: degrees(-90)
+                        });
+                    } else if (rot === 180) {
+                        targetPage.drawRectangle({
+                            x: pt.boxLeft,
+                            y: pt.patchBoxY,
+                            width: pt.width,
+                            height: pt.height,
+                            color: rgb(safeBgR, safeBgG, safeBgB),
+                            rotate: degrees(-180)
+                        });
+                        targetPage.drawText(pt.text, {
+                            x: pt.boxLeft - (pt.offsetX || 0),
+                            y: pt.patchBoxY + (pt.fontSize * 0.88),
+                            size: pt.fontSize,
+                            font: selectedFont,
+                            color: rgb(safeTxtR, safeTxtG, safeTxtB),
+                            rotate: degrees(-180)
+                        });
+                    } else if (rot === 270) {
+                        targetPage.drawRectangle({
+                            x: pt.boxLeft,
+                            y: pt.patchBoxY,
+                            width: pt.width,
+                            height: pt.height,
+                            color: rgb(safeBgR, safeBgG, safeBgB),
+                            rotate: degrees(-270)
+                        });
+                        targetPage.drawText(pt.text, {
+                            x: pt.boxLeft - (pt.fontSize * 0.88),
+                            y: pt.patchBoxY + (pt.offsetX || 0),
+                            size: pt.fontSize,
+                            font: selectedFont,
+                            color: rgb(safeTxtR, safeTxtG, safeTxtB),
+                            rotate: degrees(-270)
+                        });
+                    }
                 });
             }
 
@@ -1281,7 +1376,6 @@ async function exportVectorPDF() {
                         });
                     }
 
-                    // วาดเส้นโยงและกล่องคอมเมนต์สีแดง
                     const noteText = (sh.callout && sh.callout.text) ? sh.callout.text.trim() : (sh.note ? sh.note.trim() : '');
                     if (noteText) {
                         const calloutColor = shapeColor;
@@ -1297,7 +1391,6 @@ async function exportVectorPDF() {
                         const endX = boxX + (boxWidth / 2);
                         const endY = boxY + (boxHeight / 2);
 
-                        // ลากเส้นโยง (Leader Line)
                         targetPage.drawLine({
                             start: { x: startX, y: startY },
                             end: { x: endX, y: endY },
@@ -1306,7 +1399,6 @@ async function exportVectorPDF() {
                             dashArray: [3, 3]
                         });
 
-                        // วาดพื้นหลังกล่องคอมเมนต์สีแดงทึบ
                         targetPage.drawRectangle({
                             x: boxX,
                             y: boxY,
@@ -1315,7 +1407,6 @@ async function exportVectorPDF() {
                             color: calloutColor,
                         });
 
-                        // ตัวหนังสือสีขาวตัวหนาคมชัดในกล่องคอมเมนต์
                         targetPage.drawText(noteText, {
                             x: boxX + textPaddingX,
                             y: boxY + 6,
