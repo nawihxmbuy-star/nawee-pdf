@@ -5,7 +5,7 @@ if (pdfjsLib) {
 
 // Global States
 let currentTool = 'text';
-let currentInkColor = '#ef4444';
+let currentInkColor = '#111827';
 let currentScale = 1.0;
 let pdfDoc = null;
 let originalPdfBytes = null;
@@ -29,7 +29,7 @@ function showToast(msg) {
     toast.className = 'custom-toast';
     toast.innerText = msg;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
+    setTimeout(() => toast.remove(), 2200);
 }
 
 function recordAction(action) {
@@ -66,7 +66,8 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !isSpacePressed) {
         isSpacePressed = true;
         document.body.classList.add('panning-mode');
-        document.getElementById('workspace').style.cursor = 'grab';
+        const ws = document.getElementById('workspace');
+        if (ws) ws.style.cursor = 'grab';
     } else if (e.key === 'Enter') {
         commitActiveStages();
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -180,13 +181,13 @@ async function renderPage(pageNum, container) {
     annotCanvas.height = viewport.height;
     wrapper.appendChild(annotCanvas);
 
-    const svgLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svgLayer.setAttribute('class', 'vector-shapes-svg');
-    wrapper.appendChild(svgLayer);
-
     const patchLayer = document.createElement('div');
     patchLayer.className = 'patch-layer';
     wrapper.appendChild(patchLayer);
+
+    const svgLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgLayer.setAttribute('class', 'vector-shapes-svg');
+    wrapper.appendChild(svgLayer);
 
     const glyphLayer = document.createElement('div');
     glyphLayer.className = 'glyph-interactive-layer';
@@ -237,7 +238,7 @@ async function renderPage(pageNum, container) {
 }
 
 // --------------------------------------------------------------------------
-// 2. DYNAMIC 8-POINT RING INPAINTING
+// 2. DYNAMIC INPAINTING & INK SAMPLING
 // --------------------------------------------------------------------------
 function samplePerimeterBackground(canvas, cx, cy, w, h, rad) {
     const ctx = canvas.getContext('2d');
@@ -246,16 +247,17 @@ function samplePerimeterBackground(canvas, cx, cy, w, h, rad) {
 
     const sCX = cx * scaleFactorX;
     const sCY = cy * scaleFactorY;
-    const sHalfW = (w * scaleFactorX) / 2 + 4;
-    const sHalfH = (h * scaleFactorY) / 2 + 4;
+    const sHalfW = (w * scaleFactorX) / 2 + 5;
+    const sHalfH = (h * scaleFactorY) / 2 + 5;
 
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
+    // 8 จุดสมมาตรอย่างถูกต้องรอบกรอบข้อความ
     const sampleOffsets = [
         { x: -sHalfW, y: -sHalfH }, { x: 0, y: -sHalfH }, { x: sHalfW, y: -sHalfH },
         { x: sHalfW, y: 0 },
-        { x: sHalfW, y: sHalfH }, { x: 0, y: sHalfH }, { x: -sHalfW, y: -sHalfH },
+        { x: sHalfW, y: sHalfH },  { x: 0, y: sHalfH },  { x: -sHalfW, y: sHalfH },
         { x: -sHalfW, y: 0 }
     ];
 
@@ -280,6 +282,42 @@ function samplePerimeterBackground(canvas, cx, cy, w, h, rad) {
     return `#${toHex(median(rArr))}${toHex(median(gArr))}${toHex(median(bArr))}`;
 }
 
+// สุ่มสีหมึกที่มืดที่สุดในบริเวณตัวหนังสือเดิมเพื่อให้สีตัวหนังสือใหม่แนบเนียน
+function sampleTextInkColor(canvas, cx, cy, w, h) {
+    const ctx = canvas.getContext('2d');
+    const scaleFactorX = canvas.width / parseFloat(canvas.style.width || (canvas.width / 2));
+    const scaleFactorY = canvas.height / parseFloat(canvas.style.height || (canvas.height / 2));
+
+    const sCX = cx * scaleFactorX;
+    const sCY = cy * scaleFactorY;
+    const halfW = Math.max(2, (w * scaleFactorX) / 3);
+    const halfH = Math.max(2, (h * scaleFactorY) / 3);
+
+    const sX = Math.max(0, Math.floor(sCX - halfW));
+    const sY = Math.max(0, Math.floor(sCY - halfH));
+    const sW = Math.min(canvas.width - sX, Math.floor(halfW * 2));
+    const sH = Math.min(canvas.height - sY, Math.floor(halfH * 2));
+
+    if (sW <= 0 || sH <= 0) return '#111827';
+
+    const imgData = ctx.getImageData(sX, sY, sW, sH).data;
+    let minBrightness = 255;
+    let bestR = 17, bestG = 24, bestB = 39;
+
+    for (let i = 0; i < imgData.length; i += 4) {
+        const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2], a = imgData[i + 3];
+        if (a < 128) continue;
+        const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (brightness < minBrightness) {
+            minBrightness = brightness;
+            bestR = r; bestG = g; bestB = b;
+        }
+    }
+
+    const toHex = n => Math.min(255, Math.max(0, n)).toString(16).padStart(2, '0');
+    return `#${toHex(bestR)}${toHex(bestG)}${toHex(bestB)}`;
+}
+
 // --------------------------------------------------------------------------
 // 3. IN-PLACE UNIVERSAL TEXT & ACTIVE STAGING
 // --------------------------------------------------------------------------
@@ -299,8 +337,18 @@ function bindCadTextEngine(wrapper, pageNum, pdfCanvas, glyphLayer, textMetadata
         hitEl.style.transform = `rotate(${meta.rotation}deg)`;
         hitEl.title = `ดับเบิลคลิกแก้ไข: ${meta.text}`;
 
+        // บันทึก Metadata สำหรับตัวค้นหา Search & Replace
+        hitEl.patchMeta = meta;
+        hitEl.dataset.rawText = meta.text;
+
         hitEl.ondblclick = (e) => {
             e.stopPropagation();
+            const rad = (meta.rotation * Math.PI) / 180;
+            const sampledInk = sampleTextInkColor(pdfCanvas, meta.left + meta.width / 2, meta.top + meta.height / 2, meta.width, meta.height);
+            currentInkColor = sampledInk;
+            const colorInput = document.getElementById('rib-text-color');
+            if (colorInput) colorInput.value = sampledInk;
+
             openInPlaceEditor(wrapper, pageNum, pdfCanvas, meta.left, meta.top, meta.width, meta.height, meta.text, meta.fontSize, meta.fontWeight, meta.rotation, true);
         };
 
@@ -332,6 +380,7 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
     input.style.height = (height + 2) + 'px';
     input.style.fontSize = fontSize + 'px';
     input.style.fontWeight = fontWeight;
+    input.style.color = currentInkColor;
     input.style.transformOrigin = 'center center';
     input.style.transform = `rotate(${rotation}deg)`;
     layer.appendChild(input);
@@ -386,6 +435,8 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
         }
 
         const cadNode = createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, finalW, height, text, fontSize, fontWeight, rotation, sampledBg, isReplacingOriginal);
+        cadNode.style.color = currentInkColor;
+        cadNode.patchData.textColor = currentInkColor;
 
         recordAction({
             undo: () => {
@@ -418,7 +469,7 @@ function openInPlaceEditor(wrapper, pageNum, pdfCanvas, left, top, width, height
 }
 
 // --------------------------------------------------------------------------
-// 4. CAD TEXT NODE & EDGE RESIZE (เซนเซอร์ขอบปรับกว้าง-สูง ไร้จุดกวนสายตา)
+// 4. CAD TEXT NODE & RESIZE SENSORS
 // --------------------------------------------------------------------------
 function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height, text, fontSize, fontWeight, rotation, bgColor, hasSolidBg) {
     const layer = wrapper.querySelector('.patch-layer');
@@ -432,7 +483,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
     node.style.height = height + 'px';
     node.style.fontSize = fontSize + 'px';
     node.style.fontWeight = fontWeight;
-    node.style.color = '#111827';
+    node.style.color = currentInkColor || '#111827';
     node.style.background = hasSolidBg ? (bgColor || '#ffffff') : 'transparent';
     node.style.transform = `rotate(${rotation}deg)`;
     node.innerText = text;
@@ -457,7 +508,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
         fontSize: fontSize,
         fontWeight: fontWeight,
         rotation: rotation,
-        textColor: '#111827',
+        textColor: node.style.color,
         bgColor: node.style.background
     };
 
@@ -480,7 +531,7 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
         openInPlaceEditor(wrapper, pageNum, pdfCanvas, parseFloat(node.style.left), parseFloat(node.style.top), width, height, text, patchData.fontSize, patchData.fontWeight, patchData.rotation, false);
     };
 
-    // หมุนอิสระ 360° (กด Shift ค้างล็อกฉาก 90°)
+    // หมุนอิสระ 360° (Shift ค้างเพื่อล็อกฉาก 90°)
     let isRotating = false;
     rotHandle.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
@@ -536,7 +587,6 @@ function createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height
     return node;
 }
 
-// ขอบเซนเซอร์ปรับกว้าง-สูง
 function attachResizeHandle(node, patchData) {
     const edges = ['e', 'w', 's', 'n', 'se'];
     const wH = parseFloat(node.parentElement.style.height || 800);
@@ -835,7 +885,7 @@ function initLiveRibbonEvents() {
 }
 
 // --------------------------------------------------------------------------
-// 7. EXPORT PDF ENGINE (แก้ตำแหน่ง 1:1 + ป้องกันกล่องสีดำ)
+// 7. EXPORT PDF ENGINE (แก้จุดหมุน Center Matrix & ฝังลายเซ็นตรง 100%)
 // --------------------------------------------------------------------------
 function hexToPdfRgb(hex) {
     if (!hex || hex === 'transparent' || hex === 'none') return null;
@@ -899,7 +949,7 @@ async function exportVectorPDF() {
                 canEmbedThaiFont = true;
             }
         } catch (fontErr) {
-            console.warn("ไม่สามารถฝังฟอนต์ TTF ตรงได้ ใช้ Canvas Stamp แทน:", fontErr);
+            console.warn("ไม่สามารถฝังฟอนต์ TTF ตรงได้ ใช้ Stamp แทน:", fontErr);
             canEmbedThaiFont = false;
         }
 
@@ -919,27 +969,32 @@ async function exportVectorPDF() {
             const scaleX = pageW / cssW;
             const scaleY = pageH / cssH;
 
-            // 🎯 1. เรนเดอร์กล่องข้อความและพื้นหลัง
             const pData = documentPatches[pageNum];
+
+            // 🎯 1. เรนเดอร์กล่องข้อความและพื้นหลัง
             if (pData && pData.patches) {
                 for (const pt of pData.patches) {
                     const rot = pt.rotation || 0;
                     const pdfRot = degrees(360 - rot);
+                    const rad = (rot * Math.PI) / 180;
 
-                    const boxX = pt.boxLeft * scaleX;
-                    const boxY = (cssH - (pt.boxTop + pt.height)) * scaleY;
                     const boxW = (pt.width || 40) * scaleX;
                     const boxH = pt.height * scaleY;
 
-                    // ป้องกันไม่ให้ถมดำโดยไม่ตั้งใจ
+                    // แปลง Center-Pivot Matrix ของ CSS ให้ตรงกับ Origin ล่างซ้ายของ PDF
+                    const centerX = (pt.boxLeft + pt.width / 2) * scaleX;
+                    const centerY = (cssH - (pt.boxTop + pt.height / 2)) * scaleY;
+                    const originX = centerX - ((boxW / 2) * Math.cos(rad) - (boxH / 2) * Math.sin(rad));
+                    const originY = centerY - ((boxW / 2) * Math.sin(rad) + (boxH / 2) * Math.cos(rad));
+
                     if (pt.bgColor && pt.bgColor !== 'transparent') {
                         let bgRgb = hexToPdfRgb(pt.bgColor);
                         if (!bgRgb || (bgRgb.red === 0 && bgRgb.green === 0 && bgRgb.blue === 0 && pt.bgColor !== '#000000')) {
                             bgRgb = rgb(1, 1, 1);
                         }
                         targetPage.drawRectangle({
-                            x: boxX,
-                            y: boxY,
+                            x: originX,
+                            y: originY,
                             width: boxW,
                             height: boxH,
                             color: bgRgb,
@@ -955,15 +1010,14 @@ async function exportVectorPDF() {
                     if (canEmbedThaiFont) {
                         const font = (pt.fontWeight === '700') ? thaiFontBold : thaiFontRegular;
                         targetPage.drawText(pt.text, {
-                            x: boxX + (2 * scaleX),
-                            y: boxY + (boxH * 0.22),
+                            x: originX + (2 * scaleX),
+                            y: originY + (boxH * 0.22),
                             size: pt.fontSize * scaleY,
                             font: font,
                             color: textColorRgb,
                             rotate: pdfRot
                         });
                     } else {
-                        // High-Res Fallback ป้องกัน WinAnsi Error
                         const tCanvas = document.createElement('canvas');
                         const tCtx = tCanvas.getContext('2d');
                         const dpr = 3;
@@ -979,8 +1033,8 @@ async function exportVectorPDF() {
                         const tImgBytes = await fetch(tImgData).then(r => r.arrayBuffer());
                         const tEmbedded = await loadedPdf.embedPng(tImgBytes);
                         targetPage.drawImage(tEmbedded, {
-                            x: boxX,
-                            y: boxY,
+                            x: originX,
+                            y: originY,
                             width: boxW,
                             height: boxH,
                             rotate: pdfRot
@@ -989,7 +1043,27 @@ async function exportVectorPDF() {
                 }
             }
 
-            // 🎯 2. เรนเดอร์เมฆตรวจแบบ (SVG) และลายเส้น Canvas ให้ตรงพิกัด 100%
+            // 🎯 2. เรนเดอร์รูปลายเซ็นและตราประทับ
+            if (pData && pData.images) {
+                for (const imgItem of pData.images) {
+                    const imgBytes = await fetch(imgItem.dataUrl).then(r => r.arrayBuffer());
+                    const embeddedImg = await loadedPdf.embedPng(imgBytes);
+
+                    const imgX = imgItem.x * scaleX;
+                    const imgY = (cssH - (imgItem.y + imgItem.height)) * scaleY;
+                    const imgW = imgItem.width * scaleX;
+                    const imgH = imgItem.height * scaleY;
+
+                    targetPage.drawImage(embeddedImg, {
+                        x: imgX,
+                        y: imgY,
+                        width: imgW,
+                        height: imgH
+                    });
+                }
+            }
+
+            // 🎯 3. เรนเดอร์เมฆตรวจแบบ (SVG) และลายเส้น Canvas ให้ตรงพิกัด 100%
             const annotCanvas = wrapper.querySelector('.annotation-canvas');
             const svgLayer = wrapper.querySelector('.vector-shapes-svg');
 
@@ -1072,6 +1146,7 @@ function bindDrawingEngine(canvas, pageNum) {
         if (currentTool !== 'pen' && currentTool !== 'eraser') return;
         const c = getCoords(e);
         isDrawing = true; lastX = c.x; lastY = c.y;
+        canvas.setPointerCapture(e.pointerId);
     });
 
     canvas.addEventListener('pointermove', (e) => {
@@ -1096,33 +1171,36 @@ function bindDrawingEngine(canvas, pageNum) {
         lastX = c.x; lastY = c.y;
     });
 
-    window.addEventListener('pointerup', () => { isDrawing = false; });
+    canvas.addEventListener('pointerup', () => { isDrawing = false; });
 }
 
+// Workspace Panning
 const wsEl = document.querySelector('.workspace');
 let isPanning = false, panStartX = 0, panStartY = 0, scrollStartL = 0, scrollStartT = 0;
 
-wsEl.addEventListener('pointerdown', (e) => {
-    if (isSpacePressed || currentTool === 'pan' || e.button === 1) {
-        isPanning = true;
-        panStartX = e.clientX; panStartY = e.clientY;
-        scrollStartL = wsEl.scrollLeft; scrollStartT = wsEl.scrollTop;
-        wsEl.style.cursor = 'grabbing';
-    }
-});
+if (wsEl) {
+    wsEl.addEventListener('pointerdown', (e) => {
+        if (isSpacePressed || currentTool === 'pan' || e.button === 1) {
+            isPanning = true;
+            panStartX = e.clientX; panStartY = e.clientY;
+            scrollStartL = wsEl.scrollLeft; scrollStartT = wsEl.scrollTop;
+            wsEl.style.cursor = 'grabbing';
+        }
+    });
 
-window.addEventListener('pointermove', (e) => {
-    if (!isPanning) return;
-    wsEl.scrollLeft = scrollStartL - (e.clientX - panStartX);
-    wsEl.scrollTop = scrollStartT - (e.clientY - panStartY);
-});
+    window.addEventListener('pointermove', (e) => {
+        if (!isPanning) return;
+        wsEl.scrollLeft = scrollStartL - (e.clientX - panStartX);
+        wsEl.scrollTop = scrollStartT - (e.clientY - panStartY);
+    });
 
-window.addEventListener('pointerup', () => {
-    if (isPanning) {
-        isPanning = false;
-        wsEl.style.cursor = currentTool === 'pan' ? 'grab' : 'crosshair';
-    }
-});
+    window.addEventListener('pointerup', () => {
+        if (isPanning) {
+            isPanning = false;
+            wsEl.style.cursor = currentTool === 'pan' ? 'grab' : 'crosshair';
+        }
+    });
+}
 
 function getPageAccurateCoords(e, wrapper) {
     const rect = wrapper.getBoundingClientRect();
@@ -1134,8 +1212,18 @@ function getPageAccurateCoords(e, wrapper) {
     };
 }
 
+// Modal Signature Controllers
 function openSignatureModal() {
-    document.getElementById('sig-modal').style.display = 'flex';
+    const modal = document.getElementById('sig-modal');
+    modal.style.display = 'flex';
+    if (sigCanvas) {
+        const rect = sigCanvas.getBoundingClientRect();
+        sigCanvas.width = rect.width || 380;
+        sigCanvas.height = 160;
+        sigCtx.lineWidth = 2.5;
+        sigCtx.lineCap = 'round';
+        sigCtx.strokeStyle = sigColor;
+    }
     clearSigCanvas();
 }
 function closeSignatureModal() {
@@ -1150,7 +1238,10 @@ function switchSigTab(tab) {
 function clearSigCanvas() {
     if (sigCtx && sigCanvas) sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
 }
-function setSigInkColor(c) { sigColor = c; }
+function setSigInkColor(c) { 
+    sigColor = c; 
+    if (sigCtx) sigCtx.strokeStyle = c;
+}
 
 function handleSigUpload(e) {
     const file = e.target.files[0];
@@ -1173,23 +1264,65 @@ function placeSignatureOnDoc() {
 
     const firstPage = document.querySelector('.page-wrapper');
     if (!firstPage) return;
+    const pageNum = parseInt(firstPage.dataset.pageNumber || 1);
     const layer = firstPage.querySelector('.patch-layer');
 
     const sigNode = document.createElement('div');
     sigNode.className = 'custom-draggable-sig';
     sigNode.style.width = '140px';
     sigNode.style.height = '60px';
-    sigNode.style.left = '50%';
-    sigNode.style.top = '50%';
+    sigNode.style.left = '60px';
+    sigNode.style.top = '60px';
 
     const img = document.createElement('img');
     img.src = dataUrl;
     sigNode.appendChild(img);
 
+    const sigData = {
+        type: 'image',
+        dataUrl: dataUrl,
+        x: 60,
+        y: 60,
+        width: 140,
+        height: 60
+    };
+
+    if (!documentPatches[pageNum]) documentPatches[pageNum] = { patches: [], images: [], shapes: [] };
+    if (!documentPatches[pageNum].images) documentPatches[pageNum].images = [];
+    documentPatches[pageNum].images.push(sigData);
+
+    let isDragging = false, startX = 0, startY = 0, origX = 60, origY = 60;
+    sigNode.addEventListener('pointerdown', (e) => {
+        if (e.target.classList.contains('btn-del-sig')) return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        origX = parseFloat(sigNode.style.left);
+        origY = parseFloat(sigNode.style.top);
+        sigNode.setPointerCapture(e.pointerId);
+    });
+
+    sigNode.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = (e.clientX - startX) / currentScale;
+        const dy = (e.clientY - startY) / currentScale;
+        const newX = origX + dx;
+        const newY = origY + dy;
+        sigNode.style.left = `${newX}px`;
+        sigNode.style.top = `${newY}px`;
+        sigData.x = newX;
+        sigData.y = newY;
+    });
+
+    sigNode.addEventListener('pointerup', () => { isDragging = false; });
+
     const del = document.createElement('div');
     del.className = 'btn-del-sig';
     del.innerHTML = '&times;';
-    del.onclick = () => sigNode.remove();
+    del.onclick = () => {
+        sigNode.remove();
+        documentPatches[pageNum].images = documentPatches[pageNum].images.filter(im => im !== sigData);
+    };
     sigNode.appendChild(del);
 
     layer.appendChild(sigNode);
@@ -1208,9 +1341,11 @@ function setTool(tool) {
     document.body.classList.add(`tool-${tool}`);
 
     const ws = document.getElementById('workspace');
-    if (tool === 'pan') ws.style.cursor = 'grab';
-    else if (tool === 'text') ws.style.cursor = 'text';
-    else ws.style.cursor = 'crosshair';
+    if (ws) {
+        if (tool === 'pan') ws.style.cursor = 'grab';
+        else if (tool === 'text') ws.style.cursor = 'text';
+        else ws.style.cursor = 'crosshair';
+    }
 }
 
 function zoomDoc(delta) {
@@ -1219,6 +1354,173 @@ function zoomDoc(delta) {
     if (c) c.style.transform = `scale(${currentScale})`;
 }
 
+// --------------------------------------------------------------------------
+// 9. SEARCH & REPLACE ENGINE
+// --------------------------------------------------------------------------
+let matchedHitboxes = [];
+let currentMatchIndex = -1;
+
+function initSearchReplace() {
+    const bar = document.getElementById('search-replace-bar');
+    const findInput = document.getElementById('sr-find-input');
+    const replaceInput = document.getElementById('sr-replace-input');
+    const matchCountEl = document.getElementById('sr-match-count');
+
+    function openSearch() {
+        bar.style.display = 'flex';
+        findInput.focus();
+        findInput.select();
+        runFind();
+    }
+
+    function closeSearch() {
+        bar.style.display = 'none';
+        clearHighlights();
+    }
+
+    document.getElementById('btn-toggle-find').onclick = () => {
+        if (bar.style.display === 'none' || !bar.style.display) openSearch();
+        else closeSearch();
+    };
+
+    document.getElementById('sr-btn-close').onclick = closeSearch;
+
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+            e.preventDefault();
+            openSearch();
+        } else if (e.key === 'Escape' && bar.style.display !== 'none') {
+            closeSearch();
+        }
+    });
+
+    findInput.addEventListener('input', runFind);
+
+    findInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            if (e.shiftKey) stepMatch(-1);
+            else stepMatch(1);
+        }
+    });
+
+    document.getElementById('sr-btn-next').onclick = () => stepMatch(1);
+    document.getElementById('sr-btn-prev').onclick = () => stepMatch(-1);
+
+    document.getElementById('sr-btn-replace').onclick = () => {
+        if (currentMatchIndex >= 0 && matchedHitboxes[currentMatchIndex]) {
+            replaceSingleMatch(matchedHitboxes[currentMatchIndex], replaceInput.value);
+            runFind();
+        }
+    };
+
+    document.getElementById('sr-btn-replace-all').onclick = () => {
+        const query = findInput.value.trim();
+        const replacement = replaceInput.value;
+        if (!query) return showToast("กรุณาระบุคำที่ต้องการค้นหาค่ะ");
+        replaceAllMatches(query, replacement);
+    };
+
+    function clearHighlights() {
+        document.querySelectorAll('.glyph-hitbox.find-highlight').forEach(el => {
+            el.classList.remove('find-highlight', 'current');
+        });
+        matchedHitboxes = [];
+        currentMatchIndex = -1;
+        matchCountEl.innerText = '0/0';
+    }
+
+    function runFind() {
+        clearHighlights();
+        const query = findInput.value.trim().toLowerCase();
+        if (!query) return;
+
+        const allBoxes = document.querySelectorAll('.glyph-hitbox');
+        allBoxes.forEach(box => {
+            const rawText = (box.dataset.rawText || box.title.replace('ดับเบิลคลิกแก้ไข: ', '')).toLowerCase();
+            if (rawText.includes(query) && box.style.display !== 'none') {
+                box.classList.add('find-highlight');
+                matchedHitboxes.push(box);
+            }
+        });
+
+        if (matchedHitboxes.length > 0) {
+            currentMatchIndex = 0;
+            focusCurrentMatch();
+        } else {
+            matchCountEl.innerText = '0/0';
+        }
+    }
+
+    function stepMatch(dir) {
+        if (matchedHitboxes.length === 0) return;
+        matchedHitboxes[currentMatchIndex].classList.remove('current');
+        currentMatchIndex = (currentMatchIndex + dir + matchedHitboxes.length) % matchedHitboxes.length;
+        focusCurrentMatch();
+    }
+
+    function focusCurrentMatch() {
+        const cur = matchedHitboxes[currentMatchIndex];
+        cur.classList.add('current');
+        cur.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        matchCountEl.innerText = `${currentMatchIndex + 1}/${matchedHitboxes.length}`;
+    }
+
+    function replaceSingleMatch(hitEl, newText) {
+        const wrapper = hitEl.closest('.page-wrapper');
+        const pageNum = parseInt(wrapper.dataset.pageNumber);
+        const pdfCanvas = wrapper.querySelector('.pdf-page-canvas');
+        const meta = hitEl.patchMeta;
+
+        if (!meta) return;
+
+        const left = meta.left;
+        const top = meta.top;
+        const width = meta.width;
+        const height = meta.height;
+        const rad = (meta.rotation * Math.PI) / 180;
+
+        const sampledBg = samplePerimeterBackground(pdfCanvas, left + width / 2, top + height / 2, width, height, rad);
+        const sampledInk = sampleTextInkColor(pdfCanvas, left + width / 2, top + height / 2, width, height);
+
+        const ctx = pdfCanvas.getContext('2d');
+        const ratioX = pdfCanvas.width / parseFloat(wrapper.style.width);
+        const ratioY = pdfCanvas.height / parseFloat(wrapper.style.height);
+        const cX = (left + (width / 2)) * ratioX;
+        const cY = (top + (height / 2)) * ratioY;
+        const clearW = (width * ratioX) + (4 * ratioX);
+        const clearH = (height * ratioY) + (4 * ratioY);
+
+        ctx.save();
+        ctx.translate(cX, cY);
+        ctx.rotate(rad);
+        ctx.fillStyle = sampledBg;
+        ctx.fillRect(-clearW / 2, -clearH / 2, clearW, clearH);
+        ctx.restore();
+
+        const cadNode = createCadTextNode(wrapper, pageNum, pdfCanvas, left, top, width, height, newText, meta.fontSize, meta.fontWeight, meta.rotation, sampledBg, true);
+        cadNode.style.color = sampledInk;
+        cadNode.patchData.textColor = sampledInk;
+
+        hitEl.style.display = 'none';
+    }
+
+    function replaceAllMatches(query, newText) {
+        if (matchedHitboxes.length === 0) runFind();
+        const total = matchedHitboxes.length;
+        if (total === 0) return showToast("ไม่พบข้อความที่ตรงกันค่ะ");
+
+        [...matchedHitboxes].forEach(hitEl => {
+            replaceSingleMatch(hitEl, newText);
+        });
+
+        clearHighlights();
+        showToast(`แทนที่คำสำเร็จทั้งหมด ${total} ตำแหน่งเรียบร้อยค่ะ!`);
+    }
+}
+
+// --------------------------------------------------------------------------
+// 10. APP INITIALIZATION
+// --------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('upload-pdf').addEventListener('change', handleFileOpen);
     
@@ -1236,6 +1538,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-zoom-fit').onclick = () => { currentScale = 0.85; zoomDoc(0); };
 
     initLiveRibbonEvents();
+    initSearchReplace();
 
     sigCanvas = document.getElementById('sig-canvas');
     if (sigCanvas) {
@@ -1261,6 +1564,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sigCtx.lineTo(c.x, c.y);
             sigCtx.stroke();
         });
-        window.addEventListener('pointerup', () => isDrawingSig = false);
+        sigCanvas.addEventListener('pointerup', () => { isDrawingSig = false; });
     }
 });
