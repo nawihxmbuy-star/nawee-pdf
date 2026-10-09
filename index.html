@@ -73,11 +73,13 @@
                 <button class="dock-btn" id="btn-zoom-100" title="100%">1:1</button>
                 <button class="dock-btn" id="btn-undo" title="ย้อนกลับ (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
                 <button class="dock-btn" id="btn-redo" title="ทำซ้ำ (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
+                <button class="dock-btn" id="btn-toggle-find" title="ค้นหาและแทนที่ (Ctrl+F)"><i class="fa-solid fa-magnifying-glass"></i></button>
             </div>
         </div>
 
         <div class="action-buttons">
-            <button class="btn-secondary" onclick="resetApp()" title="เปิดเอกสารใหม่"><i class="fa-solid fa-folder-open"></i> <span class="btn-text">เปิดไฟล์</span></button>
+            <button class="btn-secondary" onclick="document.getElementById('upload-pdf').click()" title="เลือกไฟล์ PDF"><i class="fa-solid fa-folder-open"></i> <span class="btn-text">เปิดไฟล์</span></button>
+            <button class="btn-secondary" onclick="resetApp()" title="ล้างหน้าจอเริ่มใหม่"><i class="fa-solid fa-arrows-rotate"></i> <span class="btn-text">รีเซ็ต</span></button>
             <button class="btn-primary" onclick="exportVectorPDF()" title="ส่งออกเวกเตอร์ PDF"><i class="fa-solid fa-file-export"></i> <span class="btn-text">Export PDF</span></button>
         </div>
         <input type="file" id="upload-pdf" accept="application/pdf" style="display: none;">
@@ -87,7 +89,7 @@
         <div id="document-container">
             <div class="welcome-box">
                 <div class="welcome-avatar-wrap">
-                    <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\\'welcome-icon\\'><i class=\\'fa-solid fa-drafting-compass\\'></i></div>'">
+                    <img src="cat-avatar.png" alt="Cat Logo" class="welcome-cat-avatar" onerror="this.parentElement.innerHTML='<div class=\'welcome-icon\'><i class=\'fa-solid fa-drafting-compass\'></i></div>'">
                 </div>
                 <h2>Sunita Studio CAD Engine</h2>
                 <p>ระบบ Live Ribbon ปรับแต่งข้อความ สีพื้นหลัง เมฆตรวจแบบสดๆ • ส่งออกเวกเตอร์ PDF 100%</p>
@@ -98,6 +100,29 @@
         </div>
     </main>
 
+    <!-- Floating Search & Replace Bar -->
+    <div class="search-replace-bar" id="search-replace-bar" style="display: none;">
+        <div class="sr-row">
+            <div class="sr-input-wrap">
+                <i class="fa-solid fa-magnifying-glass sr-icon"></i>
+                <input type="text" id="sr-find-input" placeholder="คำที่ต้องการค้นหา..." autocomplete="off">
+                <span class="sr-counter" id="sr-match-count">0/0</span>
+            </div>
+            <button class="sr-btn" id="sr-btn-prev" title="ก่อนหน้า (Shift+Enter)"><i class="fa-solid fa-chevron-up"></i></button>
+            <button class="sr-btn" id="sr-btn-next" title="ถัดไป (Enter)"><i class="fa-solid fa-chevron-down"></i></button>
+            <button class="sr-btn-close" id="sr-btn-close" title="ปิด (Esc)"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="sr-row">
+            <div class="sr-input-wrap">
+                <i class="fa-solid fa-arrow-right-arrow-left sr-icon"></i>
+                <input type="text" id="sr-replace-input" placeholder="แทนที่ด้วยคำใหม่..." autocomplete="off">
+            </div>
+            <button class="sr-action-btn" id="sr-btn-replace" title="แทนที่จุดปัจจุบัน">แทนที่</button>
+            <button class="sr-action-btn primary" id="sr-btn-replace-all" title="แทนที่ทุกจุดในเอกสาร">แทนที่ทั้งหมด</button>
+        </div>
+    </div>
+
+    <!-- Modal ลายเซ็น / ตรายาง -->
     <div class="modal-backdrop" id="sig-modal" style="display: none;">
         <div class="modal-box">
             <div class="modal-header">
@@ -110,7 +135,7 @@
             </div>
             <div class="modal-body">
                 <div id="pane-draw">
-                    <canvas id="sig-canvas"></canvas>
+                    <canvas id="sig-canvas" width="380" height="160"></canvas>
                     <div class="sig-tools">
                         <button class="btn-mini" onclick="clearSigCanvas()"><i class="fa-solid fa-trash-can"></i> ล้าง</button>
                         <div class="sig-color-pick">
@@ -127,7 +152,7 @@
                     </div>
                     <input type="file" id="sig-file" accept="image/png, image/jpeg" style="display:none;" onchange="handleSigUpload(event)">
                     <div id="preview-upload-box" style="display:none; margin-top:10px; text-align:center;">
-                        <img id="img-preview" style="max-height:80px; border:1px dashed var(--accent);">
+                        <img id="img-preview" alt="Signature Preview" style="max-height:80px; border:1px dashed var(--accent);">
                     </div>
                 </div>
             </div>
